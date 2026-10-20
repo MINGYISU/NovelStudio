@@ -89,15 +89,21 @@
 
 .main {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
   min-width: 0;
-  padding: 2rem;
+  min-height: 0;
   background: var(--color-bg);
+}
+
+.main > section {
+  flex: 1;
 }
 
 .mainPlaceholder {
   margin: 0;
+  padding: 2rem;
   color: var(--color-text-muted);
   font-family: var(--font-title);
   font-size: 1.3rem;

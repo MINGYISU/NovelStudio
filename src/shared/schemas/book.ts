@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { displaySettingsSchema } from './display.ts';
 import { structureSettingsSchema } from './structure.ts';
 
 export const TITLE_MAX = 200;
@@ -18,6 +19,7 @@ export const bookSchema = z.object({
   coverUrl: z.string().nullable(),
   wordCount: z.number().int().nonnegative(),
   structure: structureSettingsSchema,
+  display: displaySettingsSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
   deletedAt: z.string().nullable(),
@@ -41,6 +43,7 @@ export const patchBookBodySchema = z
     description: description.optional(),
     coverAssetId: z.uuid().nullable().optional(),
     structure: structureSettingsSchema.optional(),
+    display: displaySettingsSchema.optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'Nothing to update.' });
 export type PatchBookBody = z.infer<typeof patchBookBodySchema>;

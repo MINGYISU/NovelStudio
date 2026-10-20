@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { NODE_KINDS, NODE_STATUSES } from '../types.ts';
+import { contentSchema } from './content.ts';
 
 export const NODE_TITLE_MAX = 200;
 export const NODE_SYNOPSIS_MAX = 5000;
@@ -56,3 +57,27 @@ export const moveNodeBodySchema = z.object({
   index: z.number().int().nonnegative(),
 });
 export type MoveNodeBody = z.infer<typeof moveNodeBodySchema>;
+
+/** A section with its body, as opened in the editor. `rev` is the revision the next save is based on. */
+export const nodeContentSchema = z.object({
+  id: z.string(),
+  bookId: z.string(),
+  content: contentSchema,
+  rev: z.number().int().nonnegative(),
+  wordCount: z.number().int().nonnegative(),
+  updatedAt: z.string(),
+});
+export type NodeContent = z.infer<typeof nodeContentSchema>;
+export const nodeContentResponseSchema = z.object({ node: nodeContentSchema });
+
+export const saveContentBodySchema = z.object({
+  content: contentSchema,
+  rev: z.number().int().nonnegative(),
+});
+export type SaveContentBody = z.infer<typeof saveContentBodySchema>;
+
+export const saveContentResponseSchema = z.object({
+  rev: z.number().int().nonnegative(),
+  wordCount: z.number().int().nonnegative(),
+});
+export type SaveContentResponse = z.infer<typeof saveContentResponseSchema>;

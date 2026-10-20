@@ -8,10 +8,16 @@ import { ApiError } from './errors.ts';
 import { getSchemaVersion } from './db/migrate.ts';
 import { registerAssetRoutes } from './routes/assets.ts';
 import { registerBookRoutes } from './routes/books.ts';
+import { registerColdBackupRoutes } from './routes/cold-backup.ts';
+import { registerContentRoutes } from './routes/content.ts';
 import { registerNodeRoutes } from './routes/nodes.ts';
 import { registerSecurity } from './security.ts';
+import { ColdBackupService } from './services/cold-backup.ts';
+import { ContentService } from './services/content.ts';
+import { chooseFolderWithOsascript, type FolderPicker } from './services/folder-picker.ts';
 import { LibraryService } from './services/library.ts';
 import { ManuscriptService } from './services/manuscript.ts';
+import { SnapshotService } from './services/snapshots.ts';
 
 export const JSON_BODY_LIMIT = 25 * 1024 * 1024;
 export const LISTEN_HOST = '127.0.0.1';
@@ -26,6 +32,13 @@ export interface AppOptions {
   clientDir?: string;
   extraOriginPorts?: number[];
   logger?: boolean;
+  /** Called after every successful write request, so the hourly hot backup knows something changed. */
+  onWrite?: () => void;
+  /** Replaces the macOS folder picker (tests). */
+  pickFolder?: FolderPicker;
+  /** Test overrides for the cold backup location policy. */
+  repoRoot?: string;
+  homedir?: string;
 }
 
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
@@ -56,6 +69,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     });
   });
 
+  if (options.onWrite) {
+    const onWrite = options.onWrite;
+    app.addHook('onResponse', async (request, reply) => {
+      if (request.method !== 'GET' && request.method !== 'HEAD' && reply.statusCode < 400)
+        onWrite();
+    });
+  }
+
   app.get('/api/health', async () => ({
     status: 'ok',
     mode: options.production ? 'production' : 'development',
@@ -67,6 +88,19 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     registerBookRoutes(app, options.db, library);
     registerAssetRoutes(app, options.db, options.paths, library);
     registerNodeRoutes(app, new ManuscriptService(options.db, library));
+    const snapshots = new SnapshotService(options.db, library);
+    registerContentRoutes(app, new ContentService(options.db, library, snapshots), snapshots);
+    registerColdBackupRoutes(app, {
+      db: options.db,
+      paths: options.paths,
+      service: new ColdBackupService({
+        db: options.db,
+        paths: options.paths,
+        repoRoot: options.repoRoot,
+        homedir: options.homedir,
+      }),
+      pickFolder: options.pickFolder ?? chooseFolderWithOsascript,
+    });
   }
 
   const indexFile = options.clientDir ? path.join(options.clientDir, 'index.html') : null;

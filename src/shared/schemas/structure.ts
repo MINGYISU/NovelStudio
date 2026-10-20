@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { NODE_KINDS, NODE_RANK, type NodeKind } from '../types.ts';
+import { DEFAULT_DISPLAY, displaySettingsSchema } from './display.ts';
 
 export const RESTART_SCOPES = ['book', 'volume', 'part', 'chapter'] as const;
 export type RestartScope = (typeof RESTART_SCOPES)[number];
@@ -104,7 +105,8 @@ export const STRUCTURE_PRESETS = {
 } as const;
 export type StructurePresetId = keyof typeof STRUCTURE_PRESETS;
 
-/** Shape of the `books.settings` JSON column; later milestones add display and foreshadow. */
+/** Shape of the `books.settings` JSON column; the foreshadow settings arrive with M7. */
 export const bookSettingsSchema = z.object({
   structure: structureSettingsSchema.default(DEFAULT_STRUCTURE),
+  display: displaySettingsSchema.default(DEFAULT_DISPLAY),
 });

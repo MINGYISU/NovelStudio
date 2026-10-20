@@ -1,8 +1,13 @@
 import crypto from 'node:crypto';
 import type { Book, BookSort, CreateBookBody } from '../../shared/schemas/book.ts';
 import {
-  bookSettingsSchema,
+  DEFAULT_DISPLAY,
+  displaySettingsSchema,
+  type DisplaySettings,
+} from '../../shared/schemas/display.ts';
+import {
   DEFAULT_STRUCTURE,
+  structureSettingsSchema,
   type StructureSettings,
 } from '../../shared/schemas/structure.ts';
 import type { Db } from '../db/connection.ts';
@@ -19,14 +24,27 @@ interface RawBook {
   deleted_at: string | null;
 }
 
-/** Settings that fail validation fall back to the defaults instead of breaking the book. */
-export function parseStructure(settingsJson: string | null) {
+/** The stored settings object, or an empty one when the JSON is missing or not an object. */
+export function parseSettingsObject(settingsJson: string | null): Record<string, unknown> {
   try {
-    const parsed = bookSettingsSchema.safeParse(JSON.parse(settingsJson ?? '{}'));
-    return parsed.success ? parsed.data.structure : DEFAULT_STRUCTURE;
+    const parsed: unknown = JSON.parse(settingsJson ?? '{}');
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
   } catch {
-    return DEFAULT_STRUCTURE;
+    return {};
   }
+}
+
+/** Each settings key is validated on its own; one that fails falls back to its defaults. */
+export function parseStructure(settingsJson: string | null): StructureSettings {
+  const parsed = structureSettingsSchema.safeParse(parseSettingsObject(settingsJson).structure);
+  return parsed.success ? parsed.data : DEFAULT_STRUCTURE;
+}
+
+export function parseDisplay(settingsJson: string | null): DisplaySettings {
+  const parsed = displaySettingsSchema.safeParse(parseSettingsObject(settingsJson).display ?? {});
+  return parsed.success ? parsed.data : DEFAULT_DISPLAY;
 }
 
 function toBook(row: RawBook, wordCount: number): Book {
@@ -39,6 +57,7 @@ function toBook(row: RawBook, wordCount: number): Book {
     coverUrl: row.cover_asset_id ? `/assets/${row.id}/${row.cover_asset_id}` : null,
     wordCount,
     structure: parseStructure(row.settings),
+    display: parseDisplay(row.settings),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -103,18 +122,9 @@ export function insertBook(db: Db, body: CreateBookBody, now: string): Book {
   return book;
 }
 
-/** Replaces only `structure`; other settings keys (display, foreshadow, …) are preserved. */
-function mergeStructure(settingsJson: string | null, structure: StructureSettings): string {
-  let current: Record<string, unknown> = {};
-  try {
-    const parsed: unknown = JSON.parse(settingsJson ?? '{}');
-    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-      current = parsed as Record<string, unknown>;
-    }
-  } catch {
-    current = {};
-  }
-  return JSON.stringify({ ...current, structure });
+/** Replaces only the given settings keys; the others (structure, display, foreshadow, …) are preserved. */
+function mergeSettings(settingsJson: string | null, changes: Record<string, unknown>): string {
+  return JSON.stringify({ ...parseSettingsObject(settingsJson), ...changes });
 }
 
 export interface BookUpdate {
@@ -123,6 +133,7 @@ export interface BookUpdate {
   description?: string;
   coverAssetId?: string | null;
   structure?: StructureSettings;
+  display?: DisplaySettings;
 }
 
 export function updateBookFields(db: Db, id: string, update: BookUpdate, now: string): void {
@@ -144,9 +155,12 @@ export function updateBookFields(db: Db, id: string, update: BookUpdate, now: st
     columns.push('cover_asset_id = ?');
     values.push(update.coverAssetId);
   }
-  if (update.structure !== undefined) {
+  if (update.structure !== undefined || update.display !== undefined) {
+    const changes: Record<string, unknown> = {};
+    if (update.structure !== undefined) changes.structure = update.structure;
+    if (update.display !== undefined) changes.display = update.display;
     columns.push('settings = ?');
-    values.push(mergeStructure(getBookSettingsJson(db, id), update.structure));
+    values.push(mergeSettings(getBookSettingsJson(db, id), changes));
   }
   columns.push('updated_at = ?');
   values.push(now);

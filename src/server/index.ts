@@ -30,6 +30,7 @@ async function main(): Promise<void> {
     clientDir: production ? clientDir : undefined,
     extraOriginPorts: production ? [] : [parsePort(process.env.DEV_CLIENT_PORT, 5173)],
     logger: true,
+    onWrite: () => store.hotBackup.markDirty(),
   });
 
   store.hotBackup.start();

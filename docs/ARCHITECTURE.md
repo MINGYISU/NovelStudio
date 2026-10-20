@@ -95,7 +95,10 @@ NovelStudio/
 │  │  ├─ routes/              one module per resource
 │  │  ├─ services/
 │  │  │  ├─ hot-backup.ts
-│  │  │  ├─ cold-backup.ts    export / verify / restore
+│  │  │  ├─ cold-backup.ts    export / verify / settings
+│  │  │  ├─ cold-backup-restore.ts   restore
+│  │  │  ├─ cold-backup-location.ts  folder policy checks
+│  │  │  ├─ content.ts        read/save section text
 │  │  │  ├─ snapshots.ts
 │  │  │  └─ assets.ts
 │  │  └─ scripts/
@@ -137,9 +140,9 @@ Unit tests sit next to the code they test: `tree.test.ts` beside `tree.ts`.
 | `test:e2e` | Playwright (Chromium) against its own server (port 4419) and Vite (5174) with a fresh temp data dir; it never touches `./.data-dev`. Run `npx playwright install chromium` once. |
 | `typecheck`, `lint`, `format` | |
 | `seed:dev` | Fill `.data-dev` with sample books. M3: an English book of about 190 sections (3 volumes × 3 parts × 5 chapters × 3 scenes, prologue, epilogue, made-up text) and a small Chinese-structured book. Does nothing if the sample book already exists. Maps, foreshadows and codex arrive with their milestones. |
-| `backup:cold -- [--book <id>] [--out <dir>]` | CLI cold backup export. |
-| `restore:cold -- <file> [--data-dir <dir>]` | CLI restore into a data dir as a new book. |
-| `verify:cold -- <file>` | Validate schema + checksums of a cold backup. |
+| `backup:cold -- [--book <id>] [--out <dir>] [--include-snapshots]` | CLI cold backup export (all live books without `--book`; the saved folder without `--out`). Like every script it uses `./.data-dev` unless `NOVEL_DATA_DIR` is set or `NODE_ENV=production` (real data). |
+| `restore:cold -- <file> [--data-dir <dir>] [--ignore-checksum]` | CLI restore into a data dir as a new book; reads `<file>.sha256` when present and stops on a mismatch unless `--ignore-checksum`. Works without the UI or the server. |
+| `verify:cold -- <file>` | Validate schema + checksums of a cold backup (read-only). |
 
 ---
 
@@ -317,7 +320,7 @@ All under `/api`, JSON in/out, bodies validated with Zod. Errors: `{ "error": { 
 
 | Method & path | Purpose |
 |---|---|
-| `GET /books?sort=modified\|title&trashed=0\|1` · `GET /books/:id` · `POST /books` · `PATCH /books/:id` · `DELETE /books/:id` (trash) · `POST /books/:id/restore` · `DELETE /books/:id?purge=1&confirmTitle=…` | Library. Books carry `wordCount` (live sections only) and `coverUrl`. `PATCH` accepts `coverAssetId` (an asset of that book, or `null` to remove; the replaced cover asset is deleted) and `structure` (the full per-kind structure settings, validated by `structureSettingsSchema`; only `settings.structure` is replaced, other settings keys are kept). Books carry `structure` (defaults when the stored settings are absent or invalid). Trash/restore leave `updated_at` alone. Purge only works on trashed books, needs `confirmTitle` equal to the title (exact, case-sensitive), takes a hot backup first (aborts if that fails), deletes the rows in one transaction and then `assets/<bookId>/`. Editing or uploading to a trashed book is `409 BOOK_TRASHED`. |
+| `GET /books?sort=modified\|title&trashed=0\|1` · `GET /books/:id` · `POST /books` · `PATCH /books/:id` · `DELETE /books/:id` (trash) · `POST /books/:id/restore` · `DELETE /books/:id?purge=1&confirmTitle=…` | Library. Books carry `wordCount` (live sections only) and `coverUrl`. `PATCH` accepts `coverAssetId` (an asset of that book, or `null` to remove; the replaced cover asset is deleted), `structure` (the full per-kind structure settings, validated by `structureSettingsSchema`) and `display` (the editor appearance, `displaySettingsSchema`); only the given `settings` keys are replaced, the others are kept. Each settings key is validated on its own when read, so one invalid key falls back to its defaults without touching the others. Books also carry `display`. Books carry `structure` (defaults when the stored settings are absent or invalid). Trash/restore leave `updated_at` alone. Purge only works on trashed books, needs `confirmTitle` equal to the title (exact, case-sensitive), takes a hot backup first (aborts if that fails), deletes the rows in one transaction and then `assets/<bookId>/`. Editing or uploading to a trashed book is `409 BOOK_TRASHED`. |
 | `GET /books/:id/tree` | `{ nodes }`: all nodes of a book, trashed ones included, **without** `content` (id, bookId, parentId, kind, title, position, numbered, status, synopsis, wordCount, deletedAt). Readable for a trashed book. |
 | `POST /books/:id/nodes` | Create `{ kind, parentId, index?, title?, numbered? }` → `201 { node, nodes }`. Omitted `index` appends; omitted `numbered` uses the kind's `defaultNumbered` from `books.settings.structure` (built-in defaults when absent or invalid). Rank violation is `409 INVALID_PARENT`. |
 | `PATCH /nodes/:id` | Rename / status / synopsis / numbered → `{ node }`. |
@@ -325,14 +328,14 @@ All under `/api`, JSON in/out, bodies validated with Zod. Errors: `{ "error": { 
 | `DELETE /nodes/:id` (trash) · `POST /nodes/:id/restore` | Both return `{ nodes }`. Restoring a section that is not in the trash is `409 NOT_TRASHED`. Every write to a trashed book is `409 BOOK_TRASHED`. |
 | `POST /nodes/:id/duplicate` | `201 { node, nodes }`. Copies the section with its live subtree (trashed descendants are left behind) right after the original, in one transaction. All copies get new IDs; content, synopsis, status and numbered are copied, snapshots are not. The copy of a titled section is named `<title> (copy)`; the original keeps its title. |
 | `GET /nodes/:id` | Full node including `content` and `rev`. |
-| `PUT /nodes/:id/content` | `{ content, rev }` → `200 { rev }` or `409 STALE_REVISION`. Server derives `plain_text` and `word_count`. |
-| `GET /nodes/:id/snapshots` · `POST /snapshots/:id/restore` | |
+| `PUT /nodes/:id/content` | `{ content, rev }` → `200 { rev, wordCount }` or `409 STALE_REVISION`. `content` is validated against the ED-02 allow-list (`schemas/content.ts`); anything else is `400 VALIDATION_ERROR`. The server derives `plain_text` and `word_count`, takes a snapshot when due, and touches the book's `updated_at`. Saving text identical to the stored text is a no-op that returns the current `rev`. Trashed sections are `404`, sections of a trashed book `409 BOOK_TRASHED`. |
+| `GET /nodes/:id/snapshots` · `GET /snapshots/:id` · `POST /snapshots/:id/restore` | Newest first, each with `reason`, `wordCount`, `createdAt` and a 160-character `excerpt`; the detail adds `plainText`. Restore snapshots the current text (`before-restore`), writes the snapshot's text, bumps `rev` and returns `{ node }`. |
 | `POST /books/:id/search` · `POST /books/:id/replace` | Find / replace across book. |
 | `POST /books/:id/assets` (multipart, one `file` part) · `GET /assets/:bookId/:assetId` | Images. Type is sniffed from magic bytes (PNG/JPEG/WebP/GIF); anything else is `415 UNSUPPORTED_IMAGE_TYPE`, over 20 MB is `413 FILE_TOO_LARGE`. `GET /assets/…` is outside `/api` so `<img>` tags work. |
 | Codex, maps, foreshadows | Conventional CRUD per resource, added in their milestones. |
-| `GET /settings/cold-backup` · `PUT /settings/cold-backup` · `POST /settings/cold-backup/validate` · `POST /settings/cold-backup/choose-folder` | Cold backup settings (choose-folder runs the macOS picker, §10.2). |
-| `POST /books/:id/cold-backup` · `POST /cold-backup/all` | Export `{ dir? }` (one-off location optional). |
-| `POST /import/cold-backup` · `POST /import/text` (preview + commit) | Import. |
+| `GET /settings/cold-backup` · `PUT /settings/cold-backup` · `POST /settings/cold-backup/validate` · `POST /settings/cold-backup/choose-folder` | Cold backup settings (choose-folder runs the macOS picker, §10.2). `GET` returns `{ settings: { dir, keepNewestPerBook, includeSnapshots, reminderDays }, last, pickerSupported }`; `last` feeds the reminder badges. `PUT` only enforces the location *policy* (absolute, not inside the data dir or source folder: `400 COLD_BACKUP_LOCATION_INVALID`); an unplugged drive can still be saved. `validate` always answers `200 { ok, code?, message, willCreate }` and never creates anything. |
+| `POST /books/:id/cold-backup` · `POST /cold-backup/all` · `POST /cold-backup/verify` | Export `{ dir?, includeSnapshots? }` (one-off location optional) → `{ result }` / `{ results }` (live books only; a book that fails does not stop the others). An unusable location is `409 COLD_BACKUP_LOCATION_UNAVAILABLE`, none configured `400 COLD_BACKUP_NOT_CONFIGURED`. `verify` re-checks the newest file recorded in `config.json` for each book (or `{ bookId }`). |
+| `POST /import/cold-backup` · `POST /import/text` (preview + commit) | Import. The cold backup import is multipart: `file` (the `.novelstudio.json`), optional `checksum` (the `.sha256`), optional field `ignoreChecksum=1`. A mismatch is `409 CHECKSUM_MISMATCH`; success is `201 { book, warnings, remapped }`. Invalid files are `400 INVALID_BACKUP`, newer formats `400 UNSUPPORTED_FORMAT_VERSION`. |
 | `GET /books/:id/export?format=md\|txt` | Manuscript export download. |
 
 Client routes: `/` (library), `/trash`, `/settings`, `/book/:bookId/manuscript/:nodeId?`, `/book/:bookId/maps/:mapId?`, `/book/:bookId/foreshadow`, `/book/:bookId/codex/:entryId?`, `/book/:bookId/settings`.
@@ -398,12 +401,13 @@ The client computes display titles from the cached tree on every change (cheap: 
 ## 8. Editor and saving
 
 - One Tiptap editor instance; switching sections calls `editor.commands.setContent(newContent, { emitUpdate: false })` and clears history, after flushing the pending save of the previous section.
-- **Autosave hook** (`useAutosave`): debounce 1000 ms; flush on section switch, route change, `visibilitychange → hidden`, and `pagehide` (using `fetch(..., { keepalive: true })`). One in-flight save per section; later changes queue behind it.
+- **Autosave** (`features/editor/autosave.ts`, plain TypeScript so it is unit-tested without React): one `SectionSaver` per section, kept in a registry for the life of the page. Debounce 1000 ms; flush on section switch, route change, `visibilitychange → hidden`, and `pagehide`. One in-flight save per section; later changes queue behind it. Small saves (≤ 60 KB) use `fetch(..., { keepalive: true })` so they survive an unload; browsers refuse larger keepalive bodies, so a large chapter relies on the earlier `visibilitychange` flush. A failed save keeps the text, shows `Error — click for details` and retries every 5 s (not for 4xx other than 409). Opening a section first waits for its pending save, so switching back never reads older text than was typed; unsaved text after an error or conflict is shown instead of the server's copy.
 - **Revision check**: each save sends the `rev` it was based on; the server increments on success. `409` → status "Changed elsewhere — reload" and no further saves for that section until reload.
-- **Derived fields** on the server: `plain_text` (block nodes joined with `\n`, paragraphs separated by blank lines, horizontal rule → `* * *`) and `word_count` (shared `wordcount.ts`).
+- **Derived fields** on the server: `plain_text` (`prosemirror-text.ts`: one block per paragraph, heading or quote paragraph, separated by blank lines; a hard break is `\n`; a horizontal rule is `* * *`; empty paragraphs are dropped) and `word_count` (shared `wordcount.ts`, applied to the plain text).
 - **Word count rule** (`wordcount.ts`): each CJK ideograph, kana or hangul syllable counts 1; each run of other letters/digits (including apostrophes/hyphens inside words) counts 1; punctuation and whitespace count 0.
-- **Snapshots** (server side, on content save): create one if none exists for this section since the server started, or the newest is older than 10 minutes. Prune to 50 per section.
-- **Paste**: Tiptap's schema already drops unknown marks/nodes; additionally strip inline `style`/`class`/`font` via `transformPastedHTML`. `Cmd+Shift+V` inserts plain text.
+- **Snapshots** (server side, on content save): create one if none exists for this section since the server started, or the newest is older than 10 minutes. A snapshot holds the text being overwritten (the previous saved content), and none is taken when that text is empty. Reasons: `open` (first save since start), `interval`, `before-restore`. Prune to 50 per section.
+- **Find in section**: a ProseMirror plugin that only adds decorations (`find-extension.ts`); matches stay inside one text block (they may cross formatting changes) and the document is never modified. `Cmd/Ctrl+F` opens it instead of the browser's page search.
+- **Paste**: Tiptap's schema already drops unknown marks/nodes; additionally `transformPastedHTML` removes every attribute and element that is not formatting: inline `style` is reduced to bold/italic/underline/line-through/alignment, `class`, `data-*`, `<font>`, `<style>` and scripts are dropped. `Cmd+Shift+V` inserts plain text (ProseMirror's built-in behavior). The server re-checks stored content against the ED-02 allow-list, so a paste can never make saves fail.
 - **Display settings** (book `settings.display`) are applied as CSS variables on the editor container only.
 
 ---
@@ -450,16 +454,18 @@ Format: [COLD_BACKUP_FORMAT.md](./COLD_BACKUP_FORMAT.md). Implementation in `ser
 
 **Export(bookId, dir):**
 
-1. Resolve `dir` (saved setting or one-off). Validate: absolute, not inside data dir or repo, exists (create if parent exists), writable (write+delete a probe file). Failure → `COLD_BACKUP_LOCATION_UNAVAILABLE`, nothing written.
+1. Resolve `dir` (saved setting or one-off). Validate: absolute and not inside the data dir, the real data dir or the source folder (`COLD_BACKUP_LOCATION_INVALID`); exists and writable (write+delete a probe file), or missing with an existing writable parent (the folder is then created at write time, not during the check). Anything else → `COLD_BACKUP_LOCATION_UNAVAILABLE`. A failed check writes nothing, anywhere, and does not touch `config.json`.
 2. In one read transaction, load the book, all nodes (live + trashed), codex, maps, foreshadows, occurrences, assets metadata, and optionally snapshots.
 3. Build the document: nested manuscript tree in reading order, each node with `displayTitle` (from `numbering.ts`) and `plainText`; trash as a flat list; assets read from disk and base64-encoded with `sha256` verified against the DB value (mismatch → include anyway, add to `warnings`).
 4. Validate with the Zod schema in `src/shared/schemas/cold-backup.ts`.
 5. Serialize with `JSON.stringify(doc, null, 2)`; compute SHA-256 of the bytes.
-6. Write `<dir>/<book-folder>/<file>.tmp` → `fsync` → rename to final name → `fsync` directory. Write `<file>.sha256` the same way, in `shasum` format: `<hex>  <file name>`.
-7. Re-read the final file, verify hash, parse, and compare `stats` with what was exported. Failure → delete the new files, report error.
+6. Write `<dir>/<book-folder>/<file>.tmp` → `fsync` → rename to final name → `fsync` directory. Write `<file>.sha256` the same way, in `shasum` format: `<hex>  <file name>`. The book folder is the existing folder ending in `__<id8>`, else a new one. A file name that already exists (two exports in one second) gets `-2`, `-3`, … after the timestamp; an existing backup is never overwritten.
+7. Re-read the final file, verify hash, parse, and compare `stats` with what was exported. Failure → delete the new files (and folders this export created), report error.
 8. Update `config.json → coldBackup.last[bookId]`. Apply retention only if `keepNewestPerBook` is set, and only to files matching this book's ID in that folder.
 
-**Restore(file, dataDir):** verify sidecar hash if present (warn on mismatch) → parse → check `format`/`formatVersion` (run upgraders for older versions; refuse newer) → Zod validate → if `book.id` exists in the target DB, build an old→new ID map for **every** entity and rewrite all references (`parent_id`, `cover_asset_id`, `image_asset_id`, map node links, occurrence `node_id`, `foreshadowAnchor` marks inside content) → write assets to disk with verified checksums → insert everything in one transaction → run `assertTreeInvariants` → done. On any error, roll back and delete written asset files.
+Trash entries are ordered by `deletedAt`, then stale `position`, then id, so the order survives a restore. `content` is exported as stored and is only checked at restore: a section whose text cannot be read is exported with `content: null` and a warning, never blocking the backup.
+
+**Restore(file, dataDir):** verify sidecar hash if present (warn on mismatch) → parse → check `format`/`formatVersion` (run upgraders for older versions; refuse newer) → Zod validate → if `book.id` exists in the target DB, build an old→new ID map for **every** entity and rewrite all references (`parent_id`, `cover_asset_id`, `image_asset_id`, map node links, occurrence `node_id`, `foreshadowAnchor` marks inside content) → write assets to disk with verified checksums → insert everything in one transaction → run `assertTreeInvariants` → done. On any error, roll back and delete written asset files. Details: images are re-sniffed (an SVG or any non-image is skipped with a warning) and their file names are sanitized; section `content` that fails the ED-02 schema is rebuilt from `plainText` with a warning; a trashed section whose original parent is unknown goes to the root with a warning; `plainText` and `wordCount` are recomputed; codex, maps and foreshadows are skipped with a warning until their milestones add them. The book keeps its original `createdAt`/`updatedAt`.
 
 **Folder picker (`choose-folder`)**: the server runs `osascript -e 'POSIX path of (choose folder with prompt "Choose cold backup folder")'` with a fixed argument list (no string interpolation of user input) and returns the path; cancel → `null`. Only on macOS; elsewhere the text field is used.
 
@@ -516,7 +522,7 @@ Runs on the client after every tree or foreshadow change. The previous result is
 
 | Layer | What | Where |
 |---|---|---|
-| Unit (Vitest) | tree validate/apply/invariants, numbering (incl. `{n:cn}` table), word count (EN/ZH/mixed), plain-text extraction, foreshadow analysis, import splitting, cold-backup schema | `src/shared/**/*.test.ts` |
+| Unit (Vitest) | tree validate/apply/invariants, numbering (incl. `{n:cn}` table), word count (EN/ZH/mixed), plain-text extraction, content schema, foreshadow analysis, import splitting, cold-backup names/stats, autosave state machine (`src/client/features/editor/autosave.test.ts`) | `src/shared/**/*.test.ts` |
 | API (Vitest + `app.inject`) | CRUD, move persistence, stale revision 409, migrations from empty DB, hot backup created, cold backup export → restore **round-trip equality**, location-unavailable error, ID remap on restore | `src/server/**/*.test.ts` |
 | Property test | 1,000 random valid/invalid moves on a random tree; invariants always hold; invalid ones rejected | `tree.property.test.ts` (plain loop with seeded RNG; no extra dependency) |
 | E2E (Playwright) | PRD §13 scenarios, starting with drag Ch4 above Ch3, autosave on rapid switching | `tests/e2e/` |

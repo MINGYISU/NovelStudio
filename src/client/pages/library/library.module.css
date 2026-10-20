@@ -126,8 +126,18 @@
   box-shadow: var(--shadow);
 }
 
+.menuButtonInline {
+  display: inline-flex;
+  padding: 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
 .menuItem {
   display: flex;
+  text-decoration: none;
   align-items: center;
   gap: 0.5rem;
   padding: 0.4rem 0.6rem;
@@ -185,4 +195,20 @@
 .confirmTitle {
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.badgeWarn {
+  background: #fff4dc;
+  color: #8a5a00;
+  font-weight: 600;
 }

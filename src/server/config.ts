@@ -40,7 +40,7 @@ export function resolveDataDir(options: ResolveOptions = {}): string {
 }
 
 // Resolves symlinks for the longest existing prefix so not-yet-created dirs are compared correctly.
-function canonicalize(p: string): string {
+export function canonicalize(p: string): string {
   let existing = path.resolve(p);
   const rest: string[] = [];
   for (;;) {
@@ -59,7 +59,7 @@ function canonicalize(p: string): string {
   return full.toLowerCase();
 }
 
-function isSameOrInside(candidate: string, container: string): boolean {
+export function isSameOrInside(candidate: string, container: string): boolean {
   const rel = path.relative(container, candidate);
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }

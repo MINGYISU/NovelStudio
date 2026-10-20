@@ -9,8 +9,8 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 | M0 | Skeleton & safety | DATA-01..05, HOT-01 | ☑ |
 | M1 | Library | LIB-01..07 | ☑ |
 | M2 | Tree logic & API (no UI) | TREE-01..03/08, MOVE-03..08, NUM-01..03 | ☑ |
-| M3 | Sidebar with drag-and-drop | TREE-05..07/09..11, MOVE-01..11, NUM-04 | ☐ |
-| M4 | Editor, autosave, **cold backup** | ED-01..08/10, DISP-01, SNAP-01, COLD-01..10, IMP-01, EXP-02 | ☐ |
+| M3 | Sidebar with drag-and-drop | TREE-05..07/09..11, MOVE-01..11, NUM-04 | ☑ |
+| M4 | Editor, autosave, **cold backup** | ED-01..08/10, DISP-01, SNAP-01, COLD-01..10, IMP-01, EXP-02 | ☑ |
 | M5 | Codex | CDX-01..07 | ☐ |
 | M6 | Story maps | MAP-01..09 | ☐ |
 | M7 | Foreshadowing | FS-01..07 | ☐ |
@@ -78,9 +78,9 @@ Then test manually, and commit when satisfied.
 **Build**: workspace layout (top bar, resizable sidebar, main panel placeholder, right details panel), react-arborist tree with custom row (indent, fold arrow, display title, status dot, word count on hover), drop rules via `disableDrop`, optimistic move with rollback, inline rename, context menu (new sibling/child, duplicate, unnumber, trash), keyboard moves, auto-expand on hover, single-level move undo, per-book fold state, structure settings dialog with English/Chinese presets. Playwright set up.
 
 **Done when**
-- [ ] E2E: drag Ch4 above Ch3 → labels swap → reload → still swapped.
-- [ ] E2E: drag a Part into its own Chapter → refused, nothing changes.
-- [ ] Manual: moving feels immediate with the seeded sample book (~200 sections).
+- [x] E2E: drag Ch4 above Ch3 → labels swap → reload → still swapped.
+- [x] E2E: drag a Part into its own Chapter → refused, nothing changes.
+- [x] Manual: moving feels immediate with the seeded sample book (~200 sections).
 
 ## M4 — Editor, autosave, cold backup
 
@@ -91,12 +91,12 @@ Then test manually, and commit when satisfied.
 - **Cold backup**: settings page (path field, Validate, Choose… picker), export this book / all books, verify, retention option, reminder badges, CLI `backup:cold`, `restore:cold`, `verify:cold`, import from library.
 
 **Done when**
-- [ ] E2E: type, switch section within 200 ms, reload → text intact.
-- [ ] Two tabs editing the same section → the stale one shows "Changed elsewhere".
-- [ ] Round-trip test: export → restore into empty data dir → export → identical (except allowed fields).
-- [ ] Restore test with ID collision remaps all references.
-- [ ] Export to a missing folder fails with `COLD_BACKUP_LOCATION_UNAVAILABLE` and writes nothing anywhere.
-- [ ] Manual: `shasum -a 256 -c` succeeds on an exported file; the `jq` recipe in COLD_BACKUP_FORMAT §7 prints the manuscript.
+- [x] E2E: type, switch section within 200 ms, reload → text intact.
+- [x] Two tabs editing the same section → the stale one shows "Changed elsewhere".
+- [x] Round-trip test: export → restore into empty data dir → export → identical (except allowed fields).
+- [x] Restore test with ID collision remaps all references.
+- [x] Export to a missing folder fails with `COLD_BACKUP_LOCATION_UNAVAILABLE` and writes nothing anywhere.
+- [x] Manual: `shasum -a 256 -c` succeeds on an exported file; the `jq` recipe in COLD_BACKUP_FORMAT §7 prints the manuscript.
 
 ## M5 — Codex
 

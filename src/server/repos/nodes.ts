@@ -125,7 +125,7 @@ export function updateNodeFields(db: Db, id: string, update: NodeFieldsUpdate, n
   db.prepare(`UPDATE nodes SET ${columns.join(', ')} WHERE id = ?`).run(...values, id);
 }
 
-/** Sets body text directly; used by the dev seed until content saving arrives with the editor. */
+/** Sets body text without touching `rev`; used by the dev seed. */
 export function setNodeText(
   db: Db,
   id: string,
@@ -137,6 +137,66 @@ export function setNodeText(
     text.wordCount,
     id,
   );
+}
+
+export interface NodeContentRow {
+  id: string;
+  bookId: string;
+  deletedAt: string | null;
+  content: string;
+  plainText: string;
+  wordCount: number;
+  rev: number;
+  updatedAt: string;
+}
+
+export function getNodeContentRow(db: Db, id: string): NodeContentRow | null {
+  const row = db
+    .prepare(
+      `SELECT id, book_id, deleted_at, content, plain_text, word_count, rev, updated_at
+         FROM nodes WHERE id = ?`,
+    )
+    .get(id) as
+    | {
+        id: string;
+        book_id: string;
+        deleted_at: string | null;
+        content: string;
+        plain_text: string;
+        word_count: number;
+        rev: number;
+        updated_at: string;
+      }
+    | undefined;
+  return row
+    ? {
+        id: row.id,
+        bookId: row.book_id,
+        deletedAt: row.deleted_at,
+        content: row.content,
+        plainText: row.plain_text,
+        wordCount: row.word_count,
+        rev: row.rev,
+        updatedAt: row.updated_at,
+      }
+    : null;
+}
+
+/** Writes the body only if `rev` still matches; returns false when another save got there first. */
+export function writeNodeContent(
+  db: Db,
+  id: string,
+  expectedRev: number,
+  text: { content: string; plainText: string; wordCount: number },
+  now: string,
+): boolean {
+  const result = db
+    .prepare(
+      `UPDATE nodes SET content = ?, plain_text = ?, word_count = ?, rev = rev + 1, updated_at = ?
+        WHERE id = ? AND rev = ?`,
+    )
+    .run(text.content, text.plainText, text.wordCount, now, id, expectedRev);
+  return result.changes === 1;
 }
 
 export function touchBook(db: Db, bookId: string, now: string): void {

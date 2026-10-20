@@ -1,11 +1,14 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Plus, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Plus, Settings, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useBooks } from '../../api/books.ts';
+import { useColdBackupSettings } from '../../api/cold-backup.ts';
 import { Button } from '../../components/ui.tsx';
 import { bookSortSchema, type BookSort } from '../../../shared/schemas/book.ts';
 import { BookCard } from './BookCard.tsx';
+import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
+import { ImportDialog } from '../../features/settings/ImportDialog.tsx';
 import { CreateBookDialog } from './BookDialogs.tsx';
 import styles from './library.module.css';
 
@@ -13,7 +16,10 @@ export function LibraryPage() {
   const [params, setParams] = useSearchParams();
   const sort: BookSort = bookSortSchema.catch('modified').parse(params.get('sort'));
   const books = useBooks({ sort, trashed: false });
+  const backups = useColdBackupSettings();
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [exportingAll, setExportingAll] = useState(false);
 
   return (
     <main className={styles.page}>
@@ -46,8 +52,25 @@ export function LibraryPage() {
               <DropdownMenu.Item className={styles.menuItem} onSelect={() => setCreating(true)}>
                 Create blank…
               </DropdownMenu.Item>
-              <DropdownMenu.Item className={styles.menuItem} disabled>
-                Import… (coming later)
+              <DropdownMenu.Item className={styles.menuItem} onSelect={() => setImporting(true)}>
+                Import cold backup…
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger className={styles.menuButtonInline} aria-label="Library menu">
+            <MoreHorizontal size={18} />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content className={styles.menu} align="end" sideOffset={4}>
+              <DropdownMenu.Item className={styles.menuItem} onSelect={() => setExportingAll(true)}>
+                Export all books…
+              </DropdownMenu.Item>
+              <DropdownMenu.Item className={styles.menuItem} asChild>
+                <Link to="/settings">
+                  <Settings size={16} /> Settings
+                </Link>
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
@@ -66,12 +89,27 @@ export function LibraryPage() {
       {books.data && books.data.length > 0 ? (
         <ul className={styles.grid}>
           {books.data.map((book) => (
-            <BookCard key={book.id} book={book} />
+            <BookCard
+              key={book.id}
+              book={book}
+              backup={
+                backups.data
+                  ? {
+                      lastAt: backups.data.last[book.id]?.at,
+                      reminderDays: backups.data.settings.reminderDays,
+                    }
+                  : undefined
+              }
+            />
           ))}
         </ul>
       ) : null}
 
       {creating ? <CreateBookDialog onClose={() => setCreating(false)} /> : null}
+      {importing ? <ImportDialog onClose={() => setImporting(false)} /> : null}
+      {exportingAll ? (
+        <ExportDialog scope={{ kind: 'all' }} onClose={() => setExportingAll(false)} />
+      ) : null}
     </main>
   );
 }

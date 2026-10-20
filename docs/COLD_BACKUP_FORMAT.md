@@ -21,7 +21,8 @@ Requirements: PRD §11.4 (`COLD-01` … `COLD-11`). Implementation: ARCHITECTURE
 
 - Timestamps are UTC (`Z`), so names sort chronologically.
 - The per-book folder is matched by the **book ID suffix**, not the title. If the book is renamed, the old folder keeps being used.
-- Nothing is ever deleted unless the user enabled *keep newest N per book*.
+- If two exports of one book land in the same second, the later file gets `-2`, `-3`, … after the timestamp (`2026-10-20_184909Z-2__…`); an existing file is never overwritten.
+- Nothing is ever deleted unless the user enabled *keep newest N per book*; that setting only touches this book's own `*.novelstudio.json` files and their `.sha256` files.
 
 ## 2. Title slug
 
@@ -118,9 +119,11 @@ Keys not yet supported by the exporting app's milestone are still present with e
 - `displayTitle` is computed at export time from the settings; it is informational and ignored on restore.
 - `plainText` is the readable text; `content` is the rich text as ProseMirror/Tiptap JSON and is authoritative on restore. If `content` is missing or invalid on restore, the section is rebuilt from `plainText` (paragraph per blank-line block) and a warning is reported.
 
+- A section whose stored formatted text cannot be read is exported with `"content": null` and a note in `warnings`; `plainText` is still there.
+
 ### 4.3 `TrashedSection`
 
-A `Section` (with its `children`) plus:
+Ordered by `deletedAt`, then id. A `Section` (with its `children`, which are the descendants that were not trashed separately) plus:
 
 | Key | Description |
 |---|---|
@@ -191,7 +194,8 @@ To recover an image by hand: copy `dataBase64` into a file and run `base64 -D -i
 4. If `book.id` (or any other ID) already exists in the target database, regenerate **all** IDs and rewrite every reference: section nesting, `book.coverAssetId`, `imageAssetId`, map node links, occurrence `nodeId`, `foreshadowAnchor` marks inside `content`, snapshot `nodeId`.
 5. Positions come from array order; `displayTitle`, `wordCount`, `plainText`, and `stats` are recomputed, not trusted.
 6. Write assets (checksum verified), insert everything in one transaction, check tree invariants. Any failure rolls everything back.
-7. The restored book is always a **new** book. Existing books are never modified. Title gets the suffix ` (restored YYYY-MM-DD)` if a book with the same title exists.
+7. Restore is defensive because the file is untrusted: images are re-checked by their bytes (only PNG, JPEG, WebP and GIF; anything else is skipped), image file names are sanitized, and `content` that does not match the editor's allowed formatting is rebuilt from `plainText`. Everything skipped or repaired is reported as a warning. Data this app version cannot store yet (codex, maps, foreshadows, before their milestones) is skipped with a warning, never silently.
+8. The restored book is always a **new** book. Existing books are never modified. Title gets the suffix ` (restored YYYY-MM-DD)` if a book with the same title exists.
 
 ---
 

@@ -35,6 +35,19 @@ npm run build
 npm start          # real use: http://127.0.0.1:4317, data in ~/Library/Application Support/NovelStudio
 ```
 
+## Cold backups
+
+Set a folder in **Settings** (ideally on another disk or a synced folder), then export a book from its card menu, the workspace menu, or **Export all books**. Each export is a plain JSON file with a `.sha256` file next to it:
+
+```sh
+cd "<book folder>" && shasum -a 256 -c <file>.novelstudio.json.sha256   # verify
+npm run verify:cold -- <file>                                           # verify with the app's checks
+npm run backup:cold -- --out <folder>                                   # export all books from the command line
+npm run restore:cold -- <file>                                          # restore as a new book, no UI needed
+```
+
+The command-line scripts use `./.data-dev` unless `NOVEL_DATA_DIR` is set. For your real data run them with `NODE_ENV=production`, for example `NODE_ENV=production npm run backup:cold`. A backup can also be restored from the library: **New → Import cold backup**.
+
 ## Where your data lives
 
 | What | Where |

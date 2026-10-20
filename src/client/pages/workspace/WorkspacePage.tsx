@@ -1,26 +1,46 @@
-import { ArrowLeft, Settings2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Download, MoreHorizontal, Settings, Settings2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useBook } from '../../api/books.ts';
-import { useTree } from '../../api/nodes.ts';
+import { treeKey, useTree } from '../../api/nodes.ts';
 import { Button } from '../../components/ui.tsx';
 import { computeDisplayTitles } from '../../../shared/numbering.ts';
+import { EditorPanel } from '../../features/editor/EditorPanel.tsx';
+import { saverRegistry } from '../../features/editor/save-registry.ts';
+import { SaveStatus } from '../../features/editor/SaveStatus.tsx';
 import { DetailsPanel } from '../../features/manuscript/DetailsPanel.tsx';
 import { NoticeBar } from '../../features/manuscript/NoticeBar.tsx';
 import { Resizer } from '../../features/manuscript/Resizer.tsx';
 import { Sidebar } from '../../features/manuscript/Sidebar.tsx';
+import { totalWords } from '../../features/manuscript/build-items.ts';
 import { StructureDialog } from '../../features/manuscript/StructureDialog.tsx';
+import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
+import type { TreeNode } from '../../../shared/types.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import libraryStyles from '../library/library.module.css';
 import styles from '../../features/manuscript/manuscript.module.css';
 
-/** Workspace layout (M3): top bar, resizable sidebar, main panel placeholder, details panel. */
+/** Workspace layout: top bar with save status, resizable sidebar, editor, details panel. */
 export function WorkspacePage() {
   const { bookId, nodeId } = useParams();
   const book = useBook(bookId);
   const tree = useTree(book.data && !book.data.deletedAt ? bookId : undefined);
   const sidebarWidth = useWorkspaceStore((s) => s.sidebarWidth);
   const [editingStructure, setEditingStructure] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const client = useQueryClient();
+
+  // A finished save carries the section's new word count; keep the sidebar and totals current.
+  useEffect(() => {
+    if (!bookId) return;
+    return saverRegistry.onSaved((id, result) =>
+      client.setQueryData<TreeNode[]>(treeKey(bookId), (nodes) =>
+        nodes?.map((n) => (n.id === id ? { ...n, wordCount: result.wordCount } : n)),
+      ),
+    );
+  }, [bookId, client]);
 
   const nodes = tree.data;
   const selected = nodes?.find((n) => n.id === nodeId && n.deletedAt === null);
@@ -66,9 +86,30 @@ export function WorkspacePage() {
           <ArrowLeft size={16} /> Library
         </Link>
         <h1 className={styles.bookTitle}>{book.data.title}</h1>
+        <SaveStatus />
         <Button onClick={() => setEditingStructure(true)}>
           <Settings2 size={16} /> Structure
         </Button>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger className={libraryStyles.menuButtonInline} aria-label="Book menu">
+            <MoreHorizontal size={18} />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content className={libraryStyles.menu} align="end" sideOffset={4}>
+              <DropdownMenu.Item
+                className={libraryStyles.menuItem}
+                onSelect={() => setExporting(true)}
+              >
+                <Download size={16} /> Export cold backup…
+              </DropdownMenu.Item>
+              <DropdownMenu.Item className={libraryStyles.menuItem} asChild>
+                <Link to="/settings">
+                  <Settings size={16} /> Settings
+                </Link>
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </header>
       <div
         className={styles.body}
@@ -91,15 +132,28 @@ export function WorkspacePage() {
         )}
         <Resizer />
         <main className={styles.main}>
-          <p className={styles.mainPlaceholder}>
-            {selected && displayTitle
-              ? displayTitle
-              : 'Select a section. The editor arrives in a later milestone.'}
-          </p>
+          {selected && displayTitle && nodes ? (
+            <EditorPanel
+              bookId={book.data.id}
+              nodeId={selected.id}
+              displayTitle={displayTitle}
+              display={book.data.display}
+              bookWords={totalWords(nodes)}
+              savedSectionWords={selected.wordCount}
+            />
+          ) : (
+            <p className={styles.mainPlaceholder}>Select a section to start writing.</p>
+          )}
         </main>
         <DetailsPanel bookId={book.data.id} node={selected} displayTitle={displayTitle} />
       </div>
       <NoticeBar />
+      {exporting ? (
+        <ExportDialog
+          scope={{ kind: 'book', bookId: book.data.id, title: book.data.title }}
+          onClose={() => setExporting(false)}
+        />
+      ) : null}
       {editingStructure ? (
         <StructureDialog
           bookId={book.data.id}

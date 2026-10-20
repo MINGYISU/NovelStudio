@@ -1,4 +1,5 @@
 import { CHINESE_STRUCTURE } from '../../shared/schemas/structure.ts';
+import { countWords } from '../../shared/wordcount.ts';
 import type { Db } from '../db/connection.ts';
 import { listBooks } from '../repos/books.ts';
 import { setNodeText } from '../repos/nodes.ts';
@@ -29,7 +30,7 @@ function paragraph(seed: number, words: number): string {
   );
 }
 
-/** Made-up text only. Word counts here are plain whitespace counts; the real counter arrives with the editor. */
+/** Made-up text only. */
 function writeText(db: Db, id: string, text: string): void {
   setNodeText(db, id, {
     content: JSON.stringify({
@@ -37,7 +38,7 @@ function writeText(db: Db, id: string, text: string): void {
       content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
     }),
     plainText: text,
-    wordCount: text.split(/\s+/).filter(Boolean).length,
+    wordCount: countWords(text),
   });
 }
 

@@ -51,6 +51,10 @@
   box-shadow: var(--shadow);
 }
 
+.wide {
+  width: min(52rem, calc(100vw - 2rem));
+}
+
 .dialogTitle {
   margin: 0 0 1rem;
   font-family: var(--font-title);

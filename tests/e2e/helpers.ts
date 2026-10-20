@@ -81,3 +81,43 @@ export async function openBook(page: Page, bookId: string): Promise<void> {
   await page.goto(`/book/${bookId}/manuscript`);
   await expect(rows(page).first()).toBeVisible();
 }
+
+export function editorOf(page: Page): Locator {
+  return page.getByTestId('editor');
+}
+
+/** Opens a section directly by URL and waits for its editor. */
+export async function openSection(page: Page, bookId: string, nodeId: string): Promise<Locator> {
+  await page.goto(`/book/${bookId}/manuscript/${nodeId}`);
+  const editor = editorOf(page);
+  await expect(editor).toBeVisible();
+  return editor;
+}
+
+export async function savedText(request: APIRequestContext, nodeId: string): Promise<string> {
+  const res = await request.get(`/api/nodes/${nodeId}`);
+  expect(res.ok()).toBe(true);
+  const { node } = (await res.json()) as { node: { content: unknown } };
+  const texts: string[] = [];
+  const walk = (n: { text?: string; content?: unknown[] }): void => {
+    if (n.text) texts.push(n.text);
+    (n.content as { text?: string; content?: unknown[] }[] | undefined)?.forEach(walk);
+  };
+  walk(node.content as { content?: unknown[] });
+  return texts.join('');
+}
+
+/** Puts text into a section through the API (made-up text only). */
+export async function seedText(
+  request: APIRequestContext,
+  nodeId: string,
+  text: string,
+): Promise<void> {
+  const res = await request.put(`/api/nodes/${nodeId}/content`, {
+    data: {
+      rev: 0,
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] },
+    },
+  });
+  expect(res.ok(), `seedText failed with ${res.status()}`).toBe(true);
+}

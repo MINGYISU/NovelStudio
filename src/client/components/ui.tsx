@@ -23,15 +23,19 @@ interface DialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  wide?: boolean;
   children: ReactNode;
 }
 
-export function Dialog({ open, onOpenChange, title, description, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, title, description, wide, children }: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className={styles.overlay} />
-        <RadixDialog.Content className={styles.content} aria-describedby={undefined}>
+        <RadixDialog.Content
+          className={wide ? `${styles.content} ${styles.wide}` : styles.content}
+          aria-describedby={undefined}
+        >
           <RadixDialog.Title className={styles.dialogTitle}>{title}</RadixDialog.Title>
           {description ? <p className={styles.description}>{description}</p> : null}
           {children}
