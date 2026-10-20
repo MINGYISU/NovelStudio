@@ -1,0 +1,22 @@
+.health {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--color-warn);
+}
+
+.ok {
+  background: var(--color-ok);
+}
+
+.down {
+  background: var(--color-error);
+}

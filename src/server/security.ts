@@ -45,9 +45,12 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
   app.addHook('onSend', async (_request, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('Referrer-Policy', 'no-referrer');
-    reply.header(
-      'Content-Security-Policy',
-      "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
-    );
+    // Routes that serve untrusted content (book images) set a stricter policy themselves.
+    if (!reply.hasHeader('Content-Security-Policy')) {
+      reply.header(
+        'Content-Security-Policy',
+        "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
+      );
+    }
   });
 }

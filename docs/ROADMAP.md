@@ -6,8 +6,8 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 
 | # | Milestone | Key requirement IDs | Status |
 |---|---|---|---|
-| M0 | Skeleton & safety | DATA-01..05, HOT-01 | ☐ |
-| M1 | Library | LIB-01..07 | ☐ |
+| M0 | Skeleton & safety | DATA-01..05, HOT-01 | ☑ |
+| M1 | Library | LIB-01..07 | ☑ |
 | M2 | Tree logic & API (no UI) | TREE-01..03/08, MOVE-03..08, NUM-01..03 | ☐ |
 | M3 | Sidebar with drag-and-drop | TREE-05..07/09..11, MOVE-01..11, NUM-04 | ☐ |
 | M4 | Editor, autosave, **cold backup** | ED-01..08/10, DISP-01, SNAP-01, COLD-01..10, IMP-01, EXP-02 | ☐ |
@@ -49,20 +49,20 @@ Then test manually, and commit when satisfied.
 **Not in scope:** any real UI beyond the shell.
 
 **Done when**
-- [ ] `npm run dev` opens the shell with dev data in `./.data-dev/`.
-- [ ] `npm run build && npm start` serves the app on `http://127.0.0.1:4317` using `~/Library/Application Support/NovelStudio/`.
-- [ ] Running dev with `NOVEL_DATA_DIR` pointing to the real dir is refused.
-- [ ] A hot backup file appears in `backups/` on start.
-- [ ] Tests: migration from empty DB, data dir resolution rules, Host check rejects `evil.com`.
+- [x] `npm run dev` opens the shell with dev data in `./.data-dev/`.
+- [x] `npm run build && npm start` serves the app on `http://127.0.0.1:4317` using `~/Library/Application Support/NovelStudio/`.
+- [x] Running dev with `NOVEL_DATA_DIR` pointing to the real dir is refused.
+- [x] A hot backup file appears in `backups/` on start.
+- [x] Tests: migration from empty DB, data dir resolution rules, Host check rejects `evil.com`.
 
 ## M1 — Library
 
 **Build**: library grid, generated covers, cover upload (asset pipeline with type sniffing), create blank, edit metadata, trash/restore/purge with typed confirmation, sorting. Opening a book goes to an empty workspace placeholder.
 
 **Done when**
-- [ ] Two books survive a restart; trash and restore work; purge requires the exact title.
-- [ ] Uploading a `.svg` or a renamed `.txt` as cover is rejected.
-- [ ] API tests for every library endpoint.
+- [x] Two books survive a restart; trash and restore work; purge requires the exact title.
+- [x] Uploading a `.svg` or a renamed `.txt` as cover is rejected.
+- [x] API tests for every library endpoint.
 
 ## M2 — Tree logic & API (no UI)
 

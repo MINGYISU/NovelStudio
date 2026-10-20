@@ -26,6 +26,7 @@ async function main(): Promise<void> {
     port,
     production,
     db: store.db,
+    paths: store.paths,
     clientDir: production ? clientDir : undefined,
     extraOriginPorts: production ? [] : [parsePort(process.env.DEV_CLIENT_PORT, 5173)],
     logger: true,

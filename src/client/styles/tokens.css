@@ -3,10 +3,15 @@
   --color-surface: #ffffff;
   --color-text: #2b2723;
   --color-text-muted: #7a7168;
+  --color-border: #e3ded5;
+  --color-accent: #5b4a8a;
+  --color-accent-contrast: #ffffff;
   --color-ok: #3d8b5a;
   --color-warn: #c0841a;
   --color-error: #b3402f;
   --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgb(43 39 35 / 14%), 0 4px 14px rgb(43 39 35 / 8%);
   --font-title: Georgia, 'Songti SC', 'Noto Serif CJK SC', serif;
 }
 
@@ -21,4 +26,20 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-ui);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
 }

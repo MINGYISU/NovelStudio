@@ -317,7 +317,7 @@ All under `/api`, JSON in/out, bodies validated with Zod. Errors: `{ "error": { 
 
 | Method & path | Purpose |
 |---|---|
-| `GET /books` · `POST /books` · `PATCH /books/:id` · `DELETE /books/:id` (trash) · `POST /books/:id/restore` · `DELETE /books/:id?purge=1&confirmTitle=…` | Library |
+| `GET /books?sort=modified\|title&trashed=0\|1` · `GET /books/:id` · `POST /books` · `PATCH /books/:id` · `DELETE /books/:id` (trash) · `POST /books/:id/restore` · `DELETE /books/:id?purge=1&confirmTitle=…` | Library. Books carry `wordCount` (live sections only) and `coverUrl`. `PATCH` accepts `coverAssetId` (an asset of that book, or `null` to remove); the replaced cover asset is deleted. Trash/restore leave `updated_at` alone. Purge only works on trashed books, needs `confirmTitle` equal to the title (exact, case-sensitive), takes a hot backup first (aborts if that fails), deletes the rows in one transaction and then `assets/<bookId>/`. Editing or uploading to a trashed book is `409 BOOK_TRASHED`. |
 | `GET /books/:id/tree` | All nodes of a book **without** `content` (id, parentId, kind, title, position, numbered, status, synopsis, wordCount, deletedAt). |
 | `POST /books/:id/nodes` | Create `{ kind, parentId, index, title }`. |
 | `PATCH /nodes/:id` | Rename / status / synopsis / numbered. |
@@ -327,7 +327,7 @@ All under `/api`, JSON in/out, bodies validated with Zod. Errors: `{ "error": { 
 | `PUT /nodes/:id/content` | `{ content, rev }` → `200 { rev }` or `409 STALE_REVISION`. Server derives `plain_text` and `word_count`. |
 | `GET /nodes/:id/snapshots` · `POST /snapshots/:id/restore` | |
 | `POST /books/:id/search` · `POST /books/:id/replace` | Find / replace across book. |
-| `POST /books/:id/assets` (multipart) · `GET /assets/:bookId/:assetId` | Images. |
+| `POST /books/:id/assets` (multipart, one `file` part) · `GET /assets/:bookId/:assetId` | Images. Type is sniffed from magic bytes (PNG/JPEG/WebP/GIF); anything else is `415 UNSUPPORTED_IMAGE_TYPE`, over 20 MB is `413 FILE_TOO_LARGE`. `GET /assets/…` is outside `/api` so `<img>` tags work. |
 | Codex, maps, foreshadows | Conventional CRUD per resource, added in their milestones. |
 | `GET /settings/cold-backup` · `PUT /settings/cold-backup` · `POST /settings/cold-backup/validate` · `POST /settings/cold-backup/choose-folder` | Cold backup settings (choose-folder runs the macOS picker, §10.2). |
 | `POST /books/:id/cold-backup` · `POST /cold-backup/all` | Export `{ dir? }` (one-off location optional). |
