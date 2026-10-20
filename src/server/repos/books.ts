@@ -68,6 +68,13 @@ export function getBook(db: Db, id: string): Book | null {
   return row ? toBook(row, wordCounts(db, id).get(id) ?? 0) : null;
 }
 
+/** The raw `settings` JSON; the caller validates it with Zod. */
+export function getBookSettingsJson(db: Db, id: string): string | null {
+  const row = db.prepare('SELECT settings FROM books WHERE id = ?').get(id) as
+    { settings: string } | undefined;
+  return row ? row.settings : null;
+}
+
 export function insertBook(db: Db, body: CreateBookBody, now: string): Book {
   const id = crypto.randomUUID();
   db.prepare(

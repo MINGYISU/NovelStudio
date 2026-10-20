@@ -8,8 +8,10 @@ import { ApiError } from './errors.ts';
 import { getSchemaVersion } from './db/migrate.ts';
 import { registerAssetRoutes } from './routes/assets.ts';
 import { registerBookRoutes } from './routes/books.ts';
+import { registerNodeRoutes } from './routes/nodes.ts';
 import { registerSecurity } from './security.ts';
 import { LibraryService } from './services/library.ts';
+import { ManuscriptService } from './services/manuscript.ts';
 
 export const JSON_BODY_LIMIT = 25 * 1024 * 1024;
 export const LISTEN_HOST = '127.0.0.1';
@@ -64,6 +66,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const library = new LibraryService(options.db, options.paths);
     registerBookRoutes(app, options.db, library);
     registerAssetRoutes(app, options.db, options.paths, library);
+    registerNodeRoutes(app, new ManuscriptService(options.db, library));
   }
 
   const indexFile = options.clientDir ? path.join(options.clientDir, 'index.html') : null;

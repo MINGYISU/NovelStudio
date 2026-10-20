@@ -318,11 +318,12 @@ All under `/api`, JSON in/out, bodies validated with Zod. Errors: `{ "error": { 
 | Method & path | Purpose |
 |---|---|
 | `GET /books?sort=modified\|title&trashed=0\|1` · `GET /books/:id` · `POST /books` · `PATCH /books/:id` · `DELETE /books/:id` (trash) · `POST /books/:id/restore` · `DELETE /books/:id?purge=1&confirmTitle=…` | Library. Books carry `wordCount` (live sections only) and `coverUrl`. `PATCH` accepts `coverAssetId` (an asset of that book, or `null` to remove); the replaced cover asset is deleted. Trash/restore leave `updated_at` alone. Purge only works on trashed books, needs `confirmTitle` equal to the title (exact, case-sensitive), takes a hot backup first (aborts if that fails), deletes the rows in one transaction and then `assets/<bookId>/`. Editing or uploading to a trashed book is `409 BOOK_TRASHED`. |
-| `GET /books/:id/tree` | All nodes of a book **without** `content` (id, parentId, kind, title, position, numbered, status, synopsis, wordCount, deletedAt). |
-| `POST /books/:id/nodes` | Create `{ kind, parentId, index, title }`. |
-| `PATCH /nodes/:id` | Rename / status / synopsis / numbered. |
-| `POST /nodes/:id/move` | `{ parentId, index }` → returns the updated tree. |
-| `POST /nodes/:id/duplicate` · `DELETE /nodes/:id` (trash) · `POST /nodes/:id/restore` | |
+| `GET /books/:id/tree` | `{ nodes }`: all nodes of a book, trashed ones included, **without** `content` (id, bookId, parentId, kind, title, position, numbered, status, synopsis, wordCount, deletedAt). Readable for a trashed book. |
+| `POST /books/:id/nodes` | Create `{ kind, parentId, index?, title?, numbered? }` → `201 { node, nodes }`. Omitted `index` appends; omitted `numbered` uses the kind's `defaultNumbered` from `books.settings.structure` (built-in defaults when absent or invalid). Rank violation is `409 INVALID_PARENT`. |
+| `PATCH /nodes/:id` | Rename / status / synopsis / numbered → `{ node }`. |
+| `POST /nodes/:id/move` | `{ parentId, index }` → `{ nodes }` (the updated tree). Errors: `404 NOT_FOUND`, `409 INVALID_MOVE` (cycle or rank), `400 INVALID_INDEX`. Only `parent_id`/`position` of the affected rows change. |
+| `DELETE /nodes/:id` (trash) · `POST /nodes/:id/restore` | Both return `{ nodes }`. Restoring a section that is not in the trash is `409 NOT_TRASHED`. Every write to a trashed book is `409 BOOK_TRASHED`. |
+| `POST /nodes/:id/duplicate` | M3. |
 | `GET /nodes/:id` | Full node including `content` and `rev`. |
 | `PUT /nodes/:id/content` | `{ content, rev }` → `200 { rev }` or `409 STALE_REVISION`. Server derives `plain_text` and `word_count`. |
 | `GET /nodes/:id/snapshots` · `POST /snapshots/:id/restore` | |

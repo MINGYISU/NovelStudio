@@ -8,7 +8,7 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 |---|---|---|---|
 | M0 | Skeleton & safety | DATA-01..05, HOT-01 | ☑ |
 | M1 | Library | LIB-01..07 | ☑ |
-| M2 | Tree logic & API (no UI) | TREE-01..03/08, MOVE-03..08, NUM-01..03 | ☐ |
+| M2 | Tree logic & API (no UI) | TREE-01..03/08, MOVE-03..08, NUM-01..03 | ☑ |
 | M3 | Sidebar with drag-and-drop | TREE-05..07/09..11, MOVE-01..11, NUM-04 | ☐ |
 | M4 | Editor, autosave, **cold backup** | ED-01..08/10, DISP-01, SNAP-01, COLD-01..10, IMP-01, EXP-02 | ☐ |
 | M5 | Codex | CDX-01..07 | ☐ |
@@ -69,9 +69,9 @@ Then test manually, and commit when satisfied.
 **Build**: `src/shared/tree.ts`, `numbering.ts` (all format tokens incl. `{n:cn}`), the node endpoints, trash/restore of sections, `assertTreeInvariants`, the seeded random move property test, the react-arborist index adapter (pure function, tested).
 
 **Done when**
-- [ ] Unit tests: every rule in ARCHITECTURE §7; `{n:cn}` table; unnumbered sections; restart scopes.
-- [ ] Property test: 1,000 random moves keep invariants.
-- [ ] API test: move Ch4 before Ch3, restart server (new app instance on the same temp dir), order persists.
+- [x] Unit tests: every rule in ARCHITECTURE §7; `{n:cn}` table; unnumbered sections; restart scopes.
+- [x] Property test: 1,000 random moves keep invariants.
+- [x] API test: move Ch4 before Ch3, restart server (new app instance on the same temp dir), order persists.
 
 ## M3 — Sidebar with drag-and-drop
 
