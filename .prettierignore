@@ -1,0 +1,9 @@
+dist
+node_modules
+.data-dev
+.data-test
+package-lock.json
+docs
+README.md
+AGENTS.md
+LICENSE

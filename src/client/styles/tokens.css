@@ -1,0 +1,24 @@
+:root {
+  --color-bg: #faf8f4;
+  --color-surface: #ffffff;
+  --color-text: #2b2723;
+  --color-text-muted: #7a7168;
+  --color-ok: #3d8b5a;
+  --color-warn: #c0841a;
+  --color-error: #b3402f;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-title: Georgia, 'Songti SC', 'Noto Serif CJK SC', serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+}

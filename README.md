@@ -2,7 +2,7 @@
 
 A personal, local-first writing app for long-form fiction. It runs on your own machine (a small Node server and a browser UI on `127.0.0.1`), with no accounts, cloud, or subscriptions.
 
-**Status:** planning. No code yet. Implementation follows [docs/ROADMAP.md](docs/ROADMAP.md) one milestone at a time.
+**Status:** M0 (skeleton & safety) implemented, awaiting acceptance. Implementation follows [docs/ROADMAP.md](docs/ROADMAP.md) one milestone at a time.
 
 ## Features (planned)
 
@@ -30,7 +30,7 @@ Requires Node.js 24 or newer (see `.nvmrc`).
 
 ```sh
 npm install
-npm run dev        # development, uses ./.data-dev with sample data
+npm run dev        # development: UI on http://127.0.0.1:5173, API on :4318, data in ./.data-dev
 npm run build
 npm start          # real use: http://127.0.0.1:4317, data in ~/Library/Application Support/NovelStudio
 ```

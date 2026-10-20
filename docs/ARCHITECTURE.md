@@ -37,7 +37,7 @@ Why a server instead of browser-only storage: browser storage (IndexedDB/localSt
 |---|---|---|
 | Runtime | Node.js 24 LTS or newer (`.nvmrc` = 26) | Native TypeScript stripping is **not** relied on; use `tsx` for dev/scripts. |
 | Language | TypeScript, `strict: true` | No `any` except at validated boundaries. |
-| Frontend build | Vite | Dev server proxies `/api` and `/assets` to Fastify. |
+| Frontend build | Vite (+ `@vitejs/plugin-react`) | Dev server (5173) proxies `/api` and `/assets` to Fastify (4318) with `changeOrigin`. The production build puts its own files under `/static/` so `/assets/` stays free for book images. |
 | UI | React | Function components + hooks. |
 | Routing | React Router | Routes in §6. |
 | Server state | TanStack Query | Caching, optimistic updates, retries. |
@@ -54,7 +54,8 @@ Why a server instead of browser-only storage: browser storage (IndexedDB/localSt
 | IDs | `crypto.randomUUID()` | No ID library. |
 | Unit/integration tests | Vitest (+ Fastify `inject` for API tests) | |
 | E2E tests | Playwright (from M3) | Drag-and-drop and autosave flows. |
-| Lint/format | ESLint (flat config, typescript-eslint, react-hooks) + Prettier | |
+| Lint/format | ESLint (flat config, typescript-eslint, react-hooks, `@eslint/js`, `globals`) + Prettier | Docs are excluded from Prettier (`.prettierignore`). |
+| Tooling | TypeScript **6.0.x** (typescript-eslint does not yet support 7), `concurrently` (runs server + Vite in `dev`), `@types/*` for node, react, react-dom, better-sqlite3 | Pinned to exact versions in `package.json`. |
 
 **Dependency policy:** exact versions (`.npmrc` has `save-exact=true`). No dependency is added without being listed here first (see [AGENTS.md](../AGENTS.md)).
 
@@ -125,11 +126,11 @@ NovelStudio/
 
 Unit tests sit next to the code they test: `tree.test.ts` beside `tree.ts`.
 
-### npm scripts (planned, created in M0)
+### npm scripts (planned; M0 creates `dev`, `build`, `start`, `test`, `typecheck`, `lint`, `format`, `seed:dev` — the rest arrive with their milestones)
 
 | Script | Purpose |
 |---|---|
-| `dev` | Fastify (watch, `tsx`) + Vite dev server. Uses `NOVEL_DATA_DIR=./.data-dev`. |
+| `dev` | Fastify (watch, `tsx`, port 4318) + Vite dev server (5173, opens the browser). Uses `NODE_ENV=development` and `NOVEL_DATA_DIR=./.data-dev`. |
 | `build` | Type-check and build client to `dist/client`, server to `dist/server`. |
 | `start` | Run the built server on port 4317 with the **real** data dir; serves the built client. |
 | `test` | Vitest (unit + API). Every test uses a fresh temp data dir. |
@@ -151,7 +152,9 @@ Unit tests sit next to the code they test: `tree.test.ts` beside `tree.ts`.
 | Tests | `os.tmpdir()/novelstudio-test-<random>/` | Created and deleted per test file. |
 | Override | `NOVEL_DATA_DIR=/some/path` | Always wins. |
 
-Guard: if `NODE_ENV !== 'production'` and the resolved data dir equals the real default, the server **refuses to start**. This prevents dev runs and agents from touching real data.
+Without `NOVEL_DATA_DIR`, any non-production run (including `NODE_ENV` unset) falls back to `./.data-dev`, never to the real dir.
+
+Guard: if `NODE_ENV !== 'production'` and the resolved data dir equals the real default **or is inside it** (compared after resolving symlinks, `..`, and case), the server **refuses to start**, before creating or opening anything. This prevents dev runs and agents from touching real data.
 
 Layout:
 
@@ -436,7 +439,7 @@ type MapData = {
 
 ### 10.1 Hot backups
 
-`hot-backup.ts`: on startup (after migrations) and every 60 minutes, if a dirty flag (set by every write in `repos/`) shows changes since the last backup, run `VACUUM INTO '<data dir>/backups/novelstudio-YYYYMMDD-HHmmss.db'`, then prune to the newest 20. Also run immediately **before** any migration and before a hot-backup restore.
+`hot-backup.ts`: on startup (after migrations; skipped only if the database file has not changed since the newest backup, after a WAL checkpoint) and every 60 minutes, if a dirty flag (set by every write in `repos/`, via `HotBackupService.markDirty()`) shows changes since the last backup, run `VACUUM INTO '<data dir>/backups/novelstudio-YYYYMMDD-HHmmss.db'`, then prune to the newest 20. Also run immediately **before** any migration and before a hot-backup restore.
 
 ### 10.2 Cold backup
 
