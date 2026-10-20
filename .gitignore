@@ -147,3 +147,25 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# ---------------------------------------------------------------------------
+# NovelStudio: local data must never be committed
+# ---------------------------------------------------------------------------
+.data-dev/
+.data-test/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.novelstudio.json
+*.novelstudio.json.sha256
+!tests/fixtures/**
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+
+# macOS
+.DS_Store
