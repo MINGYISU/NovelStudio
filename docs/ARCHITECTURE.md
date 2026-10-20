@@ -126,7 +126,7 @@ NovelStudio/
 
 Unit tests sit next to the code they test: `tree.test.ts` beside `tree.ts`.
 
-### npm scripts (planned; M0 creates `dev`, `build`, `start`, `test`, `typecheck`, `lint`, `format`, `seed:dev` — the rest arrive with their milestones)
+### npm scripts (planned; M0 creates `dev`, `build`, `start`, `test`, `typecheck`, `lint`, `format`, `seed:dev`; M3 adds `test:e2e` — the rest arrive with their milestones)
 
 | Script | Purpose |
 |---|---|
@@ -134,9 +134,9 @@ Unit tests sit next to the code they test: `tree.test.ts` beside `tree.ts`.
 | `build` | Type-check and build client to `dist/client`, server to `dist/server`. |
 | `start` | Run the built server on port 4317 with the **real** data dir; serves the built client. |
 | `test` | Vitest (unit + API). Every test uses a fresh temp data dir. |
-| `test:e2e` | Playwright against a temp data dir. |
+| `test:e2e` | Playwright (Chromium) against its own server (port 4419) and Vite (5174) with a fresh temp data dir; it never touches `./.data-dev`. Run `npx playwright install chromium` once. |
 | `typecheck`, `lint`, `format` | |
-| `seed:dev` | Reset and fill `.data-dev` with a sample book (volumes, parts, chapters, CJK text, maps, foreshadows, codex). |
+| `seed:dev` | Fill `.data-dev` with sample books. M3: an English book of about 190 sections (3 volumes × 3 parts × 5 chapters × 3 scenes, prologue, epilogue, made-up text) and a small Chinese-structured book. Does nothing if the sample book already exists. Maps, foreshadows and codex arrive with their milestones. |
 | `backup:cold -- [--book <id>] [--out <dir>]` | CLI cold backup export. |
 | `restore:cold -- <file> [--data-dir <dir>]` | CLI restore into a data dir as a new book. |
 | `verify:cold -- <file>` | Validate schema + checksums of a cold backup. |
@@ -317,13 +317,13 @@ All under `/api`, JSON in/out, bodies validated with Zod. Errors: `{ "error": { 
 
 | Method & path | Purpose |
 |---|---|
-| `GET /books?sort=modified\|title&trashed=0\|1` · `GET /books/:id` · `POST /books` · `PATCH /books/:id` · `DELETE /books/:id` (trash) · `POST /books/:id/restore` · `DELETE /books/:id?purge=1&confirmTitle=…` | Library. Books carry `wordCount` (live sections only) and `coverUrl`. `PATCH` accepts `coverAssetId` (an asset of that book, or `null` to remove); the replaced cover asset is deleted. Trash/restore leave `updated_at` alone. Purge only works on trashed books, needs `confirmTitle` equal to the title (exact, case-sensitive), takes a hot backup first (aborts if that fails), deletes the rows in one transaction and then `assets/<bookId>/`. Editing or uploading to a trashed book is `409 BOOK_TRASHED`. |
+| `GET /books?sort=modified\|title&trashed=0\|1` · `GET /books/:id` · `POST /books` · `PATCH /books/:id` · `DELETE /books/:id` (trash) · `POST /books/:id/restore` · `DELETE /books/:id?purge=1&confirmTitle=…` | Library. Books carry `wordCount` (live sections only) and `coverUrl`. `PATCH` accepts `coverAssetId` (an asset of that book, or `null` to remove; the replaced cover asset is deleted) and `structure` (the full per-kind structure settings, validated by `structureSettingsSchema`; only `settings.structure` is replaced, other settings keys are kept). Books carry `structure` (defaults when the stored settings are absent or invalid). Trash/restore leave `updated_at` alone. Purge only works on trashed books, needs `confirmTitle` equal to the title (exact, case-sensitive), takes a hot backup first (aborts if that fails), deletes the rows in one transaction and then `assets/<bookId>/`. Editing or uploading to a trashed book is `409 BOOK_TRASHED`. |
 | `GET /books/:id/tree` | `{ nodes }`: all nodes of a book, trashed ones included, **without** `content` (id, bookId, parentId, kind, title, position, numbered, status, synopsis, wordCount, deletedAt). Readable for a trashed book. |
 | `POST /books/:id/nodes` | Create `{ kind, parentId, index?, title?, numbered? }` → `201 { node, nodes }`. Omitted `index` appends; omitted `numbered` uses the kind's `defaultNumbered` from `books.settings.structure` (built-in defaults when absent or invalid). Rank violation is `409 INVALID_PARENT`. |
 | `PATCH /nodes/:id` | Rename / status / synopsis / numbered → `{ node }`. |
 | `POST /nodes/:id/move` | `{ parentId, index }` → `{ nodes }` (the updated tree). Errors: `404 NOT_FOUND`, `409 INVALID_MOVE` (cycle or rank), `400 INVALID_INDEX`. Only `parent_id`/`position` of the affected rows change. |
 | `DELETE /nodes/:id` (trash) · `POST /nodes/:id/restore` | Both return `{ nodes }`. Restoring a section that is not in the trash is `409 NOT_TRASHED`. Every write to a trashed book is `409 BOOK_TRASHED`. |
-| `POST /nodes/:id/duplicate` | M3. |
+| `POST /nodes/:id/duplicate` | `201 { node, nodes }`. Copies the section with its live subtree (trashed descendants are left behind) right after the original, in one transaction. All copies get new IDs; content, synopsis, status and numbered are copied, snapshots are not. The copy of a titled section is named `<title> (copy)`; the original keeps its title. |
 | `GET /nodes/:id` | Full node including `content` and `rev`. |
 | `PUT /nodes/:id/content` | `{ content, rev }` → `200 { rev }` or `409 STALE_REVISION`. Server derives `plain_text` and `word_count`. |
 | `GET /nodes/:id/snapshots` · `POST /snapshots/:id/restore` | |
@@ -366,7 +366,9 @@ applyMove (inside ONE transaction):
   touch books.updated_at
 ```
 
-Descendants are untouched: they follow because only the moved node's `parent_id` changes. Keyboard moves (`Alt+↑/↓`, `Tab`, `Shift+Tab`) are translated into the same `(parentId, index)` call.
+Descendants are untouched: they follow because only the moved node's `parent_id` changes. Keyboard moves (`Alt+↑/↓`, `Tab`, `Shift+Tab`) are translated into the same `(parentId, index)` call by `keyboardMoveTarget` in `tree.ts` (null when the move is impossible or breaks a rule).
+
+**Client behavior (M3).** The sidebar updates the cached tree optimistically with `applyMove` and reverts it (plus an error notice) if the server refuses. While several writes are in flight, only the last one to settle applies the server tree or refetches, so an older response never overwrites newer optimistic state; keyboard moves read the cache, not the last render. Undo (`Cmd/Ctrl+Z` in the sidebar) is one level: it sends a normal move back to the previous parent and index. Fold state and sidebar width are UI state kept in `localStorage` per book; they hold no manuscript data and are not part of backups.
 
 Trash: trashing sets `deleted_at` on the subtree root only and closes the gap in its old sibling list. Its descendants are considered trashed because an ancestor is. Restore appends to the original parent (if live) or to the root, after validating the rank rule (fallback: root).
 

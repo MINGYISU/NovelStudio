@@ -378,3 +378,47 @@ export function arboristIndexToFinalIndex(
   const current = siblings.findIndex((n) => n.id === nodeId);
   return current !== -1 && current < arboristIndex ? arboristIndex - 1 : arboristIndex;
 }
+
+export type KeyboardMove = 'up' | 'down' | 'indent' | 'outdent';
+
+/**
+ * Translates `Alt+↑/↓`, `Tab` and `Shift+Tab` into a `(parentId, index)` move (index in the API's
+ * final-index meaning). Returns null when the move is impossible or breaks a rule.
+ */
+export function keyboardMoveTarget(
+  nodes: readonly StructuralNode[],
+  nodeId: string,
+  move: KeyboardMove,
+): { parentId: string | null; index: number } | null {
+  const live = classify(nodes);
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node || live.get(node.id) !== 'live') return null;
+  const siblings = liveChildren(nodes, live, node.parentId);
+  const at = siblings.findIndex((n) => n.id === nodeId);
+
+  let target: { parentId: string | null; index: number } | null = null;
+  if (move === 'up') {
+    if (at > 0) target = { parentId: node.parentId, index: at - 1 };
+  } else if (move === 'down') {
+    if (at < siblings.length - 1) target = { parentId: node.parentId, index: at + 1 };
+  } else if (move === 'indent') {
+    const previous = siblings[at - 1];
+    if (previous) {
+      target = {
+        parentId: previous.id,
+        index: liveChildren(nodes, live, previous.id).length,
+      };
+    }
+  } else if (node.parentId !== null) {
+    const parent = nodes.find((n) => n.id === node.parentId);
+    if (parent) {
+      const parentSiblings = liveChildren(nodes, live, parent.parentId);
+      target = {
+        parentId: parent.parentId,
+        index: parentSiblings.findIndex((n) => n.id === parent.id) + 1,
+      };
+    }
+  }
+  if (!target || !checkMove(nodes, nodeId, target.parentId, target.index).ok) return null;
+  return target;
+}

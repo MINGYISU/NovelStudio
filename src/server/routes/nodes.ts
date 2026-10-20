@@ -32,6 +32,11 @@ export function registerNodeRoutes(app: FastifyInstance, manuscript: ManuscriptS
     return { nodes: manuscript.move(id, parseOrThrow(moveNodeBodySchema, request.body)) };
   });
 
+  app.post('/api/nodes/:id/duplicate', async (request, reply) => {
+    const { id } = parseOrThrow(idParams, request.params);
+    return reply.code(201).send(manuscript.duplicate(id));
+  });
+
   // Moves the section (with its subtree) to the trash; the subtree root carries `deletedAt`.
   app.delete('/api/nodes/:id', async (request) => {
     const { id } = parseOrThrow(idParams, request.params);

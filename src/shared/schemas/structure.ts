@@ -65,6 +65,45 @@ export const DEFAULT_STRUCTURE: StructureSettings = {
   },
 };
 
+const CHINESE_SEPARATOR = ' ';
+
+export const CHINESE_STRUCTURE: StructureSettings = {
+  volume: {
+    label: '卷',
+    format: '第{n:cn}卷',
+    restartWithin: 'book',
+    separator: CHINESE_SEPARATOR,
+    defaultNumbered: true,
+  },
+  part: {
+    label: '部',
+    format: '第{n:cn}部',
+    restartWithin: 'book',
+    separator: CHINESE_SEPARATOR,
+    defaultNumbered: true,
+  },
+  chapter: {
+    label: '章',
+    format: '第{n:cn}章',
+    restartWithin: 'book',
+    separator: CHINESE_SEPARATOR,
+    defaultNumbered: true,
+  },
+  scene: {
+    label: '场景',
+    format: '场景{n}',
+    restartWithin: 'chapter',
+    separator: CHINESE_SEPARATOR,
+    defaultNumbered: false,
+  },
+};
+
+export const STRUCTURE_PRESETS = {
+  english: DEFAULT_STRUCTURE,
+  chinese: CHINESE_STRUCTURE,
+} as const;
+export type StructurePresetId = keyof typeof STRUCTURE_PRESETS;
+
 /** Shape of the `books.settings` JSON column; later milestones add display and foreshadow. */
 export const bookSettingsSchema = z.object({
   structure: structureSettingsSchema.default(DEFAULT_STRUCTURE),

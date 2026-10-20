@@ -1,5 +1,10 @@
 import crypto from 'node:crypto';
 import type { Book, BookSort, CreateBookBody } from '../../shared/schemas/book.ts';
+import {
+  bookSettingsSchema,
+  DEFAULT_STRUCTURE,
+  type StructureSettings,
+} from '../../shared/schemas/structure.ts';
 import type { Db } from '../db/connection.ts';
 
 interface RawBook {
@@ -8,9 +13,20 @@ interface RawBook {
   author: string;
   description: string;
   cover_asset_id: string | null;
+  settings: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+}
+
+/** Settings that fail validation fall back to the defaults instead of breaking the book. */
+export function parseStructure(settingsJson: string | null) {
+  try {
+    const parsed = bookSettingsSchema.safeParse(JSON.parse(settingsJson ?? '{}'));
+    return parsed.success ? parsed.data.structure : DEFAULT_STRUCTURE;
+  } catch {
+    return DEFAULT_STRUCTURE;
+  }
 }
 
 function toBook(row: RawBook, wordCount: number): Book {
@@ -22,6 +38,7 @@ function toBook(row: RawBook, wordCount: number): Book {
     coverAssetId: row.cover_asset_id,
     coverUrl: row.cover_asset_id ? `/assets/${row.id}/${row.cover_asset_id}` : null,
     wordCount,
+    structure: parseStructure(row.settings),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -86,11 +103,26 @@ export function insertBook(db: Db, body: CreateBookBody, now: string): Book {
   return book;
 }
 
+/** Replaces only `structure`; other settings keys (display, foreshadow, …) are preserved. */
+function mergeStructure(settingsJson: string | null, structure: StructureSettings): string {
+  let current: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(settingsJson ?? '{}');
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      current = parsed as Record<string, unknown>;
+    }
+  } catch {
+    current = {};
+  }
+  return JSON.stringify({ ...current, structure });
+}
+
 export interface BookUpdate {
   title?: string;
   author?: string;
   description?: string;
   coverAssetId?: string | null;
+  structure?: StructureSettings;
 }
 
 export function updateBookFields(db: Db, id: string, update: BookUpdate, now: string): void {
@@ -111,6 +143,10 @@ export function updateBookFields(db: Db, id: string, update: BookUpdate, now: st
   if (update.coverAssetId !== undefined) {
     columns.push('cover_asset_id = ?');
     values.push(update.coverAssetId);
+  }
+  if (update.structure !== undefined) {
+    columns.push('settings = ?');
+    values.push(mergeStructure(getBookSettingsJson(db, id), update.structure));
   }
   columns.push('updated_at = ?');
   values.push(now);

@@ -7,6 +7,7 @@ import {
   checkMove,
   insertNode,
   isDescendant,
+  keyboardMoveTarget,
   restoreNode,
   trashNode,
   TreeInvariantError,
@@ -388,5 +389,59 @@ describe('react-arborist index adapter', () => {
     // Drag C5 above C4: arborist reports index 1.
     const up = arboristIndexToFinalIndex(nodes, 'C5', null, 1);
     expect(order(applyMove(nodes, 'C5', null, up).nodes, null)).toEqual(['V1', 'C5', 'C4']);
+  });
+});
+
+describe('keyboardMoveTarget (MOVE-09)', () => {
+  const tree = [
+    node('p1', 'part', null, 0),
+    node('c1', 'chapter', 'p1', 0),
+    node('c2', 'chapter', 'p1', 1),
+    node('s1', 'scene', 'c2', 0),
+    node('p2', 'part', null, 1),
+    node('c3', 'chapter', 'p2', 0),
+    node('gone', 'chapter', 'p1', 2, '2026-01-01'),
+  ];
+
+  it('moves among siblings and stops at the edges', () => {
+    expect(keyboardMoveTarget(tree, 'c2', 'up')).toEqual({ parentId: 'p1', index: 0 });
+    expect(keyboardMoveTarget(tree, 'c1', 'down')).toEqual({ parentId: 'p1', index: 1 });
+    expect(keyboardMoveTarget(tree, 'c1', 'up')).toBeNull();
+    expect(keyboardMoveTarget(tree, 'c2', 'down')).toBeNull();
+    expect(keyboardMoveTarget(tree, 'p1', 'down')).toEqual({ parentId: null, index: 1 });
+  });
+
+  it('applies the returned target as a valid move', () => {
+    const target = keyboardMoveTarget(tree, 'c1', 'down');
+    const moved = applyMove(tree, 'c1', target!.parentId, target!.index).nodes;
+    const order = moved.filter((n) => n.parentId === 'p1' && !n.deletedAt);
+    expect(order.sort((a, b) => a.position - b.position).map((n) => n.id)).toEqual(['c2', 'c1']);
+  });
+
+  it('refuses to indent when the rank rule or a missing previous sibling forbids it', () => {
+    expect(keyboardMoveTarget(tree, 'c2', 'indent')).toBeNull();
+    expect(keyboardMoveTarget(tree, 'p2', 'indent')).toBeNull();
+    expect(keyboardMoveTarget(tree, 'c1', 'indent')).toBeNull();
+    expect(keyboardMoveTarget(tree, 'c3', 'indent')).toBeNull();
+  });
+
+  it('indents a section after the previous sibling’s existing children', () => {
+    const rootChapter = [
+      node('p1', 'part', null, 0),
+      node('c1', 'chapter', 'p1', 0),
+      node('rc', 'chapter', null, 1),
+    ];
+    expect(keyboardMoveTarget(rootChapter, 'rc', 'indent')).toEqual({ parentId: 'p1', index: 1 });
+  });
+
+  it('outdents to just after the parent, or does nothing at the root', () => {
+    expect(keyboardMoveTarget(tree, 's1', 'outdent')).toEqual({ parentId: 'p1', index: 2 });
+    expect(keyboardMoveTarget(tree, 'c3', 'outdent')).toEqual({ parentId: null, index: 2 });
+    expect(keyboardMoveTarget(tree, 'p1', 'outdent')).toBeNull();
+  });
+
+  it('ignores trashed and unknown sections', () => {
+    expect(keyboardMoveTarget(tree, 'gone', 'up')).toBeNull();
+    expect(keyboardMoveTarget(tree, 'nope', 'down')).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { CreateNodeBody, MoveNodeBody, PatchNodeBody } from '../../shared/schemas/node.ts';
-import { bookSettingsSchema, DEFAULT_STRUCTURE } from '../../shared/schemas/structure.ts';
+import { NODE_TITLE_MAX } from '../../shared/schemas/node.ts';
 import {
   applyMove,
   insertNode,
@@ -12,8 +12,9 @@ import {
 import type { TreeNode } from '../../shared/types.ts';
 import type { Db } from '../db/connection.ts';
 import { ApiError } from '../errors.ts';
-import { getBookSettingsJson } from '../repos/books.ts';
+import { getBookSettingsJson, parseStructure } from '../repos/books.ts';
 import {
+  copyNodeRow,
   getNode,
   insertNodeRow,
   listNodes,
@@ -92,6 +93,60 @@ export class ManuscriptService {
     });
   }
 
+  /** Copies a section with its live subtree right after the original; trashed descendants stay behind. */
+  duplicate(id: string): { node: TreeNode; nodes: TreeNode[] } {
+    return this.write(() => {
+      const source = this.requireNode(id);
+      this.library.requireLiveBook(source.bookId);
+      if (source.deletedAt !== null) throw new ApiError(404, 'NOT_FOUND', 'Section not found.');
+      const nodes = listNodes(this.db, source.bookId);
+      const now = new Date().toISOString();
+      const rootCopy: TreeNode = {
+        ...source,
+        id: crypto.randomUUID(),
+        title: source.title ? `${source.title} (copy)`.slice(0, NODE_TITLE_MAX) : '',
+      };
+      const siblings = nodes.filter((n) => n.parentId === source.parentId && n.deletedAt === null);
+      const index = siblings.sort((a, b) => a.position - b.position).findIndex((n) => n.id === id);
+      const change = insertNode(nodes, rootCopy, index + 1);
+      const placed = change.changed.find((n) => n.id === rootCopy.id) as TreeNode;
+      copyNodeRow(
+        this.db,
+        id,
+        {
+          id: placed.id,
+          parentId: placed.parentId,
+          position: placed.position,
+          title: placed.title,
+        },
+        now,
+      );
+      writeStructure(
+        this.db,
+        change.changed.filter((n) => n.id !== placed.id),
+      );
+      const queue: [string, string][] = [[source.id, placed.id]];
+      while (queue.length > 0) {
+        const [oldParent, newParent] = queue.shift() as [string, string];
+        const children = nodes
+          .filter((n) => n.parentId === oldParent && n.deletedAt === null)
+          .sort((a, b) => a.position - b.position);
+        children.forEach((child, position) => {
+          const childCopy = crypto.randomUUID();
+          copyNodeRow(
+            this.db,
+            child.id,
+            { id: childCopy, parentId: newParent, position, title: child.title },
+            now,
+          );
+          queue.push([child.id, childCopy]);
+        });
+      }
+      touchBook(this.db, source.bookId, now);
+      return { node: placed, nodes: listNodes(this.db, source.bookId) };
+    });
+  }
+
   move(id: string, body: MoveNodeBody): TreeNode[] {
     return this.structural(id, (nodes) => applyMove(nodes, id, body.parentId, body.index));
   }
@@ -136,12 +191,6 @@ export class ManuscriptService {
   }
 
   private structure(bookId: string) {
-    const raw = getBookSettingsJson(this.db, bookId);
-    try {
-      const parsed = bookSettingsSchema.safeParse(JSON.parse(raw ?? '{}'));
-      return parsed.success ? parsed.data.structure : DEFAULT_STRUCTURE;
-    } catch {
-      return DEFAULT_STRUCTURE;
-    }
+    return parseStructure(getBookSettingsJson(this.db, bookId));
   }
 }

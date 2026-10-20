@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Book } from '../shared/schemas/book.ts';
+import { DEFAULT_STRUCTURE } from '../shared/schemas/structure.ts';
 import { assertTreeInvariants } from '../shared/tree.ts';
 import { computeDisplayTitles } from '../shared/numbering.ts';
 import type { NodeKind, TreeNode } from '../shared/types.ts';
@@ -472,11 +473,152 @@ describe('trashed books', () => {
       api('PATCH', `/api/nodes/${id}`, { title: 'x' }),
       api('POST', `/api/nodes/${id}/move`, { parentId: null, index: 1 }),
       api('DELETE', `/api/nodes/${id}`),
+      api('POST', `/api/nodes/${id}/duplicate`),
+      api('PATCH', `/api/books/${book.id}`, { structure: DEFAULT_STRUCTURE }),
     ];
     for (const res of await Promise.all(attempts)) {
       expect(res.statusCode).toBe(409);
       expect(res.json().error.code).toBe('BOOK_TRASHED');
     }
     expect(liveTitles(await getTree(book.id), null)).toEqual(['Ch1', 'Ch2']);
+  });
+});
+
+describe('duplicate (TREE-06)', () => {
+  it('copies a subtree with new ids right after the original and keeps content', async () => {
+    const book = await createBook();
+    const part = await createNode(book.id, 'part', null, 'Part A');
+    const ch1 = await createNode(book.id, 'chapter', part.id, 'Ch1');
+    const ch2 = await createNode(book.id, 'chapter', part.id, 'Ch2');
+    const scene = await createNode(book.id, 'scene', ch1.id, 'Scene');
+    await createNode(book.id, 'part', null, 'Part B');
+    store.db
+      .prepare(
+        `UPDATE nodes SET content = ?, plain_text = ?, word_count = 7, synopsis = 'Made-up synopsis',
+                          status = 'revising', numbered = 0 WHERE id = ?`,
+      )
+      .run('{"type":"doc","content":[{"type":"paragraph"}]}', 'hello world', ch1.id);
+
+    const res = await api('POST', `/api/nodes/${ch1.id}/duplicate`);
+    expect(res.statusCode).toBe(201);
+    const { node, nodes } = res.json<{ node: TreeNode; nodes: TreeNode[] }>();
+
+    expect(node.id).not.toBe(ch1.id);
+    expect(node.parentId).toBe(part.id);
+    expect(node.title).toBe('Ch1 (copy)');
+    expect(node.position).toBe(1);
+    expect(liveTitles(nodes, part.id)).toEqual(['Ch1', 'Ch1 (copy)', 'Ch2']);
+    expect(liveTitles(nodes, node.id)).toEqual(['Scene']);
+    expect(liveTitles(nodes, null)).toEqual(['Part A', 'Part B']);
+    expect(node).toMatchObject({
+      wordCount: 7,
+      synopsis: 'Made-up synopsis',
+      status: 'revising',
+      numbered: false,
+    });
+
+    const copy = store.db
+      .prepare('SELECT content, plain_text, rev FROM nodes WHERE id = ?')
+      .get(node.id) as { content: string; plain_text: string; rev: number };
+    expect(copy).toEqual({
+      content: '{"type":"doc","content":[{"type":"paragraph"}]}',
+      plain_text: 'hello world',
+      rev: 0,
+    });
+
+    const ids = new Set(nodes.map((n) => n.id));
+    expect(ids.size).toBe(nodes.length);
+    expect(nodes.find((n) => n.id === scene.id)?.parentId).toBe(ch1.id);
+    expect(nodes.find((n) => n.id === ch2.id)?.position).toBe(2);
+    expect(() => assertTreeInvariants(nodes)).not.toThrow();
+  });
+
+  it('skips trashed descendants and leaves untitled copies untitled', async () => {
+    const book = await createBook();
+    const ch = await createNode(book.id, 'chapter', null, '');
+    const keep = await createNode(book.id, 'scene', ch.id, 'Keep');
+    const gone = await createNode(book.id, 'scene', ch.id, 'Gone');
+    await api('DELETE', `/api/nodes/${gone.id}`);
+
+    const { node, nodes } = (await api('POST', `/api/nodes/${ch.id}/duplicate`)).json<{
+      node: TreeNode;
+      nodes: TreeNode[];
+    }>();
+    expect(node.title).toBe('');
+    expect(liveTitles(nodes, node.id)).toEqual(['Keep']);
+    expect(nodes.filter((n) => n.title === 'Gone')).toHaveLength(1);
+    expect(nodes.find((n) => n.id === keep.id)?.parentId).toBe(ch.id);
+  });
+
+  it('is atomic: a failure part-way leaves the tree untouched', async () => {
+    const book = await createBook();
+    const ch = await createNode(book.id, 'chapter', null, 'Ch');
+    await createNode(book.id, 'scene', ch.id, 'Scene');
+    const before = await getTree(book.id);
+    store.db.exec(
+      `CREATE TRIGGER fail_copy BEFORE INSERT ON nodes WHEN NEW.kind = 'scene'
+         BEGIN SELECT RAISE(ABORT, 'boom'); END`,
+    );
+    expect((await api('POST', `/api/nodes/${ch.id}/duplicate`)).statusCode).toBe(500);
+    store.db.exec('DROP TRIGGER fail_copy');
+    expect(await getTree(book.id)).toEqual(before);
+  });
+
+  it('rejects unknown, trashed and malformed ids', async () => {
+    const book = await createBook();
+    const ch = await createNode(book.id, 'chapter', null, 'Ch');
+    expect((await api('POST', `/api/nodes/${MISSING}/duplicate`)).statusCode).toBe(404);
+    expect((await api('POST', '/api/nodes/nope/duplicate')).statusCode).toBe(400);
+    await api('DELETE', `/api/nodes/${ch.id}`);
+    expect((await api('POST', `/api/nodes/${ch.id}/duplicate`)).statusCode).toBe(404);
+  });
+});
+
+describe('structure settings via PATCH /api/books/:id', () => {
+  const chinese = {
+    volume: { ...DEFAULT_STRUCTURE.volume, format: '第{n:cn}卷', separator: ' ' },
+    part: { ...DEFAULT_STRUCTURE.part, format: '第{n:cn}部', separator: ' ' },
+    chapter: { ...DEFAULT_STRUCTURE.chapter, format: '第{n:cn}章', separator: ' ' },
+    scene: { ...DEFAULT_STRUCTURE.scene },
+  };
+
+  it('stores the structure, returns it on the book and uses it for new sections', async () => {
+    const book = await createBook();
+    expect(book.structure).toEqual(DEFAULT_STRUCTURE);
+    const noScenes = { ...chinese, chapter: { ...chinese.chapter, defaultNumbered: false } };
+    const res = await api('PATCH', `/api/books/${book.id}`, { structure: noScenes });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<Book>().structure).toEqual(noScenes);
+    expect((await api('GET', `/api/books/${book.id}`)).json<Book>().structure).toEqual(noScenes);
+    expect((await createNode(book.id, 'chapter', null, 'C')).numbered).toBe(false);
+  });
+
+  it('keeps other settings keys and does not touch the tree', async () => {
+    const { book } = await bookWithChapters(2);
+    store.db
+      .prepare('UPDATE books SET settings = ? WHERE id = ?')
+      .run(JSON.stringify({ display: { fontSize: 18 } }), book.id);
+    const before = await getTree(book.id);
+    expect((await api('PATCH', `/api/books/${book.id}`, { structure: chinese })).statusCode).toBe(
+      200,
+    );
+    const row = store.db.prepare('SELECT settings FROM books WHERE id = ?').get(book.id) as {
+      settings: string;
+    };
+    expect(JSON.parse(row.settings)).toEqual({ display: { fontSize: 18 }, structure: chinese });
+    expect(await getTree(book.id)).toEqual(before);
+  });
+
+  it('rejects invalid structures', async () => {
+    const book = await createBook();
+    const bad = {
+      ...DEFAULT_STRUCTURE,
+      part: { ...DEFAULT_STRUCTURE.part, restartWithin: 'chapter' },
+    };
+    expect((await api('PATCH', `/api/books/${book.id}`, { structure: bad })).statusCode).toBe(400);
+    expect((await api('PATCH', `/api/books/${book.id}`, { structure: {} })).statusCode).toBe(400);
+    expect((await api('GET', `/api/books/${book.id}`)).json<Book>().structure).toEqual(
+      DEFAULT_STRUCTURE,
+    );
   });
 });

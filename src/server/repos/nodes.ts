@@ -70,6 +70,22 @@ export function insertNodeRow(db: Db, node: TreeNode, now: string): void {
   );
 }
 
+/** Copies a section row, including its content, under a new id; snapshots are not copied. */
+export function copyNodeRow(
+  db: Db,
+  sourceId: string,
+  copy: { id: string; parentId: string | null; position: number; title: string },
+  now: string,
+): void {
+  db.prepare(
+    `INSERT INTO nodes (id, book_id, parent_id, kind, title, position, numbered, status, synopsis,
+                        content, plain_text, word_count, rev, created_at, updated_at, deleted_at)
+     SELECT ?, book_id, ?, kind, ?, ?, numbered, status, synopsis,
+            content, plain_text, word_count, 0, ?, ?, NULL
+       FROM nodes WHERE id = ?`,
+  ).run(copy.id, copy.parentId, copy.title, copy.position, now, now, sourceId);
+}
+
 /** Writes parent, position and trash state only; titles, content and updated_at stay untouched. */
 export function writeStructure(db: Db, nodes: readonly TreeNode[]): void {
   const stmt = db.prepare(
@@ -107,6 +123,20 @@ export function updateNodeFields(db: Db, id: string, update: NodeFieldsUpdate, n
   columns.push('updated_at = ?');
   values.push(now);
   db.prepare(`UPDATE nodes SET ${columns.join(', ')} WHERE id = ?`).run(...values, id);
+}
+
+/** Sets body text directly; used by the dev seed until content saving arrives with the editor. */
+export function setNodeText(
+  db: Db,
+  id: string,
+  text: { content: string; plainText: string; wordCount: number },
+): void {
+  db.prepare('UPDATE nodes SET content = ?, plain_text = ?, word_count = ? WHERE id = ?').run(
+    text.content,
+    text.plainText,
+    text.wordCount,
+    id,
+  );
 }
 
 export function touchBook(db: Db, bookId: string, now: string): void {
