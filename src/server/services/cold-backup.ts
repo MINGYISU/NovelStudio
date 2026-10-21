@@ -11,6 +11,7 @@ import {
   computeStats,
 } from '../../shared/cold-backup.ts';
 import { computeDisplayTitles, UNTITLED } from '../../shared/numbering.ts';
+import type { AutoDailyLast } from '../../shared/schemas/config.ts';
 import type {
   ColdBackupSettings,
   ColdBackupSettingsResponse,
@@ -51,8 +52,15 @@ import {
   defaultRepoRoot,
   LOCATION_INVALID,
   LOCATION_UNAVAILABLE,
+  type CheckedLocation,
   type LocationContext,
 } from './cold-backup-location.ts';
+
+/** `YYYY-MM-DD` in the machine's local time zone: "once per day" means the user's calendar day. */
+function localDateString(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
 export interface ColdBackupContext extends LocationContext {
   db: Db;
@@ -441,8 +449,10 @@ export class ColdBackupService {
         keepNewestPerBook: coldBackup.keepNewestPerBook,
         includeSnapshots: coldBackup.includeSnapshots,
         reminderDays: coldBackup.reminderDays,
+        autoDaily: coldBackup.autoDaily,
       },
       last: coldBackup.last,
+      autoDailyLast: coldBackup.autoDailyLast,
       pickerSupported: process.platform === 'darwin',
     };
   }
@@ -456,6 +466,7 @@ export class ColdBackupService {
     if (body.keepNewestPerBook !== undefined) next.keepNewestPerBook = body.keepNewestPerBook;
     if (body.includeSnapshots !== undefined) next.includeSnapshots = body.includeSnapshots;
     if (body.reminderDays !== undefined) next.reminderDays = body.reminderDays;
+    if (body.autoDaily !== undefined) next.autoDaily = body.autoDaily;
     writeConfig(this.ctx.paths.dataDir, {
       ...config,
       coldBackup: { ...config.coldBackup, ...next },
@@ -536,6 +547,65 @@ export class ColdBackupService {
     return Object.entries(last)
       .filter(([id]) => bookId === undefined || id === bookId)
       .map(([id, entry]) => ({ bookId: id, ...verifyColdBackup(entry.file) }));
+  }
+
+  /**
+   * COLD-11: once per local day, on the first start after it is switched on, back up the live books
+   * changed since their last cold backup. Uses the normal exporter, so the location checks, atomic
+   * writes, never-overwrite and retention rules all apply. A failure is recorded in config.json (and
+   * shown in Settings) and retried at the next start; it is never silent.
+   */
+  runAutoDaily(): AutoDailyLast | null {
+    const now = this.now();
+    const today = localDateString(now);
+    const config = readConfig(this.ctx.paths.dataDir);
+    const cold = config.coldBackup;
+    if (!cold.autoDaily) return null;
+    if (cold.autoDailyLast?.date === today && cold.autoDailyLast.ok) return cold.autoDailyLast;
+
+    const record = (ok: boolean, message: string): AutoDailyLast => {
+      const outcome: AutoDailyLast = { date: today, at: now.toISOString(), ok, message };
+      const fresh = readConfig(this.ctx.paths.dataDir);
+      writeConfig(this.ctx.paths.dataDir, {
+        ...fresh,
+        coldBackup: { ...fresh.coldBackup, autoDailyLast: outcome },
+      });
+      return outcome;
+    };
+
+    if (!cold.dir) {
+      return record(false, 'Automatic backup is on, but no cold backup folder is set.');
+    }
+    let location: CheckedLocation;
+    try {
+      location = checkLocation(cold.dir, this.ctx);
+    } catch (err) {
+      return record(false, `Not backed up: ${(err as Error).message}`);
+    }
+
+    const changed = listBooks(this.ctx.db, { trashed: false, sort: 'title' }).filter((book) => {
+      const lastAt = cold.last[book.id]?.at;
+      return lastAt === undefined || book.updatedAt > lastAt;
+    });
+    let exists = location.exists;
+    const failures: string[] = [];
+    for (const book of changed) {
+      try {
+        this.writeBook(book.id, location.dir, exists, {});
+        exists = true;
+      } catch (err) {
+        failures.push(`"${book.title}": ${(err as Error).message}`);
+      }
+    }
+    if (failures.length > 0) {
+      return record(false, `Some books were not backed up. ${failures.join(' ')}`);
+    }
+    return record(
+      true,
+      changed.length === 0
+        ? 'No books changed since their last cold backup.'
+        : `Backed up ${changed.length} changed ${changed.length === 1 ? 'book' : 'books'}.`,
+    );
   }
 
   private writeBook(

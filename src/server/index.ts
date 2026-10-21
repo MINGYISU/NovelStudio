@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { buildApp, LISTEN_HOST } from './app.ts';
 import { openDataStore } from './bootstrap.ts';
 import { DataDirError } from './config.ts';
+import { ColdBackupService } from './services/cold-backup.ts';
 
 function parsePort(value: string | undefined, fallback: number): number {
   if (value === undefined || value === '') return fallback;
@@ -55,6 +56,13 @@ async function main(): Promise<void> {
   } catch (err) {
     store.close();
     throw err;
+  }
+
+  try {
+    const outcome = new ColdBackupService({ db: store.db, paths: store.paths }).runAutoDaily();
+    if (outcome) app.log.info(`Automatic cold backup: ${outcome.message}`);
+  } catch (err) {
+    app.log.error(err, 'Automatic cold backup failed');
   }
 }
 

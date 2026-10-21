@@ -4,7 +4,8 @@ import type { Book, CreateBookBody, PatchBookBody } from '../../shared/schemas/b
 import type { DataPaths } from '../config.ts';
 import type { Db } from '../db/connection.ts';
 import { ApiError } from '../errors.ts';
-import { deleteAsset, getAsset } from '../repos/assets.ts';
+import { deleteAsset, getAsset, type AssetRow } from '../repos/assets.ts';
+import { isAssetInUse } from '../repos/codex.ts';
 import {
   deleteBook,
   getBook,
@@ -39,9 +40,9 @@ export class LibraryService {
 
   update(id: string, patch: PatchBookBody): Book {
     const now = new Date().toISOString();
-    const replaced = this.db.transaction(() => {
+    const removed = this.db.transaction(() => {
       const book = this.requireLiveBook(id);
-      let oldCover = null;
+      const candidates: (string | null)[] = [];
       if (patch.coverAssetId !== undefined && patch.coverAssetId !== book.coverAssetId) {
         if (patch.coverAssetId !== null) {
           const asset = getAsset(this.db, patch.coverAssetId);
@@ -53,13 +54,36 @@ export class LibraryService {
             );
           }
         }
-        oldCover = book.coverAssetId ? getAsset(this.db, book.coverAssetId) : null;
+        candidates.push(book.coverAssetId);
+      }
+      const background = patch.display?.backgroundImageAssetId;
+      if (background !== undefined && background !== book.display.backgroundImageAssetId) {
+        if (background !== null) {
+          const asset = getAsset(this.db, background);
+          if (!asset || asset.bookId !== id) {
+            throw new ApiError(
+              400,
+              'INVALID_BACKGROUND',
+              'The background must be an image uploaded to this book.',
+            );
+          }
+        }
+        candidates.push(book.display.backgroundImageAssetId);
       }
       updateBookFields(this.db, id, patch, now);
-      if (oldCover) deleteAsset(this.db, oldCover.id);
-      return oldCover;
+
+      // A replaced or removed image is deleted unless something else (cover, codex, background) uses it.
+      const gone: AssetRow[] = [];
+      for (const assetId of candidates) {
+        const asset = assetId ? getAsset(this.db, assetId) : null;
+        if (asset && !isAssetInUse(this.db, asset.id)) {
+          deleteAsset(this.db, asset.id);
+          gone.push(asset);
+        }
+      }
+      return gone;
     })();
-    if (replaced) removeAssetFile(this.paths.assetsDir, replaced);
+    for (const asset of removed) removeAssetFile(this.paths.assetsDir, asset);
     return this.requireBook(id);
   }
 

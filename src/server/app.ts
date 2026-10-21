@@ -11,6 +11,10 @@ import { registerBookRoutes } from './routes/books.ts';
 import { registerColdBackupRoutes } from './routes/cold-backup.ts';
 import { registerCodexRoutes } from './routes/codex.ts';
 import { registerContentRoutes } from './routes/content.ts';
+import { registerExportRoutes } from './routes/export.ts';
+import { registerHotBackupRoutes } from './routes/hot-backups.ts';
+import { registerImportTextRoutes } from './routes/import-text.ts';
+import { registerSearchRoutes } from './routes/search.ts';
 import { registerForeshadowRoutes } from './routes/foreshadows.ts';
 import { registerMapRoutes } from './routes/maps.ts';
 import { registerNodeRoutes } from './routes/nodes.ts';
@@ -23,6 +27,7 @@ import { ContentService } from './services/content.ts';
 import { chooseFolderWithOsascript, type FolderPicker } from './services/folder-picker.ts';
 import { LibraryService } from './services/library.ts';
 import { ManuscriptService } from './services/manuscript.ts';
+import { SearchReplaceService } from './services/search-replace.ts';
 import { SnapshotService } from './services/snapshots.ts';
 
 export const JSON_BODY_LIMIT = 25 * 1024 * 1024;
@@ -99,6 +104,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     registerForeshadowRoutes(app, new ForeshadowService(options.db, library));
     const snapshots = new SnapshotService(options.db, library);
     registerContentRoutes(app, new ContentService(options.db, library, snapshots), snapshots);
+    registerSearchRoutes(app, new SearchReplaceService(options.db, library, snapshots));
+    registerExportRoutes(app, options.db, library);
+    registerImportTextRoutes(app, options.db);
+    registerHotBackupRoutes(app, options.db, options.paths);
     registerColdBackupRoutes(app, {
       db: options.db,
       paths: options.paths,

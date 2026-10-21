@@ -7,6 +7,10 @@ export const BACKUP_INTERVAL_MS = 60 * 60 * 1000;
 
 const BACKUP_NAME = /^novelstudio-\d{8}-\d{6}\.db$/;
 
+export function isBackupName(name: string): boolean {
+  return BACKUP_NAME.test(name);
+}
+
 function pad(n: number, width = 2): string {
   return String(n).padStart(width, '0');
 }

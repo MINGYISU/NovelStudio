@@ -63,15 +63,26 @@ export interface UpdateBookVars {
   patch: Omit<PatchBookBody, 'coverAssetId'>;
   /** `undefined` keeps the cover, `null` removes it, a File replaces it. */
   cover?: File | null;
+  /** `undefined` keeps the background image, `null` removes it, a File replaces it (DISP-02). */
+  background?: File | null;
 }
 
 export function useUpdateBook() {
-  return useBookMutation(async ({ id, patch, cover }: UpdateBookVars): Promise<Book> => {
-    const body: PatchBookBody = { ...patch };
-    if (cover instanceof File) body.coverAssetId = (await uploadCover(id, cover)).id;
-    else if (cover === null) body.coverAssetId = null;
-    return bookSchema.parse(await apiRequest(`/api/books/${id}`, { method: 'PATCH', json: body }));
-  });
+  return useBookMutation(
+    async ({ id, patch, cover, background }: UpdateBookVars): Promise<Book> => {
+      const body: PatchBookBody = { ...patch };
+      if (cover instanceof File) body.coverAssetId = (await uploadCover(id, cover)).id;
+      else if (cover === null) body.coverAssetId = null;
+      if (body.display && background !== undefined) {
+        const backgroundImageAssetId =
+          background === null ? null : (await uploadCover(id, background)).id;
+        body.display = { ...body.display, backgroundImageAssetId };
+      }
+      return bookSchema.parse(
+        await apiRequest(`/api/books/${id}`, { method: 'PATCH', json: body }),
+      );
+    },
+  );
 }
 
 export function useTrashBook() {

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const DISPLAY_FONTS = ['serif', 'sans', 'mono', 'cjk-serif', 'cjk-sans'] as const;
 export type DisplayFont = (typeof DISPLAY_FONTS)[number];
-export const DISPLAY_THEMES = ['light', 'dark'] as const;
+export const DISPLAY_THEMES = ['light', 'dark', 'sepia'] as const;
 
 /** Only system fonts are offered (DISP-03): no font files are loaded from anywhere. */
 export const FONT_STACKS: Record<DisplayFont, string> = {
@@ -28,6 +28,14 @@ export const displaySettingsSchema = z.object({
   firstLineIndent: z.number().min(0).max(4).default(0),
   editorWidth: z.number().int().min(480).max(1200).default(720),
   theme: z.enum(DISPLAY_THEMES).default('light'),
+  paragraphSpacing: z.number().min(0).max(2).default(0.6),
+  backgroundColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .nullable()
+    .default(null),
+  backgroundImageAssetId: z.uuid().nullable().default(null),
+  backgroundImageOpacity: z.number().min(0.05).max(1).default(0.3),
 });
 export type DisplaySettings = z.infer<typeof displaySettingsSchema>;
 

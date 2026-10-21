@@ -87,3 +87,50 @@
   color: #8a5a00;
   font-weight: 600;
 }
+
+.preview {
+  max-height: 20rem;
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.preview li {
+  margin-bottom: 0.5rem;
+}
+
+.previewChild {
+  margin-left: 1.25rem;
+}
+
+.backupList {
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.backupList li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+.backupList li > span:first-child {
+  flex: 1;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.82rem;
+}
+
+.banner {
+  margin: 0.5rem 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--color-warn);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}

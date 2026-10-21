@@ -127,6 +127,27 @@ describe('displaySettingsSchema', () => {
     expect(displaySettingsSchema.parse({})).toEqual(DEFAULT_DISPLAY);
     expect(displaySettingsSchema.safeParse({ fontSize: 80 }).success).toBe(false);
     expect(displaySettingsSchema.safeParse({ fontFamily: 'Comic Sans' }).success).toBe(false);
-    expect(displaySettingsSchema.safeParse({ theme: 'sepia' }).success).toBe(false);
+    expect(displaySettingsSchema.safeParse({ theme: 'neon' }).success).toBe(false);
+  });
+
+  it('accepts the sepia theme, paragraph spacing and background options (DISP-02)', () => {
+    expect(displaySettingsSchema.parse({ theme: 'sepia' }).theme).toBe('sepia');
+    expect(DEFAULT_DISPLAY).toMatchObject({
+      paragraphSpacing: 0.6,
+      backgroundColor: null,
+      backgroundImageAssetId: null,
+      backgroundImageOpacity: 0.3,
+    });
+    expect(displaySettingsSchema.safeParse({ backgroundColor: '#f4ecd8' }).success).toBe(true);
+    for (const bad of [
+      { backgroundColor: 'red' },
+      { backgroundColor: '#fff' },
+      { paragraphSpacing: 3 },
+      { backgroundImageOpacity: 0 },
+      { backgroundImageOpacity: 1.5 },
+      { backgroundImageAssetId: 'x' },
+    ]) {
+      expect(displaySettingsSchema.safeParse(bad).success).toBe(false);
+    }
   });
 });

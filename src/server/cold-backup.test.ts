@@ -205,7 +205,19 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
   const asset = (
     await harness.app.inject({ method: 'POST', url: `/api/books/${book.id}/assets`, ...form })
   ).json<{ id: string }>();
-  await harness.api('PATCH', `/api/books/${book.id}`, {
+  const backgroundForm = multipartBody([{ name: 'file', filename: 'paper.png', data: TINY_PNG }]);
+  const background = (
+    await harness.app.inject({
+      method: 'POST',
+      url: `/api/books/${book.id}/assets`,
+      ...backgroundForm,
+    })
+  ).json<{ id: string }>();
+  // Same-millisecond uploads would order by random id; pin the order so tests can rely on assets[0].
+  const pin = harness.store.db.prepare('UPDATE assets SET created_at = ? WHERE id = ?');
+  pin.run('2026-01-01T00:00:00.000Z', asset.id);
+  pin.run('2026-01-02T00:00:00.000Z', background.id);
+  const patched = await harness.api('PATCH', `/api/books/${book.id}`, {
     coverAssetId: asset.id,
     author: 'Made Up',
     description: 'Invented.',
@@ -215,9 +227,14 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
       lineHeight: 1.8,
       firstLineIndent: 2,
       editorWidth: 800,
-      theme: 'dark',
+      theme: 'sepia',
+      paragraphSpacing: 1,
+      backgroundColor: '#f4ecd8',
+      backgroundImageAssetId: background.id,
+      backgroundImageOpacity: 0.4,
     },
   });
+  expect(patched.statusCode).toBe(200);
   const codex = await addCodex(harness, book.id, asset.id);
   const maps = await addMaps(harness, book.id, {
     section: ch1.id,
@@ -239,6 +256,7 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
       goneChild: goneChild.id,
       nested: nested.id,
       asset: asset.id,
+      background: background.id,
     },
   };
 }
@@ -349,7 +367,15 @@ describe('export (COLD-02..04, EXP-02)', () => {
       author: 'Made Up',
       coverAssetId: ids.asset,
     });
-    expect(doc.book.settings.display).toMatchObject({ fontFamily: 'cjk-serif', theme: 'dark' });
+    expect(doc.book.settings.display).toMatchObject({
+      fontFamily: 'cjk-serif',
+      theme: 'sepia',
+      paragraphSpacing: 1,
+      backgroundColor: '#f4ecd8',
+      backgroundImageAssetId: ids.background,
+      backgroundImageOpacity: 0.4,
+    });
+    expect(doc.assets.map((a) => a.id)).toContain(ids.background);
     expect(doc.manuscript.map((s) => s.displayTitle)).toEqual(['Volume I — Old Roads', 'Prologue']);
     const part = doc.manuscript[0]!.children[0]!;
     expect(part.displayTitle).toBe('Part 1 — Beginnings');
@@ -369,9 +395,9 @@ describe('export (COLD-02..04, EXP-02)', () => {
     expect(cut.children.map((c) => c.title)).toEqual(['Cut scene']);
     expect(doc.trash.find((t) => t.title === 'Trashed earlier')!.originalParentId).toBe(ids.ch1);
 
-    expect(doc.assets).toHaveLength(1);
+    expect(doc.assets).toHaveLength(2);
     expect(Buffer.from(doc.assets[0]!.dataBase64, 'base64').equals(TINY_PNG)).toBe(true);
-    expect(doc.stats).toMatchObject({ sections: 5, trashedSections: 3, assets: 1, snapshots: 0 });
+    expect(doc.stats).toMatchObject({ sections: 5, trashedSections: 3, assets: 2, snapshots: 0 });
   });
 
   it('reproduces the manuscript with the jq recipe of COLD_BACKUP_FORMAT §7', async () => {
@@ -705,7 +731,18 @@ describe('restore with ID collision (COLD-07)', () => {
 
     // Same content and structure; only the ids (and the restored-title suffix) differ.
     const strip = (d: ColdBackupDoc) =>
-      canonical({ ...d, book: { ...d.book, title: '', updatedAt: '' } });
+      canonical({
+        ...d,
+        book: {
+          ...d.book,
+          title: '',
+          updatedAt: '',
+          settings: {
+            ...d.book.settings,
+            display: { ...(d.book.settings.display as object), backgroundImageAssetId: '' },
+          },
+        },
+      });
     expect(strip(copyDoc)).toEqual(strip(original));
 
     // References: trash parents, cover, snapshot nodes all point into the new book.
@@ -717,6 +754,11 @@ describe('restore with ID collision (COLD-07)', () => {
     );
     expect(copyDoc.book.coverAssetId).toBe(copyDoc.assets[0]!.id);
     expect(copyDoc.assets[0]!.id).not.toBe(ids.asset);
+    // The background image reference follows the remap (COLD-09).
+    expect(copyDoc.book.settings.display).toMatchObject({
+      backgroundImageAssetId: copyDoc.assets[1]!.id,
+    });
+    expect(copyDoc.assets[1]!.id).not.toBe(ids.background);
     for (const s of copyDoc.snapshots!) expect(newIds.has(s.nodeId)).toBe(true);
     expect(
       fs.existsSync(
@@ -804,11 +846,14 @@ describe('restore validation and safety', () => {
 
   it('skips images that are not real PNG/JPEG/WebP/GIF files (an SVG is refused)', async () => {
     const doc = await exportedDoc();
-    doc.assets[0]!.dataBase64 = Buffer.from(
-      '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
-    ).toString('base64');
+    for (const asset of doc.assets) {
+      asset.dataBase64 = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+      ).toString('base64');
+    }
     const result = restore(doc);
     expect(result.warnings.join(' ')).toContain('not a supported image type');
+    expect(result.warnings.join(' ')).toContain('The background image was not available');
     expect(getBook(h.store.db, result.book.id)?.coverAssetId).toBeNull();
     expect(
       h.store.db.prepare('SELECT COUNT(*) AS n FROM assets WHERE book_id = ?').get(result.book.id),
@@ -1471,8 +1516,10 @@ describe('API', () => {
       keepNewestPerBook: null,
       includeSnapshots: false,
       reminderDays: 7,
+      autoDaily: false,
     });
     expect(initial.last).toEqual({});
+    expect(initial.autoDailyLast).toBeNull();
 
     const res = await h.api('PUT', '/api/settings/cold-backup', {
       dir: backupDir,
@@ -1485,6 +1532,7 @@ describe('API', () => {
       keepNewestPerBook: 5,
       includeSnapshots: true,
       reminderDays: 3,
+      autoDaily: false,
     });
     expect(readConfig(h.dataDir).coldBackup).toMatchObject({
       dir: backupDir,

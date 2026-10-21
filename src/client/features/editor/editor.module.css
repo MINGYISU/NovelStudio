@@ -7,12 +7,25 @@
   --ed-border: var(--color-border);
   --ed-accent: var(--color-accent);
 
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   background: var(--ed-bg);
   color: var(--ed-text);
+}
+
+/* Optional background picture (DISP-02): behind the text, never part of it. */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  pointer-events: none;
 }
 
 .panel[data-theme='dark'] {
@@ -22,6 +35,15 @@
   --ed-muted: #a39b90;
   --ed-border: #3d3935;
   --ed-accent: #b3a0e6;
+}
+
+.panel[data-theme='sepia'] {
+  --ed-bg: #f4ecd8;
+  --ed-surface: #ece1c6;
+  --ed-text: #433422;
+  --ed-muted: #86775e;
+  --ed-border: #d8c9a4;
+  --ed-accent: #7a5c2e;
 }
 
 .toolbar {
@@ -156,7 +178,7 @@
 }
 
 .prose :global(.ProseMirror p) {
-  margin: 0 0 0.6em;
+  margin: 0 0 var(--ed-para, 0.6em);
   text-indent: calc(var(--ed-indent, 0) * 1em);
 }
 

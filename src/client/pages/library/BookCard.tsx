@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Download, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Download, FileText, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useTrashBook } from '../../api/books.ts';
@@ -54,6 +54,16 @@ export function BookCard({ book, backup }: { book: Book; backup?: BackupInfo }) 
           <DropdownMenu.Content className={styles.menu} align="end" sideOffset={4}>
             <DropdownMenu.Item className={styles.menuItem} onSelect={() => setEditing(true)}>
               <Pencil size={16} /> Edit metadata
+            </DropdownMenu.Item>
+            <DropdownMenu.Item className={styles.menuItem} asChild>
+              <a href={`/api/books/${book.id}/export?format=md`} download>
+                <FileText size={16} /> Export Markdown
+              </a>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item className={styles.menuItem} asChild>
+              <a href={`/api/books/${book.id}/export?format=txt`} download>
+                <FileText size={16} /> Export plain text
+              </a>
             </DropdownMenu.Item>
             <DropdownMenu.Item className={styles.menuItem} onSelect={() => setExporting(true)}>
               <Download size={16} /> Export cold backup…

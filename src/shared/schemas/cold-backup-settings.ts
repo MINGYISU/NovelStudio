@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { bookSchema } from './book.ts';
 import { statsSchema } from './cold-backup.ts';
+import { autoDailyLastSchema } from './config.ts';
 
 const dir = z.string().trim().min(1).max(4096);
 
@@ -9,12 +10,14 @@ export const coldBackupSettingsSchema = z.object({
   keepNewestPerBook: z.number().int().positive().nullable(),
   includeSnapshots: z.boolean(),
   reminderDays: z.number().int().positive(),
+  autoDaily: z.boolean(),
 });
 export type ColdBackupSettings = z.infer<typeof coldBackupSettingsSchema>;
 
 export const coldBackupSettingsResponseSchema = z.object({
   settings: coldBackupSettingsSchema,
   last: z.record(z.string(), z.object({ at: z.string(), file: z.string() })),
+  autoDailyLast: autoDailyLastSchema.nullable(),
   pickerSupported: z.boolean(),
 });
 export type ColdBackupSettingsResponse = z.infer<typeof coldBackupSettingsResponseSchema>;
@@ -25,6 +28,7 @@ export const putColdBackupSettingsBodySchema = z
     keepNewestPerBook: z.number().int().min(1).max(1000).nullable().optional(),
     includeSnapshots: z.boolean().optional(),
     reminderDays: z.number().int().min(1).max(365).optional(),
+    autoDaily: z.boolean().optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'Nothing to update.' });
 export type PutColdBackupSettingsBody = z.infer<typeof putColdBackupSettingsBodySchema>;

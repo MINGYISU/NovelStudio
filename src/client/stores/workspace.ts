@@ -64,6 +64,12 @@ interface WorkspaceState {
   /** The story map last open per book, so the Story Maps tab returns to it. */
   lastMapByBook: Record<string, string>;
   setLastMap: (bookId: string, mapId: string) => void;
+  /** WS-03: hides the top bar, sidebar and right panel. Never persisted: a reload starts normal. */
+  focusMode: boolean;
+  setFocusMode: (on: boolean) => void;
+  /** Bumped when section text changed on the server behind the editor's back (find & replace). */
+  contentEpoch: number;
+  bumpContentEpoch: () => void;
 }
 
 let noticeCounter = 0;
@@ -101,4 +107,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   lastMapByBook: {},
   setLastMap: (bookId, mapId) =>
     set((state) => ({ lastMapByBook: { ...state.lastMapByBook, [bookId]: mapId } })),
+  focusMode: false,
+  setFocusMode: (focusMode) => set({ focusMode }),
+  contentEpoch: 0,
+  bumpContentEpoch: () => set((state) => ({ contentEpoch: state.contentEpoch + 1 })),
 }));

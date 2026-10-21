@@ -35,6 +35,21 @@ npm run build
 npm start          # real use: http://127.0.0.1:4317, data in ~/Library/Application Support/NovelStudio
 ```
 
+### Double-click launcher and "Install app"
+
+`NovelStudio.command` (double-click in Finder, or `./NovelStudio.command`) starts the server in a Terminal window if it is not already running and opens the app in your browser. Press Ctrl+C in that window to stop the server. If the server is already running it only opens the browser. It builds the app first when there is no build yet or the sources are newer.
+
+In Chrome or Edge, open the app and choose **Install NovelStudio** (address bar icon or the browser menu) to get its own window and Dock icon. This only adds a window; the server must still be running.
+
+## Importing and exporting text
+
+- **Import:** library → **New → Import text or Markdown…** reads a `.txt` or `.md` file (UTF-8, or GB18030 for older Chinese files, up to 25 MB), shows the detected chapters, and creates a new book only after you confirm.
+- **Export:** book card menu or workspace menu → **Export Markdown** / **Export plain text** (reading order, display titles, no trash).
+
+## Backups of the database
+
+Settings → **Automatic database backups** lists the hourly database copies and can restore one. A restore is applied the next time the server starts; the database it replaces is kept under `backups/replaced-<time>/` in the data folder.
+
 ## Cold backups
 
 Set a folder in **Settings** (ideally on another disk or a synced folder), then export a book from its card menu, the workspace menu, or **Export all books**. Each export is a plain JSON file with a `.sha256` file next to it:

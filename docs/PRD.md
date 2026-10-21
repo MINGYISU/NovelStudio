@@ -328,3 +328,8 @@ Accounts, cloud sync, collaboration, mobile apps, AI writing features, publishin
 | Default Codex categories for existing books | Created lazily the first time the Codex view opens for a book that has none | No migration touches existing data; deleting every category brings the defaults back on the next visit. |
 | "Characters in this section" | Computed from names and aliases in the section text, not from stored links | No new data to back up or remap; manual links stay possible later. |
 | Native project format | The cold backup JSON | One format to maintain, readable without the app. |
+| Hot backup restore (HOT-02) | Staged, applied at the next server start before the database opens; the replaced database files are kept in `backups/replaced-<time>/` | The running server never swaps its own SQLite file, and nothing that was written after the request is lost. |
+| Text import size | 25 MB; larger files are refused with a warning, never truncated | A silently cut manuscript is worse than a refusal. |
+| Background picture (DISP-02) | An image asset of the book, referenced from the display settings | Reuses the asset pipeline (type sniffing, cold backup, restore remap); no new table. |
+| Installable app | PWA manifest only, no service worker | Chrome/Edge can install from the manifest; a service worker would add a cache that could serve stale code. |
+| Launcher | `NovelStudio.command` keeps the server in its Terminal window; Ctrl+C stops it | Simple and visible; a background service and stop command are for the later deployment stage. |

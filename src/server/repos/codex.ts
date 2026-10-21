@@ -222,10 +222,17 @@ export function setEntryPositions(db: Db, orderedIds: readonly string[]): void {
   orderedIds.forEach((id, index) => stmt.run(index, id));
 }
 
-/** True when an entry or the book cover still uses the asset, so the file must stay. */
+/** True when an entry, the book cover or a book's background image still uses the asset, so the file must stay. */
 export function isAssetInUse(db: Db, assetId: string): boolean {
   return (
     db.prepare('SELECT 1 FROM codex_entries WHERE image_asset_id = ?').get(assetId) !== undefined ||
-    db.prepare('SELECT 1 FROM books WHERE cover_asset_id = ?').get(assetId) !== undefined
+    db.prepare('SELECT 1 FROM books WHERE cover_asset_id = ?').get(assetId) !== undefined ||
+    db
+      .prepare(
+        `SELECT 1 FROM books
+          WHERE CASE WHEN json_valid(settings)
+                     THEN json_extract(settings, '$.display.backgroundImageAssetId') END = ?`,
+      )
+      .get(assetId) !== undefined
   );
 }

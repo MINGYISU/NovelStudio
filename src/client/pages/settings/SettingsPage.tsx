@@ -11,6 +11,7 @@ import {
 } from '../../api/cold-backup.ts';
 import { Button, Field, FormError, uiStyles } from '../../components/ui.tsx';
 import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
+import { HotBackupsSection } from '../../features/settings/HotBackupsSection.tsx';
 import { isBackupOverdue } from '../../../shared/cold-backup.ts';
 import type {
   ColdBackupSettingsResponse,
@@ -37,6 +38,7 @@ export function SettingsPage() {
         </p>
       ) : null}
       {settings.data ? <ColdBackupSection data={settings.data} /> : null}
+      <HotBackupsSection />
     </main>
   );
 }
@@ -50,6 +52,7 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
   const [keepN, setKeepN] = useState(data.settings.keepNewestPerBook ?? 5);
   const [snapshots, setSnapshots] = useState(data.settings.includeSnapshots);
   const [days, setDays] = useState(data.settings.reminderDays);
+  const [autoDaily, setAutoDaily] = useState(data.settings.autoDaily);
   const [validation, setValidation] = useState<ValidateLocationResponse | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [exportingAll, setExportingAll] = useState(false);
@@ -86,6 +89,7 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
         keepNewestPerBook: keepOn ? keepN : null,
         includeSnapshots: snapshots,
         reminderDays: days,
+        autoDaily,
       },
       { onSuccess: () => setMessage('Saved.') },
     );
@@ -163,6 +167,24 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
             />
             days
           </label>
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={autoDaily}
+              onChange={(e) => setAutoDaily(e.target.checked)}
+            />{' '}
+            Back up automatically once a day, at the first start, the books that changed (off by
+            default)
+          </label>
+          {data.autoDailyLast ? (
+            <p
+              className={data.autoDailyLast.ok ? styles.hint : styles.warning}
+              role={data.autoDailyLast.ok ? 'status' : 'alert'}
+            >
+              Last automatic backup, {new Date(data.autoDailyLast.at).toLocaleString()}:{' '}
+              {data.autoDailyLast.message}
+            </p>
+          ) : null}
           <FormError message={save.error?.message ?? null} />
           {message ? (
             <p className={styles.hint} role="status">

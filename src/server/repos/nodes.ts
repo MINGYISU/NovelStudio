@@ -165,36 +165,51 @@ export interface NodeContentRow {
   updatedAt: string;
 }
 
+interface RawContentRow {
+  id: string;
+  book_id: string;
+  deleted_at: string | null;
+  content: string;
+  plain_text: string;
+  word_count: number;
+  rev: number;
+  updated_at: string;
+}
+
+function toContentRow(row: RawContentRow): NodeContentRow {
+  return {
+    id: row.id,
+    bookId: row.book_id,
+    deletedAt: row.deleted_at,
+    content: row.content,
+    plainText: row.plain_text,
+    wordCount: row.word_count,
+    rev: row.rev,
+    updatedAt: row.updated_at,
+  };
+}
+
+const CONTENT_COLUMNS = 'id, book_id, deleted_at, content, plain_text, word_count, rev, updated_at';
+
 export function getNodeContentRow(db: Db, id: string): NodeContentRow | null {
-  const row = db
+  const row = db.prepare(`SELECT ${CONTENT_COLUMNS} FROM nodes WHERE id = ?`).get(id) as
+    RawContentRow | undefined;
+  return row ? toContentRow(row) : null;
+}
+
+/** Live sections of a book with their text; a trashed section hides its whole subtree. */
+export function listLiveContentRows(db: Db, bookId: string): NodeContentRow[] {
+  const rows = db
     .prepare(
-      `SELECT id, book_id, deleted_at, content, plain_text, word_count, rev, updated_at
-         FROM nodes WHERE id = ?`,
+      `WITH RECURSIVE live(id) AS (
+         SELECT id FROM nodes WHERE book_id = ? AND parent_id IS NULL AND deleted_at IS NULL
+         UNION ALL
+         SELECT n.id FROM nodes n JOIN live l ON n.parent_id = l.id WHERE n.deleted_at IS NULL
+       )
+       SELECT ${CONTENT_COLUMNS} FROM nodes WHERE id IN (SELECT id FROM live) ORDER BY id`,
     )
-    .get(id) as
-    | {
-        id: string;
-        book_id: string;
-        deleted_at: string | null;
-        content: string;
-        plain_text: string;
-        word_count: number;
-        rev: number;
-        updated_at: string;
-      }
-    | undefined;
-  return row
-    ? {
-        id: row.id,
-        bookId: row.book_id,
-        deletedAt: row.deleted_at,
-        content: row.content,
-        plainText: row.plain_text,
-        wordCount: row.word_count,
-        rev: row.rev,
-        updatedAt: row.updated_at,
-      }
-    : null;
+    .all(bookId) as RawContentRow[];
+  return rows.map(toContentRow);
 }
 
 /** Writes the body only if `rev` still matches; returns false when another save got there first. */

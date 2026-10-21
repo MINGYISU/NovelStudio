@@ -139,6 +139,28 @@ function assertNoDuplicates(label: string, ids: readonly string[]): void {
 }
 
 /**
+ * `settings.display.backgroundImageAssetId` points at one of the book's images, so it follows the
+ * id remap; an image that is not in the file removes the reference (with a warning).
+ */
+function remapBackgroundImage(
+  settings: Record<string, unknown>,
+  ids: ReadonlyMap<string, string>,
+  assetIdSet: ReadonlySet<string>,
+  warnings: string[],
+): Record<string, unknown> {
+  const display = settings.display;
+  if (typeof display !== 'object' || display === null || Array.isArray(display)) return settings;
+  const background = (display as Record<string, unknown>).backgroundImageAssetId;
+  if (typeof background !== 'string') return settings;
+  const mappedId = ids.get(background);
+  if (mappedId && assetIdSet.has(mappedId)) {
+    return { ...settings, display: { ...display, backgroundImageAssetId: mappedId } };
+  }
+  warnings.push('The background image was not available and was removed.');
+  return { ...settings, display: { ...display, backgroundImageAssetId: null } };
+}
+
+/**
  * Restores a cold backup as a NEW book (COLD-07). If any id already exists in this database, every
  * id is regenerated and every reference remapped. Positions come from array order; plain text and
  * word counts are recomputed. Everything is inserted in one transaction; on any error nothing stays.
@@ -284,7 +306,8 @@ export function restoreColdBackup(
   });
   const nodeIdSet = new Set(nodes.map((n) => n.id));
 
-  const assets = doc.assets.flatMap((asset) => {
+  // Spaced 1 ms apart so the restored images keep the order of the file (assets sort by created_at).
+  const assets = doc.assets.flatMap((asset, index) => {
     const data = Buffer.from(asset.dataBase64, 'base64');
     const mime = sniffImage(data);
     if (!mime) {
@@ -305,7 +328,7 @@ export function restoreColdBackup(
           mime,
           bytes: data.length,
           sha256,
-          createdAt: now.toISOString(),
+          createdAt: new Date(now.getTime() + index).toISOString(),
         },
       },
     ];
@@ -317,6 +340,7 @@ export function restoreColdBackup(
     if (mappedCover && assetIdSet.has(mappedCover)) coverAssetId = mappedCover;
     else warnings.push('The cover image was not available and was removed.');
   }
+  const settings = remapBackgroundImage(doc.book.settings, ids, assetIdSet, warnings);
 
   const snapshots = (doc.snapshots ?? []).flatMap((s) => {
     const parsed = contentSchema.safeParse(s.content);
@@ -484,7 +508,7 @@ export function restoreColdBackup(
         author: doc.book.author,
         description: doc.book.description,
         coverAssetId,
-        settings: JSON.stringify(doc.book.settings),
+        settings: JSON.stringify(settings),
         createdAt: doc.book.createdAt,
         updatedAt: doc.book.updatedAt,
       });

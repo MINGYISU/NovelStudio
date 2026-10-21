@@ -85,6 +85,11 @@ export class SnapshotService {
     this.seen.add(nodeId);
   }
 
+  /** Keeps the text about to be replaced by find & replace (ED-09); the caller's transaction covers it. */
+  takeBeforeReplace(previous: NodeContentRow, now: Date): void {
+    this.insert(previous, 'before-replace', now);
+  }
+
   list(nodeId: string): SnapshotSummary[] {
     this.requireRow(nodeId);
     return listSnapshots(this.db, nodeId).map(summarize);

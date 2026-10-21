@@ -10,7 +10,13 @@ import {
   type DisplaySettings,
 } from '../../../shared/schemas/display.ts';
 
-/** Per-book editor appearance (DISP-01). Stored in the book settings, never in the text. */
+const THEME_LABELS: Record<DisplaySettings['theme'], string> = {
+  light: 'Light',
+  dark: 'Dark',
+  sepia: 'Sepia',
+};
+
+/** Per-book editor appearance (DISP-01, DISP-02). Stored in the book settings, never in the text. */
 export function DisplaySettingsDialog({
   bookId,
   display,
@@ -21,6 +27,8 @@ export function DisplaySettingsDialog({
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<DisplaySettings>(display);
+  // undefined keeps the stored image, null removes it, a File replaces it.
+  const [background, setBackground] = useState<File | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const update = useUpdateBook();
 
@@ -32,11 +40,14 @@ export function DisplaySettingsDialog({
       return;
     }
     setError(null);
-    update.mutate({ id: bookId, patch: { display: parsed.data } }, { onSuccess: onClose });
+    update.mutate(
+      { id: bookId, patch: { display: parsed.data }, background },
+      { onSuccess: onClose },
+    );
   };
 
   const number = (
-    key: 'fontSize' | 'lineHeight' | 'firstLineIndent' | 'editorWidth',
+    key: 'fontSize' | 'lineHeight' | 'firstLineIndent' | 'editorWidth' | 'paragraphSpacing',
     step: number,
   ) => (
     <input
@@ -87,14 +98,68 @@ export function DisplaySettingsDialog({
           >
             {DISPLAY_THEMES.map((theme) => (
               <option key={theme} value={theme}>
-                {theme === 'light' ? 'Light' : 'Dark'}
+                {THEME_LABELS[theme]}
               </option>
             ))}
           </select>
         </Field>
+        <Field label="Space between paragraphs (em)">{number('paragraphSpacing', 0.1)}</Field>
+        <Field label="Background color">
+          <span className={uiStyles.inline}>
+            <input
+              type="checkbox"
+              checked={draft.backgroundColor !== null}
+              onChange={(e) =>
+                setDraft({ ...draft, backgroundColor: e.target.checked ? '#f4ecd8' : null })
+              }
+              aria-label="Use a custom background color"
+            />
+            <input
+              type="color"
+              value={draft.backgroundColor ?? '#ffffff'}
+              disabled={draft.backgroundColor === null}
+              onChange={(e) => setDraft({ ...draft, backgroundColor: e.target.value })}
+              aria-label="Background color"
+            />
+          </span>
+        </Field>
+        <Field label="Background image (PNG, JPEG, WebP or GIF)">
+          <input
+            className={uiStyles.input}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={(e) => setBackground(e.target.files?.[0] ?? undefined)}
+            aria-label="Background image"
+          />
+        </Field>
+        {background || (background === undefined && draft.backgroundImageAssetId) ? (
+          <>
+            <Field label="Background image opacity">
+              <input
+                type="range"
+                min={0.05}
+                max={1}
+                step={0.05}
+                value={draft.backgroundImageOpacity}
+                onChange={(e) =>
+                  setDraft({ ...draft, backgroundImageOpacity: Number(e.target.value) })
+                }
+                aria-label="Background image opacity"
+              />
+            </Field>
+            <Button onClick={() => setBackground(null)}>Remove background image</Button>
+          </>
+        ) : null}
         <FormError message={error ?? update.error?.message ?? null} />
         <div className={uiStyles.actions}>
-          <Button onClick={() => setDraft(DEFAULT_DISPLAY)}>Reset</Button>
+          <Button
+            onClick={() => {
+              setDraft(DEFAULT_DISPLAY);
+              setBackground(display.backgroundImageAssetId ? null : undefined);
+            }}
+          >
+            Reset
+          </Button>
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={update.isPending}>
             Save

@@ -31,6 +31,7 @@ interface Opened {
 interface LoadResult {
   nodeId: string;
   token: number;
+  epoch: number;
   opened: Opened | null;
   message: string | null;
 }
@@ -59,6 +60,8 @@ function displayStyle(display: DisplaySettings): CSSProperties {
     '--ed-line': String(display.lineHeight),
     '--ed-indent': String(display.firstLineIndent),
     '--ed-width': `${display.editorWidth}px`,
+    '--ed-para': `${display.paragraphSpacing}em`,
+    ...(display.backgroundColor ? { '--ed-bg': display.backgroundColor } : {}),
   } as CSSProperties;
 }
 
@@ -74,23 +77,28 @@ interface EditorPanelProps {
 
 /** Main panel of the manuscript view: toolbar, find, text, counts (ED-01..08, DISP-01). */
 export function EditorPanel(props: EditorPanelProps) {
-  const { nodeId, display } = props;
+  const { bookId, nodeId, display } = props;
   const [token, setToken] = useState(0);
   const [result, setResult] = useState<LoadResult | null>(null);
+  // Find & replace changes text on the server; the open section is then re-read, not kept.
+  const epoch = useWorkspaceStore((s) => s.contentEpoch);
 
   useEffect(() => {
     let cancelled = false;
     openSection(nodeId).then(
-      (opened) => !cancelled && setResult({ nodeId, token, opened, message: null }),
+      (opened) => !cancelled && setResult({ nodeId, token, epoch, opened, message: null }),
       (error: Error) =>
-        !cancelled && setResult({ nodeId, token, opened: null, message: error.message }),
+        !cancelled && setResult({ nodeId, token, epoch, opened: null, message: error.message }),
     );
     return () => {
       cancelled = true;
     };
-  }, [nodeId, token]);
+  }, [nodeId, token, epoch]);
 
-  const current = result && result.nodeId === nodeId && result.token === token ? result : null;
+  const current =
+    result && result.nodeId === nodeId && result.token === token && result.epoch === epoch
+      ? result
+      : null;
 
   const reload = () => {
     saverRegistry.drop(nodeId);
@@ -104,6 +112,17 @@ export function EditorPanel(props: EditorPanelProps) {
       style={displayStyle(display)}
       aria-label="Editor"
     >
+      {display.backgroundImageAssetId ? (
+        <div
+          className={styles.backdrop}
+          aria-hidden="true"
+          data-testid="editor-backdrop"
+          style={{
+            backgroundImage: `url(/assets/${bookId}/${display.backgroundImageAssetId})`,
+            opacity: display.backgroundImageOpacity,
+          }}
+        />
+      ) : null}
       {!current ? (
         <p className={styles.empty}>Loading…</p>
       ) : !current.opened ? (
@@ -113,7 +132,7 @@ export function EditorPanel(props: EditorPanelProps) {
         </div>
       ) : (
         <SectionEditor
-          key={`${current.nodeId}:${current.token}`}
+          key={`${current.nodeId}:${current.token}:${current.epoch}`}
           {...props}
           opened={current.opened}
           onReload={reload}

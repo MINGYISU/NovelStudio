@@ -15,7 +15,7 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 | M6 | Story maps | MAP-01..09 | ☑ |
 | M7 | Foreshadowing | FS-01..07 | ☑ |
 | M7b | In-text foreshadow anchors | FS-08 | ☑ |
-| M8 | Polish, import/export | WS-03, ED-09, DISP-02, HOT-02, IMP-02/03, EXP-01, COLD-11 | ☐ |
+| M8 | Polish, import/export | WS-03, ED-09, DISP-02, HOT-02, IMP-02/03, EXP-01, COLD-11 | ☑ |
 
 **From M4 on, the app is usable for real writing.** Before you write real chapters in it, make sure a cold backup folder is set and one export has succeeded.
 
@@ -130,6 +130,26 @@ Then test manually, and commit when satisfied.
 **Build**: focus mode, find & replace across book (with snapshots), sepia theme/background image/paragraph spacing, hot backup list & restore, TXT/Markdown import with preview, Markdown/TXT export, optional daily cold backup, PWA manifest (so Chrome/Edge can "Install app"), a `NovelStudio.command` launcher (double-click: start server if not running, open browser).
 
 **Done when**: all PRD §13 acceptance scenarios pass (automated where practical, the rest by a manual checklist).
+
+**Acceptance coverage (PRD §13)**
+
+| # | Scenario | Automated by | Manual |
+|---|---|---|---|
+| 1 | Two books survive a restart | `tests/e2e/acceptance.spec.ts` (reload), `library.test.ts` (server restart) | |
+| 2 | Create volume/part/chapter/scene, collapse and expand | `acceptance.spec.ts`, `sidebar.spec.ts` (fold state) | |
+| 3 | Drag Ch4 above Ch3 | `sidebar.spec.ts`, `nodes.test.ts` (restart) | |
+| 4 | Move a chapter between parts | `sidebar.spec.ts`, `nodes.test.ts` | |
+| 5 | Move a whole Part | `nodes.test.ts` (subtree moves), property test | Drag a Part in the UI |
+| 6 | Refused drops | `sidebar.spec.ts` (Part into its own Chapter), `tree.test.ts` (rank rule) | |
+| 7 | Unnumbered chapter renumbers the rest | `acceptance.spec.ts` | |
+| 8 | Chinese preset | `acceptance.spec.ts` | |
+| 9 | Type, switch, reload | `editor.spec.ts` | |
+| 10 | Plot-tree map link follows renames | `maps.spec.ts` | |
+| 11 | Payoff above setup warns | `foreshadow.spec.ts` | |
+| 12 | Custom codex field survives a restart | `codex.spec.ts` (reload), `codex.test.ts` (restart) | |
+| 13 | Cold backup → delete DB → `restore:cold` | `scripts/cli.test.ts`, `cold-backup.test.ts` (round trip incl. images, maps, foreshadows, codex) | `shasum -a 256 -c` and the `jq` recipe |
+| 14 | Missing cold folder fails clearly | `cold-backup.spec.ts`, `cold-backup.test.ts` | Unplug a real drive |
+| 15 | TXT with 第一章…第五章 | `tests/e2e/import-export.spec.ts`, `import-text.test.ts`, `import-split.test.ts` | |
 
 ---
 

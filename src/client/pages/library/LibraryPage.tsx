@@ -9,6 +9,7 @@ import { bookSortSchema, type BookSort } from '../../../shared/schemas/book.ts';
 import { BookCard } from './BookCard.tsx';
 import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
 import { ImportDialog } from '../../features/settings/ImportDialog.tsx';
+import { TextImportDialog } from '../../features/settings/TextImportDialog.tsx';
 import { CreateBookDialog } from './BookDialogs.tsx';
 import styles from './library.module.css';
 
@@ -19,6 +20,7 @@ export function LibraryPage() {
   const backups = useColdBackupSettings();
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importingText, setImportingText] = useState(false);
   const [exportingAll, setExportingAll] = useState(false);
 
   return (
@@ -51,6 +53,12 @@ export function LibraryPage() {
             <DropdownMenu.Content className={styles.menu} align="end" sideOffset={4}>
               <DropdownMenu.Item className={styles.menuItem} onSelect={() => setCreating(true)}>
                 Create blank…
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                className={styles.menuItem}
+                onSelect={() => setImportingText(true)}
+              >
+                Import text or Markdown…
               </DropdownMenu.Item>
               <DropdownMenu.Item className={styles.menuItem} onSelect={() => setImporting(true)}>
                 Import cold backup…
@@ -107,6 +115,7 @@ export function LibraryPage() {
 
       {creating ? <CreateBookDialog onClose={() => setCreating(false)} /> : null}
       {importing ? <ImportDialog onClose={() => setImporting(false)} /> : null}
+      {importingText ? <TextImportDialog onClose={() => setImportingText(false)} /> : null}
       {exportingAll ? (
         <ExportDialog scope={{ kind: 'all' }} onClose={() => setExportingAll(false)} />
       ) : null}

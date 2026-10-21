@@ -12,6 +12,7 @@ import {
 import { openDatabase, type Db } from './db/connection.ts';
 import { migrate } from './db/migrate.ts';
 import { createHotBackup, HotBackupService } from './services/hot-backup.ts';
+import { applyPendingRestore } from './services/hot-backup-restore.ts';
 
 export interface DataStore {
   paths: DataPaths;
@@ -32,6 +33,10 @@ export function openDataStore(
   assertSafeDataDir(dataDir, options);
 
   const paths = ensureDataDir(dataDir);
+  const restore = applyPendingRestore(paths);
+  if (restore.status !== 'none') {
+    options.log?.(`Hot backup restore ${restore.status}: ${restore.message}`);
+  }
   const configExisted = fs.existsSync(paths.configFile);
   const config = readConfig(dataDir);
   if (!configExisted) writeConfig(dataDir, appConfigSchema.parse(config));

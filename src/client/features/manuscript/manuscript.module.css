@@ -14,6 +14,28 @@
   background: var(--color-surface);
 }
 
+/* Focus mode (WS-03): only the save status and a way out stay, dimmed until hovered. */
+.focusBar {
+  position: fixed;
+  right: 0.75rem;
+  bottom: 0.5rem;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+
+.focusBar:hover,
+.focusBar:focus-within {
+  opacity: 1;
+}
+
 .bookTitle {
   flex: 1;
   margin: 0;
