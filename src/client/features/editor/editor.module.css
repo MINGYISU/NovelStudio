@@ -208,6 +208,12 @@
   pointer-events: none;
 }
 
+/* FS-08: anchored text in its thread's color (decoration, see anchor-extension.ts); only when switched on. */
+.prose[data-anchors='on'] :global(.ProseMirror .foreshadow-anchor-text) {
+  background: color-mix(in srgb, var(--anchor-color) 22%, transparent);
+  border-bottom: 2px solid var(--anchor-color);
+}
+
 .prose :global(.find-match) {
   background: #ffe58a;
   color: #2b2723;

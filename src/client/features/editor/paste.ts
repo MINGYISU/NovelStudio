@@ -1,3 +1,4 @@
+import { ANCHOR_ATTRIBUTE, isOccurrenceId } from '../../../shared/foreshadow-anchors.ts';
 import { TEXT_ALIGNMENTS } from '../../../shared/schemas/content.ts';
 
 /** Inline styles worth keeping: they map onto formatting the editor supports (ED-02). */
@@ -22,7 +23,7 @@ function cleanStyle(el: HTMLElement): void {
 
 /**
  * Pasted HTML is untrusted and usually carries fonts, sizes and colors (ED-04). Everything except
- * bold/italic/underline/strike/alignment is removed before the editor's schema filters the rest.
+ * bold/italic/underline/strike/alignment (and foreshadow anchors) is removed before the editor's schema filters the rest.
  */
 export function cleanPastedHtml(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -33,7 +34,9 @@ export function cleanPastedHtml(html: string): string {
   doc.body.querySelectorAll<HTMLElement>('*').forEach((el) => {
     cleanStyle(el);
     for (const attr of Array.from(el.attributes)) {
-      if (attr.name !== 'style') el.removeAttribute(attr.name);
+      // Cut-and-paste inside the app must keep an anchor with its text (FS-08).
+      const keepAnchor = attr.name === ANCHOR_ATTRIBUTE && isOccurrenceId(attr.value);
+      if (attr.name !== 'style' && !keepAnchor) el.removeAttribute(attr.name);
     }
   });
   return doc.body.innerHTML;

@@ -152,6 +152,11 @@ export function ThreadList({
                               <span className={styles.missing}>{section.label}</span>
                             )}
                           </div>
+                          {o.anchorState === 'missing' ? (
+                            <p className={styles.anchorMissing} data-testid="anchor-missing">
+                              Anchor missing: the marked text was deleted.
+                            </p>
+                          ) : null}
                           {o.excerpt ? (
                             <blockquote className={styles.excerpt}>{o.excerpt}</blockquote>
                           ) : null}

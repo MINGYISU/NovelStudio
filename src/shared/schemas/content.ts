@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isOccurrenceId } from '../foreshadow-anchors.ts';
 
 /** Everything the editor can store (PRD ED-02); anything else is refused before it reaches the database. */
 export const NODE_TYPES = [
@@ -10,7 +11,14 @@ export const NODE_TYPES = [
   'horizontalRule',
   'hardBreak',
 ] as const;
-export const MARK_TYPES = ['bold', 'italic', 'underline', 'strike', 'highlight'] as const;
+export const MARK_TYPES = [
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'highlight',
+  'foreshadowAnchor',
+] as const;
 export const TEXT_ALIGNMENTS = ['left', 'center', 'right', 'justify'] as const;
 
 export const HIGHLIGHT_COLORS = [
@@ -86,6 +94,9 @@ function checkNode(node: ContentNode, depth: number, ctx: z.RefinementCtx): void
       !(typeof color === 'string' && HEX_COLOR.test(color))
     ) {
       fail('Highlight colors must be hex values.');
+    }
+    if (mark.type === 'foreshadowAnchor' && !isOccurrenceId(mark.attrs?.occurrenceId)) {
+      fail('Foreshadow anchors need an occurrence id.');
     }
   }
   for (const child of node.content ?? []) checkNode(child, depth + 1, ctx);

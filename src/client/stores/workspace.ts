@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 const SIDEBAR_KEY = 'novelstudio.sidebarWidth';
+const ANCHORS_KEY = 'novelstudio.showAnchors';
 export const SIDEBAR_MIN = 200;
 export const SIDEBAR_MAX = 560;
 const SIDEBAR_DEFAULT = 300;
@@ -15,6 +16,14 @@ function readSidebarWidth(): number {
     return Number.isFinite(raw) && raw > 0 ? clampSidebarWidth(raw) : SIDEBAR_DEFAULT;
   } catch {
     return SIDEBAR_DEFAULT;
+  }
+}
+
+function readShowAnchors(): boolean {
+  try {
+    return localStorage.getItem(ANCHORS_KEY) !== 'off';
+  } catch {
+    return true;
   }
 }
 
@@ -38,6 +47,9 @@ export interface UndoableMove {
 interface WorkspaceState {
   sidebarWidth: number;
   setSidebarWidth: (width: number) => void;
+  /** FS-08: whether anchored text is highlighted in the editor. */
+  showAnchors: boolean;
+  setShowAnchors: (show: boolean) => void;
   notice: Notice | null;
   notify: (notice: Omit<Notice, 'id' | 'at'>) => void;
   dismissNotice: () => void;
@@ -66,6 +78,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       // Width is a convenience only; ignore storage failures.
     }
     set({ sidebarWidth: next });
+  },
+  showAnchors: readShowAnchors(),
+  setShowAnchors: (showAnchors) => {
+    try {
+      localStorage.setItem(ANCHORS_KEY, showAnchors ? 'on' : 'off');
+    } catch {
+      // The toggle is a convenience only; ignore storage failures.
+    }
+    set({ showAnchors });
   },
   notice: null,
   notify: (notice) => set({ notice: { ...notice, id: ++noticeCounter, at: Date.now() } }),

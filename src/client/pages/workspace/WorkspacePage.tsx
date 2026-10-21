@@ -4,6 +4,7 @@ import { ArrowLeft, Download, MoreHorizontal, Settings, Settings2 } from 'lucide
 import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
 import { useBook } from '../../api/books.ts';
+import { threadsKey } from '../../api/foreshadows.ts';
 import { treeKey, useTree } from '../../api/nodes.ts';
 import { Button } from '../../components/ui.tsx';
 import { CodexView } from '../../features/codex/CodexView.tsx';
@@ -41,11 +42,13 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
   // A finished save carries the section's new word count; keep the sidebar and totals current.
   useEffect(() => {
     if (!bookId) return;
-    return saverRegistry.onSaved((id, result) =>
+    return saverRegistry.onSaved((id, result) => {
       client.setQueryData<TreeNode[]>(treeKey(bookId), (nodes) =>
         nodes?.map((n) => (n.id === id ? { ...n, wordCount: result.wordCount } : n)),
-      ),
-    );
+      );
+      // Saving text can move an occurrence or change its anchor state (FS-08).
+      void client.invalidateQueries({ queryKey: threadsKey(bookId) });
+    });
   }, [bookId, client]);
 
   const nodes = tree.data;

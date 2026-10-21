@@ -1,3 +1,5 @@
+import { ANCHOR_MARK, stripAnchors } from '../../shared/foreshadow-anchors.ts';
+import type { ContentDoc } from '../../shared/schemas/content.ts';
 import type { TreeNode } from '../../shared/types.ts';
 import type { Db } from '../db/connection.ts';
 
@@ -70,7 +72,10 @@ export function insertNodeRow(db: Db, node: TreeNode, now: string): void {
   );
 }
 
-/** Copies a section row, including its content, under a new id; snapshots are not copied. */
+/**
+ * Copies a section row, including its content, under a new id; snapshots are not copied.
+ * Foreshadow anchors stay with the original: a copy that kept them would take the occurrence over.
+ */
 export function copyNodeRow(
   db: Db,
   sourceId: string,
@@ -84,6 +89,16 @@ export function copyNodeRow(
             content, plain_text, word_count, 0, ?, ?, NULL
        FROM nodes WHERE id = ?`,
   ).run(copy.id, copy.parentId, copy.title, copy.position, now, now, sourceId);
+  const row = db.prepare('SELECT content FROM nodes WHERE id = ?').get(copy.id) as
+    { content: string } | undefined;
+  if (row?.content.includes(ANCHOR_MARK)) {
+    try {
+      const content = JSON.stringify(stripAnchors(JSON.parse(row.content) as ContentDoc));
+      db.prepare('UPDATE nodes SET content = ? WHERE id = ?').run(content, copy.id);
+    } catch {
+      // Unreadable stored text is copied unchanged, like any other copy.
+    }
+  }
 }
 
 /** Writes parent, position and trash state only; titles, content and updated_at stay untouched. */

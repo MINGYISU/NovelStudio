@@ -1316,6 +1316,91 @@ describe('foreshadows (COLD-09, FS-01, FS-02)', () => {
     expect(copy[0]!.occurrences.every((o) => o.foreshadowId === copy[0]!.id)).toBe(true);
   });
 
+  describe('in-text anchors (FS-08)', () => {
+    const anchorDoc = (occurrenceId: string) => ({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'The needle shook.',
+              marks: [{ type: 'foreshadowAnchor', attrs: { occurrenceId } }],
+            },
+          ],
+        },
+      ],
+    });
+    const contentOf = (harness: Harness, bookId: string, title: string) =>
+      harness.store.db
+        .prepare('SELECT content FROM nodes WHERE book_id = ? AND title = ?')
+        .get(bookId, title) as { content: string };
+
+    async function anchoredBook() {
+      const { book, ids } = await buildRichBook();
+      const occurrence = (await threadsOf(h, book.id))[0]!.occurrences[0]!;
+      const rev = (await h.api('GET', `/api/nodes/${ids.ch1}`)).json().node.rev as number;
+      expect(
+        (await h.saveContent(ids.ch1!, anchorDoc(occurrence.id) as never, rev)).statusCode,
+      ).toBe(200);
+      return { book, occurrence };
+    }
+
+    it('round-trips an anchor unchanged into an empty data directory', async () => {
+      const { book, occurrence } = await anchoredBook();
+      const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+      other = await new Harness().start();
+      expect(restoreDoc(doc, other)).toMatchObject({ remapped: false, warnings: [] });
+      expect(contentOf(other, book.id, 'Reunion').content).toContain(occurrence.id);
+      const restored = (await threadsOf(other, book.id))[0]!.occurrences[0]!;
+      expect(restored).toMatchObject({ id: occurrence.id, anchored: true, anchorState: 'present' });
+    });
+
+    it('rewrites anchors in sections and snapshots to the new occurrence ids on an id collision', async () => {
+      const { book, occurrence } = await anchoredBook();
+      const doc = readDoc(
+        service().exportBook(book.id, { dir: backupDir, includeSnapshots: true }).file,
+      );
+      const target = doc.snapshots?.[0];
+      expect(target).toBeDefined();
+      target!.content = anchorDoc(occurrence.id) as never;
+
+      const result = restoreDoc(doc);
+      expect(result.remapped).toBe(true);
+      expect(result.warnings).toEqual([]);
+
+      const copy = (await threadsOf(h, result.book.id))[0]!.occurrences[0]!;
+      expect(copy.id).not.toBe(occurrence.id);
+      expect(copy).toMatchObject({ anchored: true, anchorState: 'present' });
+      const text = contentOf(h, result.book.id, 'Reunion').content;
+      expect(text).toContain(copy.id);
+      expect(text).not.toContain(occurrence.id);
+
+      const snapshots = h.store.db
+        .prepare(
+          'SELECT s.content FROM snapshots s JOIN nodes n ON n.id = s.node_id WHERE n.book_id = ?',
+        )
+        .all(result.book.id) as { content: string }[];
+      expect(snapshots.some((s) => s.content.includes(copy.id))).toBe(true);
+      expect(snapshots.some((s) => s.content.includes(occurrence.id))).toBe(false);
+      expect(contentOf(h, book.id, 'Reunion').content).toContain(occurrence.id);
+    });
+
+    it('keeps a missing anchor missing through a restore', async () => {
+      const { book, occurrence } = await anchoredBook();
+      h.store.db
+        .prepare("UPDATE foreshadow_occurrences SET anchor_state = 'missing' WHERE id = ?")
+        .run(occurrence.id);
+      const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+      const result = restoreDoc(doc);
+      expect((await threadsOf(h, result.book.id))[0]!.occurrences[0]).toMatchObject({
+        anchored: true,
+        anchorState: 'missing',
+      });
+    });
+  });
+
   it('repairs an unknown status, a bad color and a missing section with warnings', async () => {
     const doc = await exportedDoc();
     doc.foreshadows[0]!.status = 'mystery';

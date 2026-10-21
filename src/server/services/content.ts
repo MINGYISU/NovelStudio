@@ -1,3 +1,4 @@
+import { extractAnchorIds } from '../../shared/foreshadow-anchors.ts';
 import { docToPlainText } from '../../shared/prosemirror-text.ts';
 import { contentSchema } from '../../shared/schemas/content.ts';
 import type {
@@ -8,6 +9,7 @@ import type {
 import { countWords } from '../../shared/wordcount.ts';
 import type { Db } from '../db/connection.ts';
 import { ApiError } from '../errors.ts';
+import { syncAnchors } from '../repos/foreshadows.ts';
 import { getNodeContentRow, touchBook, writeNodeContent } from '../repos/nodes.ts';
 import type { LibraryService } from './library.ts';
 import type { SnapshotService } from './snapshots.ts';
@@ -70,6 +72,7 @@ export class ContentService {
         now.toISOString(),
       );
       if (!written) throw new ApiError(409, 'STALE_REVISION', STALE_MESSAGE);
+      syncAnchors(this.db, row.bookId, id, extractAnchorIds(body.content));
       touchBook(this.db, row.bookId, now.toISOString());
       return { rev: body.rev + 1, wordCount, snapshot };
     })();

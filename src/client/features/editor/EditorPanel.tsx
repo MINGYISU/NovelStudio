@@ -1,6 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { useEffect, useState, type CSSProperties } from 'react';
+import type { OccurrenceRole } from '../../../shared/schemas/foreshadow.ts';
+import { useThreads } from '../../api/foreshadows.ts';
+import { MarkAnchorDialog } from '../foreshadow/MarkAnchorDialog.tsx';
+import { useWorkspaceStore } from '../../stores/workspace.ts';
 import { treeKey } from '../../api/nodes.ts';
 import { fetchNodeContent } from '../../api/content.ts';
 import { Button } from '../../components/ui.tsx';
@@ -9,6 +13,7 @@ import { FONT_STACKS, type DisplaySettings } from '../../../shared/schemas/displ
 import { countWords } from '../../../shared/wordcount.ts';
 import type { SectionSaver } from './autosave.ts';
 import { DisplaySettingsDialog } from './DisplaySettingsDialog.tsx';
+import { AnchorColors, anchorColorsKey } from './anchor-extension.ts';
 import { createExtensions } from './extensions.ts';
 import { FindBar } from './FindBar.tsx';
 import { cleanPastedHtml } from './paste.ts';
@@ -130,7 +135,17 @@ function SectionEditor({
 }: EditorPanelProps & { opened: Opened; onReload: () => void }) {
   const { saver } = opened;
   const client = useQueryClient();
-  const [extensions] = useState(createExtensions);
+  const [anchorColors] = useState(() => new AnchorColors());
+  const [extensions] = useState(() => createExtensions(anchorColors));
+  const threads = useThreads(bookId);
+  const showAnchors = useWorkspaceStore((s) => s.showAnchors);
+  const setShowAnchors = useWorkspaceStore((s) => s.setShowAnchors);
+  const [marking, setMarking] = useState<{
+    role: OccurrenceRole;
+    from: number;
+    to: number;
+    text: string;
+  } | null>(null);
   const [finding, setFinding] = useState(false);
   const [dialog, setDialog] = useState<'snapshots' | 'display' | null>(null);
   const state = useSaverState(saver);
@@ -153,6 +168,18 @@ function SectionEditor({
     },
     [saver],
   );
+
+  // Anchored text takes its thread's color; redraw when the threads change (no document change).
+  useEffect(() => {
+    anchorColors.replace(
+      new Map(
+        (threads.data ?? []).flatMap((t) => t.occurrences.map((o) => [o.id, t.color] as const)),
+      ),
+    );
+    if (editor && !editor.isDestroyed) {
+      editor.view.dispatch(editor.state.tr.setMeta(anchorColorsKey, true));
+    }
+  }, [editor, threads.data, anchorColors]);
 
   useEffect(() => {
     editor?.setEditable(!stale);
@@ -203,6 +230,13 @@ function SectionEditor({
           void saver.flush().then(() => setDialog('snapshots'));
         }}
         onDisplay={() => setDialog('display')}
+        onMarkAnchor={(role) => {
+          const { from, to, empty } = editor.state.selection;
+          if (empty) return;
+          setMarking({ role, from, to, text: editor.state.doc.textBetween(from, to, ' ') });
+        }}
+        showAnchors={showAnchors}
+        onToggleAnchors={() => setShowAnchors(!showAnchors)}
       />
       {finding ? (
         <FindBar
@@ -225,7 +259,7 @@ function SectionEditor({
       <div className={styles.scroller}>
         <div className={styles.page}>
           <h2 className={styles.title}>{displayTitle}</h2>
-          <div className={styles.prose}>
+          <div className={styles.prose} data-anchors={showAnchors ? 'on' : 'off'}>
             <EditorContent editor={editor} />
           </div>
         </div>
@@ -246,6 +280,27 @@ function SectionEditor({
             setDialog(null);
             void client.invalidateQueries({ queryKey: treeKey(bookId) });
             onReload();
+          }}
+        />
+      ) : null}
+      {marking ? (
+        <MarkAnchorDialog
+          bookId={bookId}
+          nodeId={nodeId}
+          role={marking.role}
+          text={marking.text}
+          onClose={() => {
+            setMarking(null);
+            editor.commands.focus();
+          }}
+          onMarked={(occurrenceId) => {
+            editor
+              .chain()
+              .focus()
+              .setTextSelection({ from: marking.from, to: marking.to })
+              .setMark('foreshadowAnchor', { occurrenceId })
+              .run();
+            setMarking(null);
           }}
         />
       ) : null}

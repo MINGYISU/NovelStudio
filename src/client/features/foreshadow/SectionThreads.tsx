@@ -54,6 +54,15 @@ export function SectionThreads({ bookId, nodeId, threads, warnings }: SectionThr
                       </span>
                     ))}
                   </span>
+                  {occurrences.some((o) => o.anchorState === 'missing') ? (
+                    <span
+                      className={styles.anchorMissingTag}
+                      data-testid="anchor-missing"
+                      title="The marked text of an occurrence was deleted"
+                    >
+                      anchor missing
+                    </span>
+                  ) : null}
                   {flagged ? (
                     <span
                       className={styles.badge}

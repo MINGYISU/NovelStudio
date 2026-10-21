@@ -31,6 +31,30 @@ describe('contentSchema', () => {
     expect(contentSchema.safeParse({ type: 'doc', content: [] }).success).toBe(true);
   });
 
+  it('accepts a foreshadow anchor with a UUID occurrence id', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'a',
+              marks: [
+                {
+                  type: 'foreshadowAnchor',
+                  attrs: { occurrenceId: '11111111-1111-4111-8111-111111111111' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(contentSchema.safeParse(doc).success).toBe(true);
+  });
+
   it.each([
     ['a non-doc root', { type: 'paragraph' }],
     ['an unknown node', { type: 'doc', content: [{ type: 'bulletList', content: [] }] }],
@@ -75,6 +99,24 @@ describe('contentSchema', () => {
       { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }] },
     ],
     ['text on a paragraph', { type: 'doc', content: [{ type: 'paragraph', text: 'a' }] }],
+    ...[undefined, 'abc', 42].map((occurrenceId): [string, unknown] => [
+      `a foreshadow anchor with id ${String(occurrenceId)}`,
+      {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'a',
+                marks: [{ type: 'foreshadowAnchor', attrs: { occurrenceId } }],
+              },
+            ],
+          },
+        ],
+      },
+    ]),
   ])('rejects %s', (_name, doc) => {
     expect(contentSchema.safeParse(doc).success).toBe(false);
   });

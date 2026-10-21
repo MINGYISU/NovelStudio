@@ -41,6 +41,8 @@ export function OccurrenceDialog({
   const busy = add.isPending || update.isPending;
   // An occurrence in a trashed section keeps its old target until the user picks a live one.
   const keepsOldTarget = occurrence !== undefined && nodeId === occurrence.nodeId;
+  // While its marked text exists, that text decides the section (FS-08).
+  const followsAnchor = occurrence?.anchorState === 'present';
   const pickable = nodeId !== '' && (keepsOldTarget || options.some((o) => o.id === nodeId));
 
   const submit = (event: FormEvent) => {
@@ -72,6 +74,7 @@ export function OccurrenceDialog({
             className={uiStyles.input}
             value={nodeId}
             onChange={(e) => setNodeId(e.target.value)}
+            disabled={followsAnchor}
             required
           >
             {keepsOldTarget && !options.some((o) => o.id === nodeId) ? (
@@ -85,6 +88,11 @@ export function OccurrenceDialog({
             ))}
           </select>
         </Field>
+        {followsAnchor ? (
+          <p className={styles.empty}>
+            This occurrence follows its marked text. Move the text to change its section.
+          </p>
+        ) : null}
         <Field label="Role">
           <select
             className={uiStyles.input}

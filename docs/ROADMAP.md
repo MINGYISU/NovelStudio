@@ -14,7 +14,7 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 | M5 | Codex | CDX-01..07 | ☑ |
 | M6 | Story maps | MAP-01..09 | ☑ |
 | M7 | Foreshadowing | FS-01..07 | ☑ |
-| M7b | In-text foreshadow anchors | FS-08 | ☐ |
+| M7b | In-text foreshadow anchors | FS-08 | ☑ |
 | M8 | Polish, import/export | WS-03, ED-09, DISP-02, HOT-02, IMP-02/03, EXP-01, COLD-11 | ☐ |
 
 **From M4 on, the app is usable for real writing.** Before you write real chapters in it, make sure a cold backup folder is set and one export has succeeded.

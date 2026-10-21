@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { repairFields } from '../../shared/codex.ts';
 import { CODEX_SUMMARY_MAX, CODEX_TITLE_MAX } from '../../shared/schemas/codex.ts';
+import { remapAnchorIds } from '../../shared/foreshadow-anchors.ts';
 import { remapMapLinks } from '../../shared/map-links.ts';
 import { docToPlainText } from '../../shared/prosemirror-text.ts';
 import { MAP_TEMPLATES, MAP_TITLE_MAX, repairMapData } from '../../shared/schemas/map.ts';
@@ -226,6 +227,7 @@ export function restoreColdBackup(
         `Section "${section.title || section.displayTitle}": its formatting could not be read, so it was rebuilt from plain text.`,
       );
     }
+    content = remapAnchorIds(content, (id) => ids.get(id));
     const plainText = docToPlainText(content);
     return { content: JSON.stringify(content), plainText, wordCount: countWords(plainText) };
   };
@@ -326,7 +328,7 @@ export function restoreColdBackup(
       {
         id: mapped(s.id),
         nodeId: mapped(s.nodeId),
-        content: JSON.stringify(parsed.data),
+        content: JSON.stringify(remapAnchorIds(parsed.data, (id) => ids.get(id))),
         wordCount: countWords(docToPlainText(parsed.data)),
         reason: s.reason,
         createdAt: s.createdAt,

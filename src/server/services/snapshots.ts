@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { extractAnchorIds } from '../../shared/foreshadow-anchors.ts';
 import { docToPlainText } from '../../shared/prosemirror-text.ts';
 import { contentSchema } from '../../shared/schemas/content.ts';
 import type { NodeContent } from '../../shared/schemas/node.ts';
@@ -17,6 +18,7 @@ import {
   writeNodeContent,
   type NodeContentRow,
 } from '../repos/nodes.ts';
+import { syncAnchors } from '../repos/foreshadows.ts';
 import {
   getSnapshot,
   insertSnapshot,
@@ -118,6 +120,7 @@ export class SnapshotService {
         now.toISOString(),
       );
       if (!saved) throw new ApiError(409, 'STALE_REVISION', 'The section changed. Try again.');
+      syncAnchors(this.db, current.bookId, current.id, extractAnchorIds(doc));
       touchBook(this.db, current.bookId, now.toISOString());
       return {
         id: current.id,

@@ -384,3 +384,15 @@
   font-size: 0.7rem;
   font-weight: 700;
 }
+
+.anchorMissing {
+  margin: 0.15rem 0 0;
+  color: var(--color-error);
+  font-size: 0.85rem;
+}
+
+.anchorMissingTag {
+  color: var(--color-error);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}

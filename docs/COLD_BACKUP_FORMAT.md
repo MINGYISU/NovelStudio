@@ -167,6 +167,8 @@ Categories are in display order and entries are ordered by category, then by pos
 
 `nodeId` may refer to a section in `manuscript` or in `trash`, or be `null` if the section was permanently deleted.
 
+An occurrence with `"anchored": true` is tied to text: the section's `content` (and snapshot `content`) holds a mark `{ "type": "foreshadowAnchor", "attrs": { "occurrenceId": "<occurrence id>" } }` on that text. `anchorState` is `"present"` or `"missing"` (the text was deleted; the occurrence is kept). On restore with new IDs these `occurrenceId` values are rewritten with the occurrence ids.
+
 ### 4.7 `Asset`
 
 ```json

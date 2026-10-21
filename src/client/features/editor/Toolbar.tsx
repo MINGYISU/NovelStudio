@@ -6,6 +6,9 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Eye,
+  EyeOff,
+  Flag,
   Heading1,
   Heading2,
   Highlighter,
@@ -22,6 +25,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { HIGHLIGHT_COLORS } from '../../../shared/schemas/content.ts';
+import {
+  OCCURRENCE_ROLES,
+  ROLE_GLYPHS,
+  ROLE_LABELS,
+  type OccurrenceRole,
+} from '../../../shared/schemas/foreshadow.ts';
 import libraryStyles from '../../pages/library/library.module.css';
 import styles from './editor.module.css';
 
@@ -61,10 +70,23 @@ interface ToolbarProps {
   onFind: () => void;
   onSnapshots: () => void;
   onDisplay: () => void;
+  /** FS-08: mark the selection as a setup, hint or payoff. */
+  onMarkAnchor: (role: OccurrenceRole) => void;
+  showAnchors: boolean;
+  onToggleAnchors: () => void;
 }
 
 /** ED-02 formatting toolbar. Nothing here can produce formatting the schema does not allow. */
-export function Toolbar({ editor, editable, onFind, onSnapshots, onDisplay }: ToolbarProps) {
+export function Toolbar({
+  editor,
+  editable,
+  onFind,
+  onSnapshots,
+  onDisplay,
+  onMarkAnchor,
+  showAnchors,
+  onToggleAnchors,
+}: ToolbarProps) {
   const s = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -80,6 +102,7 @@ export function Toolbar({ editor, editable, onFind, onSnapshots, onDisplay }: To
       center: e.isActive({ textAlign: 'center' }),
       right: e.isActive({ textAlign: 'right' }),
       justify: e.isActive({ textAlign: 'justify' }),
+      hasSelection: !e.state.selection.empty,
       canUndo: e.can().undo(),
       canRedo: e.can().redo(),
     }),
@@ -226,6 +249,39 @@ export function Toolbar({ editor, editable, onFind, onSnapshots, onDisplay }: To
         active={s.justify}
         disabled={!editable}
         onClick={() => run().setTextAlign('justify').run()}
+      />
+      <span className={styles.separator} />
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger asChild disabled={!editable || !s.hasSelection}>
+          <button
+            type="button"
+            className={styles.tool}
+            aria-label="Mark as foreshadowing"
+            title="Mark selection as setup, hint or payoff"
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            <Flag size={16} />
+          </button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content className={libraryStyles.menu} sideOffset={4}>
+            {OCCURRENCE_ROLES.map((role) => (
+              <DropdownMenu.Item
+                key={role}
+                className={libraryStyles.menuItem}
+                onSelect={() => onMarkAnchor(role)}
+              >
+                {ROLE_GLYPHS[role]} Mark as {ROLE_LABELS[role].toLowerCase()}
+              </DropdownMenu.Item>
+            ))}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+      <Tool
+        label={showAnchors ? 'Hide foreshadow anchors' : 'Show foreshadow anchors'}
+        icon={showAnchors ? Eye : EyeOff}
+        active={showAnchors}
+        onClick={onToggleAnchors}
       />
       <span className={styles.spacer} />
       <Tool label="Find in section" icon={Search} onClick={onFind} />

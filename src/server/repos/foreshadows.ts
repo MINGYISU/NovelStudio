@@ -221,3 +221,37 @@ export function updateOccurrenceFields(db: Db, id: string, update: OccurrenceFie
 export function deleteOccurrenceRow(db: Db, id: string): void {
   db.prepare('DELETE FROM foreshadow_occurrences WHERE id = ?').run(id);
 }
+
+/**
+ * Brings occurrences in line with the anchors found in a section's saved text (ARCHITECTURE §11).
+ * Ids that are not occurrences of this book are ignored, so text pasted from another book cannot
+ * take over an occurrence.
+ */
+export function syncAnchors(
+  db: Db,
+  bookId: string,
+  nodeId: string,
+  anchorIds: ReadonlySet<string>,
+): void {
+  const found = [...anchorIds];
+  if (found.length > 0) {
+    const mark = db.prepare(
+      `UPDATE foreshadow_occurrences
+          SET node_id = ?, anchored = 1, anchor_state = 'present'
+        WHERE id = ?
+          AND foreshadow_id IN (SELECT id FROM foreshadows WHERE book_id = ?)
+          AND (node_id IS NOT ? OR anchored != 1 OR anchor_state IS NOT 'present')`,
+    );
+    for (const id of found) mark.run(nodeId, id, bookId, nodeId);
+  }
+  const previous = db
+    .prepare(
+      `SELECT id FROM foreshadow_occurrences
+        WHERE node_id = ? AND anchored = 1 AND anchor_state IS NOT 'missing'`,
+    )
+    .all(nodeId) as { id: string }[];
+  const miss = db.prepare(
+    "UPDATE foreshadow_occurrences SET anchor_state = 'missing' WHERE id = ?",
+  );
+  for (const { id } of previous) if (!anchorIds.has(id)) miss.run(id);
+}
