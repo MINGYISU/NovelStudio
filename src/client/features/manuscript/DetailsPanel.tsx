@@ -8,6 +8,7 @@ import {
 } from '../../../shared/schemas/node.ts';
 import { NODE_STATUSES, type NodeStatus, type TreeNode } from '../../../shared/types.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
+import { CharactersInSection } from '../codex/CharactersInSection.tsx';
 import styles from './manuscript.module.css';
 
 interface DetailsPanelProps {
@@ -21,13 +22,16 @@ export function DetailsPanel({ bookId, node, displayTitle }: DetailsPanelProps) 
   return (
     <aside className={styles.details} aria-label="Section details">
       {node ? (
-        <DetailsForm
-          // Remount when the saved values change so the fields never show stale text.
-          key={`${node.id}|${node.title}|${node.synopsis}|${node.status}|${node.numbered}`}
-          bookId={bookId}
-          node={node}
-          displayTitle={displayTitle ?? node.title}
-        />
+        <>
+          <DetailsForm
+            // Remount when the saved values change so the fields never show stale text.
+            key={`${node.id}|${node.title}|${node.synopsis}|${node.status}|${node.numbered}`}
+            bookId={bookId}
+            node={node}
+            displayTitle={displayTitle ?? node.title}
+          />
+          <CharactersInSection key={node.id} bookId={bookId} nodeId={node.id} />
+        </>
       ) : (
         <p className={styles.detailsEmpty}>Select a section to see its details.</p>
       )}

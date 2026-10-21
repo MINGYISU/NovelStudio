@@ -45,7 +45,55 @@ function readDoc(file: string): ColdBackupDoc {
   return JSON.parse(fs.readFileSync(file, 'utf8')) as ColdBackupDoc;
 }
 
-/** A book with every kind of data M4 has: nesting, formatting, trash, a cover, display settings, snapshots. */
+/**
+ * Codex data of every shape: a reordered default category set, an extra empty category, a custom
+ * template, entries with a custom/renamed/reordered/removed field, an image and a reorder.
+ */
+async function addCodex(harness: Harness, bookId: string, imageAssetId: string) {
+  const seeded = (await harness.api('POST', `/api/books/${bookId}/codex/seed`)).json<{
+    categories: { id: string; name: string }[];
+  }>().categories;
+  const characters = seeded.find((c) => c.name === 'Characters')!;
+  const locations = seeded.find((c) => c.name === 'Locations')!;
+  const magic = (
+    await harness.api('POST', `/api/books/${bookId}/codex/categories`, {
+      name: 'Magic',
+      fieldTemplate: [{ key: 'rules', label: 'Rules', type: 'longtext' }],
+    })
+  ).json<{ category: { id: string } }>().category;
+  await harness.api('POST', `/api/codex/categories/${magic.id}/move`, { index: 1 });
+  await harness.api('PATCH', `/api/codex/categories/${locations.id}`, { name: 'Places' });
+
+  const entry = async (categoryId: string, title: string, summary = '') =>
+    (
+      await harness.api('POST', `/api/books/${bookId}/codex/entries`, {
+        categoryId,
+        title,
+        summary,
+      })
+    ).json<{ entry: { id: string; fields: object[] } }>().entry;
+  const lin = await entry(characters.id, 'Lin Yao', 'A courier');
+  const mo = await entry(characters.id, 'Mo Han');
+  const gate = await entry(locations.id, 'Harbour Gate', '港口的门');
+  await harness.api('PATCH', `/api/codex/entries/${lin.id}`, {
+    fields: [
+      { key: 'name', label: 'Name', type: 'text', value: 'Lin Yao' },
+      { key: 'aliases', label: 'Also known as', type: 'text', value: 'Yao, 阿遥' },
+      { key: 'f-0a1b2c3d', label: 'Favourite tea', type: 'text', value: 'Jasmine' },
+      { key: 'background', label: 'Background', type: 'longtext', value: 'Grew up by the sea.' },
+    ],
+  });
+  await harness.api('PATCH', `/api/codex/entries/${gate.id}`, { imageAssetId });
+  await harness.api('POST', `/api/codex/entries/${mo.id}/move`, { index: 0 });
+  return {
+    codexCategory: characters.id,
+    codexMagic: magic.id,
+    codexLin: lin.id,
+    codexGate: gate.id,
+  };
+}
+
+/** A book with every kind of data M5 has: nesting, formatting, trash, a cover, display settings, snapshots. */
 async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<string, string> }> {
   const book = await harness.createBook('The Lantern Road');
   const volume = await harness.createNode(book.id, 'volume', null, 'Old Roads');
@@ -91,9 +139,11 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
       theme: 'dark',
     },
   });
+  const codex = await addCodex(harness, book.id, asset.id);
   return {
     book,
     ids: {
+      ...codex,
       volume: volume.id,
       part: part.id,
       ch1: ch1.id,
@@ -124,6 +174,8 @@ function allIds(doc: ColdBackupDoc): string[] {
   const ids = [
     doc.book.id,
     ...doc.assets.map((a) => a.id),
+    ...doc.codex.categories.map((c) => c.id),
+    ...doc.codex.entries.map((e) => e.id),
     ...(doc.snapshots ?? []).map((s) => s.id),
   ];
   const visit = (s: ColdSection) => {
@@ -195,7 +247,7 @@ describe('export (COLD-02..04, EXP-02)', () => {
       warnings: [],
       snapshots: null,
     });
-    expect(doc.codex).toEqual({ categories: [], entries: [] });
+    expect(doc.stats).toMatchObject({ codexCategories: 9, codexEntries: 3 });
     expect(verifyColdBackup(result.file)).toMatchObject({ ok: true, checksum: 'ok', problems: [] });
   });
 
@@ -721,7 +773,7 @@ describe('restore validation and safety', () => {
     expect(row.parent_id).toBeNull();
   });
 
-  it('warns that codex, maps and foreshadows from a later version are skipped, not silently dropped', async () => {
+  it('warns that story maps from a later version are skipped, not silently dropped', async () => {
     const doc = await exportedDoc();
     doc.maps = [
       {
@@ -748,6 +800,188 @@ describe('restore validation and safety', () => {
       .get(result.book.id, 'Reunion') as { plain_text: string; word_count: number };
     expect(row.plain_text).toBe('The rain had stopped.\n\n她没有抬头。\n\nA third paragraph.');
     expect(row.word_count).toBe(12);
+  });
+});
+
+describe('codex (COLD-09, CDX-01..06)', () => {
+  const restoreDoc = (doc: unknown) =>
+    restoreColdBackup(h.store.db, h.store.paths, Buffer.from(JSON.stringify(doc)));
+  const countRows = (table: string, bookId: string) =>
+    (
+      h.store.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE book_id = ?`).get(bookId) as {
+        n: number;
+      }
+    ).n;
+
+  async function exportedCodexDoc(): Promise<ColdBackupDoc> {
+    const { book } = await buildRichBook();
+    return readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+  }
+
+  it('exports categories and entries in their order, with templates, fields and the image id', async () => {
+    const { book, ids } = await buildRichBook();
+    const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+
+    expect(doc.codex.categories.map((c) => [c.name, c.position])).toEqual([
+      ['Characters', 0],
+      ['Magic', 1],
+      ['Places', 2],
+      ['Era & Timeline', 3],
+      ['Culture & Traditions', 4],
+      ['Organizations', 5],
+      ['Creatures & Species', 6],
+      ['Rules & Concepts', 7],
+      ['Other', 8],
+    ]);
+    expect(doc.codex.categories[1]!.fieldTemplate).toEqual([
+      { key: 'rules', label: 'Rules', type: 'longtext' },
+    ]);
+    expect(doc.codex.entries.map((e) => e.title)).toEqual(['Mo Han', 'Lin Yao', 'Harbour Gate']);
+    expect(doc.codex.entries.map((e) => e.position)).toEqual([0, 1, 0]);
+    const lin = doc.codex.entries.find((e) => e.id === ids.codexLin)!;
+    expect(lin.categoryId).toBe(ids.codexCategory);
+    expect(lin.fields.map((f) => [f.key, f.label])).toEqual([
+      ['name', 'Name'],
+      ['aliases', 'Also known as'],
+      ['f-0a1b2c3d', 'Favourite tea'],
+      ['background', 'Background'],
+    ]);
+    expect(doc.codex.entries.find((e) => e.id === ids.codexGate)!.imageAssetId).toBe(ids.asset);
+    expect(doc.stats).toMatchObject({ codexCategories: 9, codexEntries: 3 });
+  });
+
+  it('restores the codex into an empty data directory with the same ids, order and fields', async () => {
+    const original = await exportedCodexDoc();
+    other = await new Harness().start();
+    const result = restoreColdBackup(
+      other.store.db,
+      other.store.paths,
+      Buffer.from(JSON.stringify(original)),
+    );
+    expect(result).toMatchObject({ remapped: false, warnings: [] });
+
+    const api = (await other.api('GET', `/api/books/${original.book.id}/codex`)).json();
+    expect(api.categories.map((c: { id: string }) => c.id)).toEqual(
+      original.codex.categories.map((c) => c.id),
+    );
+    const gate = api.entries.find((e: { title: string }) => e.title === 'Harbour Gate');
+    expect(gate.imageUrl).toBe(`/assets/${original.book.id}/${original.book.coverAssetId}`);
+    const lin = api.entries.find((e: { title: string }) => e.title === 'Lin Yao');
+    expect(lin.fields[2]).toEqual({
+      key: 'f-0a1b2c3d',
+      label: 'Favourite tea',
+      type: 'text',
+      value: 'Jasmine',
+    });
+  });
+
+  it('remaps category and image references on an id collision and leaves the original codex alone', async () => {
+    const { book } = await buildRichBook();
+    const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+    const before = (await h.api('GET', `/api/books/${book.id}/codex`)).json();
+
+    const result = restoreDoc(doc);
+    expect(result.remapped).toBe(true);
+    const copy = (await h.api('GET', `/api/books/${result.book.id}/codex`)).json();
+
+    const oldIds = new Set([
+      ...doc.codex.categories.map((c) => c.id),
+      ...doc.codex.entries.map((e) => e.id),
+    ]);
+    const newCategoryIds = new Set<string>(copy.categories.map((c: { id: string }) => c.id));
+    expect(copy.categories).toHaveLength(9);
+    expect(copy.entries).toHaveLength(3);
+    for (const c of copy.categories) {
+      expect(oldIds.has(c.id)).toBe(false);
+      expect(c.bookId).toBe(result.book.id);
+    }
+    for (const e of copy.entries) {
+      expect(oldIds.has(e.id)).toBe(false);
+      expect(newCategoryIds.has(e.categoryId)).toBe(true);
+    }
+    const gate = copy.entries.find((e: { title: string }) => e.title === 'Harbour Gate');
+    expect(gate.imageAssetId).toEqual(expect.any(String));
+    expect(gate.imageAssetId).not.toBe(book.coverAssetId);
+    expect(gate.imageUrl).toBe(`/assets/${result.book.id}/${gate.imageAssetId}`);
+    expect(
+      fs.existsSync(path.join(h.store.paths.assetsDir, result.book.id, `${gate.imageAssetId}.png`)),
+    ).toBe(true);
+    expect((await h.api('GET', `/api/books/${book.id}/codex`)).json()).toEqual(before);
+  });
+
+  it('restores a backup made before the codex was used without inventing categories', async () => {
+    const book = await h.createBook('Plain');
+    const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+    expect(doc.codex).toEqual({ categories: [], entries: [] });
+    const result = restoreDoc(doc);
+    expect(countRows('codex_categories', result.book.id)).toBe(0);
+    expect(countRows('codex_entries', result.book.id)).toBe(0);
+  });
+
+  it('skips an entry whose category is missing, with a warning', async () => {
+    const doc = await exportedCodexDoc();
+    doc.codex.entries[0]!.categoryId = crypto.randomUUID();
+    const result = restoreDoc(doc);
+    expect(result.warnings.join(' ')).toContain('has no category');
+    expect(countRows('codex_entries', result.book.id)).toBe(2);
+  });
+
+  it('drops an entry image that is not a real image, with a warning, keeping the entry', async () => {
+    const doc = await exportedCodexDoc();
+    doc.assets[0]!.dataBase64 = Buffer.from('<svg><script>alert(1)</script></svg>').toString(
+      'base64',
+    );
+    const result = restoreDoc(doc);
+    expect(result.warnings.join(' ')).toContain('Harbour Gate');
+    const gate = h.store.db
+      .prepare('SELECT image_asset_id FROM codex_entries WHERE book_id = ? AND title = ?')
+      .get(result.book.id, 'Harbour Gate') as { image_asset_id: string | null };
+    expect(gate.image_asset_id).toBeNull();
+  });
+
+  it('repairs hostile field keys and labels instead of storing them or failing', async () => {
+    const doc = await exportedCodexDoc();
+    const lin = doc.codex.entries.find((e) => e.title === 'Lin Yao')!;
+    lin.fields = [
+      { key: 'Bad Key!', label: '', type: 'text', value: 'a' },
+      { key: 'bad-key-', label: 'Twin', type: 'longtext', value: 'b' },
+    ];
+    doc.codex.categories[0]!.fieldTemplate = [{ key: '../x', label: '  ', type: 'text' }];
+    const result = restoreDoc(doc);
+    expect(result.warnings.join(' ')).toContain('Lin Yao');
+    const api = (await h.api('GET', `/api/books/${result.book.id}/codex`)).json();
+    const stored = api.entries.find((e: { title: string }) => e.title === 'Lin Yao');
+    expect(stored.fields.map((f: { key: string }) => f.key)).toEqual(['bad-key-', 'bad-key--2']);
+    expect(stored.fields[0].label).toBe('bad-key-');
+    expect(api.categories[0].fieldTemplate).toEqual([{ key: 'x', label: 'x', type: 'text' }]);
+  });
+
+  it('rejects duplicate category or entry ids inside one file and changes nothing', async () => {
+    const doc = await exportedCodexDoc();
+    const before = (h.store.db.prepare('SELECT COUNT(*) AS n FROM books').get() as { n: number }).n;
+    const dupCategory = structuredClone(doc);
+    dupCategory.codex.categories[1]!.id = dupCategory.codex.categories[0]!.id;
+    expect(() => restoreDoc(dupCategory)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_BACKUP' }),
+    );
+    const dupEntry = structuredClone(doc);
+    dupEntry.codex.entries[1]!.id = dupEntry.codex.entries[0]!.id;
+    expect(() => restoreDoc(dupEntry)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_BACKUP' }),
+    );
+    expect((h.store.db.prepare('SELECT COUNT(*) AS n FROM books').get() as { n: number }).n).toBe(
+      before,
+    );
+  });
+
+  it('verify reports a codex stats mismatch', async () => {
+    const { book } = await buildRichBook();
+    const { file } = service().exportBook(book.id, { dir: backupDir });
+    const tampered = readDoc(file);
+    tampered.stats.codexEntries += 1;
+    fs.writeFileSync(file, JSON.stringify(tampered));
+    fs.rmSync(file + '.sha256');
+    expect(verifyColdBackup(file).problems.join(' ')).toContain('stats.codexEntries');
   });
 });
 

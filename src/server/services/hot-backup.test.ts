@@ -4,7 +4,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDatabase, type Db } from '../db/connection.ts';
-import { migrate } from '../db/migrate.ts';
+import { loadMigrations, migrate } from '../db/migrate.ts';
 import {
   HotBackupService,
   KEEP_BACKUPS,
@@ -43,7 +43,7 @@ describe('createHotBackup', () => {
 
     const copy = new Database(file, { readonly: true });
     expect(copy.prepare('SELECT title FROM books').get()).toEqual({ title: 'Made-up' });
-    expect(copy.pragma('user_version', { simple: true })).toBe(1);
+    expect(copy.pragma('user_version', { simple: true })).toBe(loadMigrations().length);
     expect(copy.pragma('integrity_check', { simple: true })).toBe('ok');
     copy.close();
   });

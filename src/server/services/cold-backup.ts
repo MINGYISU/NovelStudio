@@ -40,6 +40,7 @@ import {
   listFullNodes,
   type FullNodeRow,
 } from '../repos/cold-backup.ts';
+import { listCategories, listEntries } from '../repos/codex.ts';
 import { listBookSnapshots } from '../repos/snapshots.ts';
 import { assetFilePath } from './assets.ts';
 import {
@@ -104,6 +105,8 @@ export function buildColdBackup(
       book,
       nodes: listFullNodes(db, bookId),
       assets: listBookAssets(db, bookId),
+      categories: listCategories(db, bookId),
+      entries: listEntries(db, bookId),
       snapshots: options.includeSnapshots ? listBookSnapshots(db, bookId) : null,
       schemaVersion: getSchemaVersion(db),
     };
@@ -199,10 +202,38 @@ export function buildColdBackup(
       createdAt: s.createdAt,
     })) ?? null;
 
+  const categoryOrder = new Map(loaded.categories.map((c, i) => [c.id, i]));
+  const codex: ColdBackupDoc['codex'] = {
+    categories: loaded.categories.map((c) => ({
+      id: c.id,
+      name: c.name,
+      position: c.position,
+      fieldTemplate: c.fieldTemplate,
+    })),
+    entries: loaded.entries
+      .sort(
+        (a, b) =>
+          (categoryOrder.get(a.categoryId) ?? 0) - (categoryOrder.get(b.categoryId) ?? 0) ||
+          a.position - b.position ||
+          a.id.localeCompare(b.id),
+      )
+      .map((e) => ({
+        id: e.id,
+        categoryId: e.categoryId,
+        title: e.title,
+        summary: e.summary,
+        fields: e.fields,
+        imageAssetId: e.imageAssetId,
+        position: e.position,
+        createdAt: e.createdAt,
+        updatedAt: e.updatedAt,
+      })),
+  };
+
   const partial = {
     manuscript,
     trash,
-    codex: { categories: [], entries: [] },
+    codex,
     maps: [],
     foreshadows: [],
     assets,

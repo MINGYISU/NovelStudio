@@ -14,7 +14,11 @@ export function App() {
           <Route path="/" element={<LibraryPage />} />
           <Route path="/trash" element={<TrashPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/book/:bookId/manuscript/:nodeId?" element={<WorkspacePage />} />
+          <Route
+            path="/book/:bookId/manuscript/:nodeId?"
+            element={<WorkspacePage view="manuscript" />}
+          />
+          <Route path="/book/:bookId/codex/:entryId?" element={<WorkspacePage view="codex" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

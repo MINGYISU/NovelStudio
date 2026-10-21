@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDataStore } from './bootstrap.ts';
 import { DataDirError, realDataDir } from './config.ts';
+import { loadMigrations } from './db/migrate.ts';
 import { listBackups } from './services/hot-backup.ts';
 
 let tmp: string;
@@ -31,7 +32,7 @@ describe('openDataStore', () => {
     expect(fs.existsSync(path.join(dataDir, 'novelstudio.db'))).toBe(true);
     expect(fs.existsSync(path.join(dataDir, 'assets'))).toBe(true);
     expect(fs.existsSync(path.join(dataDir, 'config.json'))).toBe(true);
-    expect(store.db.pragma('user_version', { simple: true })).toBe(1);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(loadMigrations().length);
 
     const backups = listBackups(path.join(dataDir, 'backups'));
     expect(backups).toHaveLength(1);

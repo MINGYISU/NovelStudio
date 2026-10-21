@@ -25,6 +25,29 @@
   white-space: nowrap;
 }
 
+.viewTabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.viewTab {
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.viewTab:hover {
+  background: rgb(91 74 138 / 9%);
+}
+
+.viewTabActive,
+.viewTabActive:hover {
+  background: rgb(91 74 138 / 15%);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
 .body {
   display: grid;
   flex: 1;

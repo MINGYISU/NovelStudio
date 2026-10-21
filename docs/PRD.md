@@ -325,4 +325,6 @@ Accounts, cloud sync, collaboration, mobile apps, AI writing features, publishin
 | Numbering | Continuous through the book by default, configurable per kind | Matches most serialized and print novels. |
 | Fonts | Display settings per book, not stored in text | Keeps the manuscript clean; exports stay consistent. |
 | Characters vs. worldbuilding | One Codex module | Same data shape; half the code. |
+| Default Codex categories for existing books | Created lazily the first time the Codex view opens for a book that has none | No migration touches existing data; deleting every category brings the defaults back on the next visit. |
+| "Characters in this section" | Computed from names and aliases in the section text, not from stored links | No new data to back up or remap; manual links stay possible later. |
 | Native project format | The cold backup JSON | One format to maintain, readable without the app. |

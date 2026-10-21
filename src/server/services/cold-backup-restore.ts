@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { repairFields } from '../../shared/codex.ts';
+import { CODEX_SUMMARY_MAX, CODEX_TITLE_MAX } from '../../shared/schemas/codex.ts';
 import { docToPlainText } from '../../shared/prosemirror-text.ts';
 import { contentSchema, docFromPlainText, type ContentDoc } from '../../shared/schemas/content.ts';
 import {
@@ -25,6 +27,7 @@ import {
   titleExists,
   type FullNodeRow,
 } from '../repos/cold-backup.ts';
+import { insertCategory, insertEntry } from '../repos/codex.ts';
 import { listNodes } from '../repos/nodes.ts';
 import { insertSnapshot } from '../repos/snapshots.ts';
 import { writeFileAtomic } from '../config.ts';
@@ -88,6 +91,8 @@ function collectIds(doc: ColdBackupDoc): {
   nodeIds: string[];
   assetIds: string[];
   snapshotIds: string[];
+  categoryIds: string[];
+  entryIds: string[];
 } {
   const nodeIds: string[] = [];
   const visit = (s: ColdSection): void => {
@@ -100,6 +105,8 @@ function collectIds(doc: ColdBackupDoc): {
     nodeIds,
     assetIds: doc.assets.map((a) => a.id),
     snapshotIds: (doc.snapshots ?? []).map((s) => s.id),
+    categoryIds: doc.codex.categories.map((c) => c.id),
+    entryIds: doc.codex.entries.map((e) => e.id),
   };
 }
 
@@ -137,14 +144,13 @@ export function restoreColdBackup(
   }
 
   const doc = parseColdBackup(bytes);
-  const { nodeIds, assetIds, snapshotIds } = collectIds(doc);
+  const { nodeIds, assetIds, snapshotIds, categoryIds, entryIds } = collectIds(doc);
   assertNoDuplicates('section', nodeIds);
   assertNoDuplicates('image', assetIds);
   assertNoDuplicates('snapshot', snapshotIds);
+  assertNoDuplicates('codex category', categoryIds);
+  assertNoDuplicates('codex entry', entryIds);
 
-  if (doc.codex.categories.length + doc.codex.entries.length > 0) {
-    warnings.push('Codex data is not supported by this version of the app and was skipped.');
-  }
   if (doc.maps.length > 0)
     warnings.push('Story maps are not supported by this version and were skipped.');
   if (doc.foreshadows.length > 0) {
@@ -155,9 +161,18 @@ export function restoreColdBackup(
     anyIdExists(db, 'books', [doc.book.id]) ||
     anyIdExists(db, 'nodes', nodeIds) ||
     anyIdExists(db, 'assets', assetIds) ||
-    anyIdExists(db, 'snapshots', snapshotIds);
+    anyIdExists(db, 'snapshots', snapshotIds) ||
+    anyIdExists(db, 'codex_categories', categoryIds) ||
+    anyIdExists(db, 'codex_entries', entryIds);
   const ids = new Map<string, string>();
-  for (const id of [doc.book.id, ...nodeIds, ...assetIds, ...snapshotIds]) {
+  for (const id of [
+    doc.book.id,
+    ...nodeIds,
+    ...assetIds,
+    ...snapshotIds,
+    ...categoryIds,
+    ...entryIds,
+  ]) {
     ids.set(id, remapped ? crypto.randomUUID() : id);
   }
   const mapped = (id: string): string => ids.get(id) as string;
@@ -285,6 +300,53 @@ export function restoreColdBackup(
     ];
   });
 
+  const categories = doc.codex.categories.map((c, position) => {
+    const template = repairFields(c.fieldTemplate);
+    for (const problem of template.problems)
+      warnings.push(`Codex category "${c.name}": ${problem}`);
+    return {
+      id: mapped(c.id),
+      bookId,
+      name: c.name.trim().slice(0, 100) || 'Untitled category',
+      position,
+      fieldTemplate: template.items,
+    };
+  });
+  const categoryIdSet = new Set(categories.map((c) => c.id));
+  const entryCounts = new Map<string, number>();
+  const entries = doc.codex.entries.flatMap((e) => {
+    const categoryId = mapped(e.categoryId);
+    if (!categoryIdSet.has(categoryId)) {
+      warnings.push(`Codex entry "${e.title}" has no category in the file and was skipped.`);
+      return [];
+    }
+    const fields = repairFields(e.fields);
+    for (const problem of fields.problems) warnings.push(`Codex entry "${e.title}": ${problem}`);
+    let imageAssetId: string | null = null;
+    if (e.imageAssetId !== null) {
+      const mappedImage = ids.get(e.imageAssetId);
+      if (mappedImage && assetIdSet.has(mappedImage)) imageAssetId = mappedImage;
+      else
+        warnings.push(`The image of codex entry "${e.title}" was not available and was removed.`);
+    }
+    const position = entryCounts.get(categoryId) ?? 0;
+    entryCounts.set(categoryId, position + 1);
+    return [
+      {
+        id: mapped(e.id),
+        bookId,
+        categoryId,
+        title: e.title.trim().slice(0, CODEX_TITLE_MAX) || 'Untitled',
+        summary: e.summary.slice(0, CODEX_SUMMARY_MAX),
+        fields: fields.items,
+        imageAssetId,
+        position,
+        createdAt: e.createdAt,
+        updatedAt: e.updatedAt,
+      },
+    ];
+  });
+
   const writtenFiles: string[] = [];
   try {
     for (const { data, row } of assets) {
@@ -307,6 +369,8 @@ export function restoreColdBackup(
       });
       for (const node of nodes) insertFullNodeRow(db, node);
       for (const { row } of assets) insertAsset(db, row);
+      for (const category of categories) insertCategory(db, category);
+      for (const entry of entries) insertEntry(db, entry);
       for (const snapshot of snapshots) insertSnapshot(db, snapshot);
       try {
         assertTreeInvariants(listNodes(db, bookId));

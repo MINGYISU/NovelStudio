@@ -132,6 +132,8 @@ Ordered by `deletedAt`, then id. A `Section` (with its `children`, which are the
 
 ### 4.4 Codex
 
+Categories are in display order and entries are ordered by category, then by position; `position` is informational (restore takes it from array order). `fields` are the entry's own ordered fields: `key` is a stable identifier (renaming a field only changes `label`), `type` is `text` or `longtext`. `fieldTemplate` is the category template that new entries copy.
+
 ```json
 {
   "categories": [
@@ -191,10 +193,10 @@ To recover an image by hand: copy `dataBase64` into a file and run `base64 -D -i
 1. Verify the `.sha256` sidecar if present; on mismatch, warn and ask before continuing.
 2. Require `format == "novelstudio.cold-backup"`. If `formatVersion` is older, run upgraders in order; if newer than the app supports, refuse.
 3. Validate with the Zod schema (`src/shared/schemas/cold-backup.ts`).
-4. If `book.id` (or any other ID) already exists in the target database, regenerate **all** IDs and rewrite every reference: section nesting, `book.coverAssetId`, `imageAssetId`, map node links, occurrence `nodeId`, `foreshadowAnchor` marks inside `content`, snapshot `nodeId`.
+4. If `book.id` (or any other ID) already exists in the target database, regenerate **all** IDs and rewrite every reference: section nesting, `book.coverAssetId`, codex `categoryId` and `imageAssetId`, map node links, occurrence `nodeId`, `foreshadowAnchor` marks inside `content`, snapshot `nodeId`.
 5. Positions come from array order; `displayTitle`, `wordCount`, `plainText`, and `stats` are recomputed, not trusted.
 6. Write assets (checksum verified), insert everything in one transaction, check tree invariants. Any failure rolls everything back.
-7. Restore is defensive because the file is untrusted: images are re-checked by their bytes (only PNG, JPEG, WebP and GIF; anything else is skipped), image file names are sanitized, and `content` that does not match the editor's allowed formatting is rebuilt from `plainText`. Everything skipped or repaired is reported as a warning. Data this app version cannot store yet (codex, maps, foreshadows, before their milestones) is skipped with a warning, never silently.
+7. Restore is defensive because the file is untrusted: images are re-checked by their bytes (only PNG, JPEG, WebP and GIF; anything else is skipped), image file names are sanitized, and `content` that does not match the editor's allowed formatting is rebuilt from `plainText`. Everything skipped or repaired is reported as a warning. Codex field keys and labels that break the app's rules are repaired (and over-long values shortened), an entry whose category is missing is skipped, and an entry image that is unavailable is removed from the entry, each with a warning. Data this app version cannot store yet (maps, foreshadows, before their milestones) is skipped with a warning, never silently.
 8. The restored book is always a **new** book. Existing books are never modified. Title gets the suffix ` (restored YYYY-MM-DD)` if a book with the same title exists.
 
 ---

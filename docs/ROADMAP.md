@@ -11,7 +11,7 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 | M2 | Tree logic & API (no UI) | TREE-01..03/08, MOVE-03..08, NUM-01..03 | ☑ |
 | M3 | Sidebar with drag-and-drop | TREE-05..07/09..11, MOVE-01..11, NUM-04 | ☑ |
 | M4 | Editor, autosave, **cold backup** | ED-01..08/10, DISP-01, SNAP-01, COLD-01..10, IMP-01, EXP-02 | ☑ |
-| M5 | Codex | CDX-01..07 | ☐ |
+| M5 | Codex | CDX-01..07 | ☑ |
 | M6 | Story maps | MAP-01..09 | ☐ |
 | M7 | Foreshadowing | FS-01..07 | ☐ |
 | M7b | In-text foreshadow anchors | FS-08 | ☐ |
@@ -102,7 +102,10 @@ Then test manually, and commit when satisfied.
 
 **Build**: categories with templates (defaults per PRD §8), entry cards, entry editor with add/rename/reorder/remove fields, images, search, "characters in this section" in the right panel. Extend cold backup + round-trip test.
 
-**Done when**: custom field persists after restart; category with entries cannot be deleted; round-trip test covers codex.
+**Done when**
+- [x] Custom field persists after restart.
+- [x] Category with entries cannot be deleted.
+- [x] Round-trip test covers codex.
 
 ## M6 — Story maps
 

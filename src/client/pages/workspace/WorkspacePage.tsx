@@ -2,10 +2,11 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Download, MoreHorizontal, Settings, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, NavLink, useParams } from 'react-router';
 import { useBook } from '../../api/books.ts';
 import { treeKey, useTree } from '../../api/nodes.ts';
 import { Button } from '../../components/ui.tsx';
+import { CodexView } from '../../features/codex/CodexView.tsx';
 import { computeDisplayTitles } from '../../../shared/numbering.ts';
 import { EditorPanel } from '../../features/editor/EditorPanel.tsx';
 import { saverRegistry } from '../../features/editor/save-registry.ts';
@@ -23,8 +24,8 @@ import libraryStyles from '../library/library.module.css';
 import styles from '../../features/manuscript/manuscript.module.css';
 
 /** Workspace layout: top bar with save status, resizable sidebar, editor, details panel. */
-export function WorkspacePage() {
-  const { bookId, nodeId } = useParams();
+export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' }) {
+  const { bookId, nodeId, entryId } = useParams();
   const book = useBook(bookId);
   const tree = useTree(book.data && !book.data.deletedAt ? bookId : undefined);
   const sidebarWidth = useWorkspaceStore((s) => s.sidebarWidth);
@@ -44,6 +45,10 @@ export function WorkspacePage() {
 
   const nodes = tree.data;
   const selected = nodes?.find((n) => n.id === nodeId && n.deletedAt === null);
+  const lastNode = useWorkspaceStore((s) => (bookId ? s.lastNodeByBook[bookId] : undefined));
+  useEffect(() => {
+    if (bookId && selected) useWorkspaceStore.getState().setLastNode(bookId, selected.id);
+  }, [bookId, selected]);
   const displayTitle = useMemo(
     () =>
       nodes && selected && book.data
@@ -86,6 +91,24 @@ export function WorkspacePage() {
           <ArrowLeft size={16} /> Library
         </Link>
         <h1 className={styles.bookTitle}>{book.data.title}</h1>
+        <nav className={styles.viewTabs} aria-label="Views">
+          {(
+            [
+              ['Manuscript', `/book/${book.data.id}/manuscript${lastNode ? `/${lastNode}` : ''}`],
+              ['Codex', `/book/${book.data.id}/codex`],
+            ] as const
+          ).map(([label, to]) => (
+            <NavLink
+              key={label}
+              to={to}
+              className={() =>
+                `${styles.viewTab} ${(label === 'Codex') === (view === 'codex') ? styles.viewTabActive : ''}`
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
+        </nav>
         <SaveStatus />
         <Button onClick={() => setEditingStructure(true)}>
           <Settings2 size={16} /> Structure
@@ -111,42 +134,46 @@ export function WorkspacePage() {
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       </header>
-      <div
-        className={styles.body}
-        style={{ gridTemplateColumns: `${sidebarWidth}px 6px 1fr 18rem` }}
-      >
-        {nodes ? (
-          <Sidebar
-            key={book.data.id}
-            bookId={book.data.id}
-            nodes={nodes}
-            structure={book.data.structure}
-            selectedId={selected?.id}
-          />
-        ) : (
-          <aside className={styles.sidebar}>
-            <p className={styles.emptyTree} role={tree.error ? 'alert' : undefined}>
-              {tree.error ? 'The manuscript could not be loaded.' : 'Loading…'}
-            </p>
-          </aside>
-        )}
-        <Resizer />
-        <main className={styles.main}>
-          {selected && displayTitle && nodes ? (
-            <EditorPanel
+      {view === 'codex' ? (
+        <CodexView key={book.data.id} bookId={book.data.id} entryId={entryId} />
+      ) : (
+        <div
+          className={styles.body}
+          style={{ gridTemplateColumns: `${sidebarWidth}px 6px 1fr 18rem` }}
+        >
+          {nodes ? (
+            <Sidebar
+              key={book.data.id}
               bookId={book.data.id}
-              nodeId={selected.id}
-              displayTitle={displayTitle}
-              display={book.data.display}
-              bookWords={totalWords(nodes)}
-              savedSectionWords={selected.wordCount}
+              nodes={nodes}
+              structure={book.data.structure}
+              selectedId={selected?.id}
             />
           ) : (
-            <p className={styles.mainPlaceholder}>Select a section to start writing.</p>
+            <aside className={styles.sidebar}>
+              <p className={styles.emptyTree} role={tree.error ? 'alert' : undefined}>
+                {tree.error ? 'The manuscript could not be loaded.' : 'Loading…'}
+              </p>
+            </aside>
           )}
-        </main>
-        <DetailsPanel bookId={book.data.id} node={selected} displayTitle={displayTitle} />
-      </div>
+          <Resizer />
+          <main className={styles.main}>
+            {selected && displayTitle && nodes ? (
+              <EditorPanel
+                bookId={book.data.id}
+                nodeId={selected.id}
+                displayTitle={displayTitle}
+                display={book.data.display}
+                bookWords={totalWords(nodes)}
+                savedSectionWords={selected.wordCount}
+              />
+            ) : (
+              <p className={styles.mainPlaceholder}>Select a section to start writing.</p>
+            )}
+          </main>
+          <DetailsPanel bookId={book.data.id} node={selected} displayTitle={displayTitle} />
+        </div>
+      )}
       <NoticeBar />
       {exporting ? (
         <ExportDialog

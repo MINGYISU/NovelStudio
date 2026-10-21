@@ -44,6 +44,9 @@ interface WorkspaceState {
   /** A freshly created section whose title should open for inline rename. */
   pendingEditId: string | null;
   setPendingEditId: (id: string | null) => void;
+  /** The section last open per book, so the Manuscript tab returns to it after a visit elsewhere. */
+  lastNodeByBook: Record<string, string>;
+  setLastNode: (bookId: string, nodeId: string) => void;
 }
 
 let noticeCounter = 0;
@@ -66,4 +69,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setLastMove: (lastMove) => set({ lastMove }),
   pendingEditId: null,
   setPendingEditId: (pendingEditId) => set({ pendingEditId }),
+  lastNodeByBook: {},
+  setLastNode: (bookId, nodeId) =>
+    set((state) => ({ lastNodeByBook: { ...state.lastNodeByBook, [bookId]: nodeId } })),
 }));

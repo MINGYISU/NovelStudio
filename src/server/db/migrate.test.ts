@@ -26,16 +26,37 @@ function tableNames(db: Database.Database): string[] {
     .sort();
 }
 
+const ALL_TABLES = ['assets', 'books', 'codex_categories', 'codex_entries', 'nodes', 'snapshots'];
+
 describe('migrate', () => {
   it('builds the schema from an empty database', () => {
     const db = openDatabase(path.join(tmp, 'novelstudio.db'));
     const result = migrate(db);
 
     expect(result).toEqual({ from: 0, to: loadMigrations().length });
-    expect(getSchemaVersion(db)).toBe(1);
-    expect(tableNames(db)).toEqual(['assets', 'books', 'nodes', 'snapshots']);
+    expect(getSchemaVersion(db)).toBe(loadMigrations().length);
+    expect(tableNames(db)).toEqual(ALL_TABLES);
     expect(db.pragma('journal_mode', { simple: true })).toBe('wal');
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    db.close();
+  });
+
+  it('002 adds the codex tables to a version-1 database without touching existing rows', () => {
+    const db = openDatabase(path.join(tmp, 'novelstudio.db'));
+    const [first] = loadMigrations();
+    migrate(db, { migrations: [first!] });
+    db.prepare(
+      "INSERT INTO books (id, title, created_at, updated_at) VALUES ('b1', 'Keep me', 'x', 'x')",
+    ).run();
+    db.prepare(
+      `INSERT INTO nodes (id, book_id, kind, title, position, content, created_at, updated_at)
+       VALUES ('n1', 'b1', 'chapter', 'Ch', 0, '{"type":"doc","content":[]}', 'x', 'x')`,
+    ).run();
+
+    expect(migrate(db)).toEqual({ from: 1, to: loadMigrations().length });
+    expect(tableNames(db)).toEqual(ALL_TABLES);
+    expect(db.prepare('SELECT title FROM books').get()).toEqual({ title: 'Keep me' });
+    expect(db.prepare('SELECT title FROM nodes').get()).toEqual({ title: 'Ch' });
     db.close();
   });
 
@@ -53,7 +74,8 @@ describe('migrate', () => {
     db.prepare(
       "INSERT INTO books (id, title, created_at, updated_at) VALUES ('b1', 'Keep me', 'x', 'x')",
     ).run();
-    expect(migrate(db)).toEqual({ from: 1, to: 1 });
+    const latest = loadMigrations().length;
+    expect(migrate(db)).toEqual({ from: latest, to: latest });
     expect(db.prepare('SELECT title FROM books').get()).toEqual({ title: 'Keep me' });
     db.close();
   });
@@ -81,7 +103,7 @@ describe('migrate', () => {
 
     expect(() => migrate(db)).toThrow(SchemaTooNewError);
     expect(getSchemaVersion(db)).toBe(99);
-    expect(tableNames(db)).toEqual(['assets', 'books', 'nodes', 'snapshots']);
+    expect(tableNames(db)).toEqual(ALL_TABLES);
     db.close();
   });
 
