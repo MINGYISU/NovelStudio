@@ -12,7 +12,7 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 | M3 | Sidebar with drag-and-drop | TREE-05..07/09..11, MOVE-01..11, NUM-04 | ☑ |
 | M4 | Editor, autosave, **cold backup** | ED-01..08/10, DISP-01, SNAP-01, COLD-01..10, IMP-01, EXP-02 | ☑ |
 | M5 | Codex | CDX-01..07 | ☑ |
-| M6 | Story maps | MAP-01..09 | ☐ |
+| M6 | Story maps | MAP-01..09 | ☑ |
 | M7 | Foreshadowing | FS-01..07 | ☐ |
 | M7b | In-text foreshadow anchors | FS-08 | ☐ |
 | M8 | Polish, import/export | WS-03, ED-09, DISP-02, HOT-02, IMP-02/03, EXP-01, COLD-11 | ☐ |

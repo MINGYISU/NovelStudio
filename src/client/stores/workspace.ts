@@ -47,6 +47,9 @@ interface WorkspaceState {
   /** The section last open per book, so the Manuscript tab returns to it after a visit elsewhere. */
   lastNodeByBook: Record<string, string>;
   setLastNode: (bookId: string, nodeId: string) => void;
+  /** The story map last open per book, so the Story Maps tab returns to it. */
+  lastMapByBook: Record<string, string>;
+  setLastMap: (bookId: string, mapId: string) => void;
 }
 
 let noticeCounter = 0;
@@ -72,4 +75,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   lastNodeByBook: {},
   setLastNode: (bookId, nodeId) =>
     set((state) => ({ lastNodeByBook: { ...state.lastNodeByBook, [bookId]: nodeId } })),
+  lastMapByBook: {},
+  setLastMap: (bookId, mapId) =>
+    set((state) => ({ lastMapByBook: { ...state.lastMapByBook, [bookId]: mapId } })),
 }));

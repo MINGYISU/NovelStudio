@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { repairFields } from '../../shared/codex.ts';
 import { CODEX_SUMMARY_MAX, CODEX_TITLE_MAX } from '../../shared/schemas/codex.ts';
+import { remapMapLinks } from '../../shared/map-links.ts';
 import { docToPlainText } from '../../shared/prosemirror-text.ts';
+import { MAP_TEMPLATES, MAP_TITLE_MAX, repairMapData } from '../../shared/schemas/map.ts';
 import { contentSchema, docFromPlainText, type ContentDoc } from '../../shared/schemas/content.ts';
 import {
   COLD_BACKUP_FORMAT,
@@ -28,6 +30,7 @@ import {
   type FullNodeRow,
 } from '../repos/cold-backup.ts';
 import { insertCategory, insertEntry } from '../repos/codex.ts';
+import { insertMap } from '../repos/maps.ts';
 import { listNodes } from '../repos/nodes.ts';
 import { insertSnapshot } from '../repos/snapshots.ts';
 import { writeFileAtomic } from '../config.ts';
@@ -93,6 +96,7 @@ function collectIds(doc: ColdBackupDoc): {
   snapshotIds: string[];
   categoryIds: string[];
   entryIds: string[];
+  mapIds: string[];
 } {
   const nodeIds: string[] = [];
   const visit = (s: ColdSection): void => {
@@ -107,6 +111,7 @@ function collectIds(doc: ColdBackupDoc): {
     snapshotIds: (doc.snapshots ?? []).map((s) => s.id),
     categoryIds: doc.codex.categories.map((c) => c.id),
     entryIds: doc.codex.entries.map((e) => e.id),
+    mapIds: doc.maps.map((m) => m.id),
   };
 }
 
@@ -144,15 +149,14 @@ export function restoreColdBackup(
   }
 
   const doc = parseColdBackup(bytes);
-  const { nodeIds, assetIds, snapshotIds, categoryIds, entryIds } = collectIds(doc);
+  const { nodeIds, assetIds, snapshotIds, categoryIds, entryIds, mapIds } = collectIds(doc);
   assertNoDuplicates('section', nodeIds);
   assertNoDuplicates('image', assetIds);
   assertNoDuplicates('snapshot', snapshotIds);
   assertNoDuplicates('codex category', categoryIds);
   assertNoDuplicates('codex entry', entryIds);
+  assertNoDuplicates('map', mapIds);
 
-  if (doc.maps.length > 0)
-    warnings.push('Story maps are not supported by this version and were skipped.');
   if (doc.foreshadows.length > 0) {
     warnings.push('Foreshadow threads are not supported by this version and were skipped.');
   }
@@ -163,7 +167,8 @@ export function restoreColdBackup(
     anyIdExists(db, 'assets', assetIds) ||
     anyIdExists(db, 'snapshots', snapshotIds) ||
     anyIdExists(db, 'codex_categories', categoryIds) ||
-    anyIdExists(db, 'codex_entries', entryIds);
+    anyIdExists(db, 'codex_entries', entryIds) ||
+    anyIdExists(db, 'maps', mapIds);
   const ids = new Map<string, string>();
   for (const id of [
     doc.book.id,
@@ -172,6 +177,7 @@ export function restoreColdBackup(
     ...snapshotIds,
     ...categoryIds,
     ...entryIds,
+    ...mapIds,
   ]) {
     ids.set(id, remapped ? crypto.randomUUID() : id);
   }
@@ -347,6 +353,41 @@ export function restoreColdBackup(
     ];
   });
 
+  const sectionIdSet = new Set(nodes.map((n) => n.id));
+  const entryIdSet = new Set(entries.map((e) => e.id));
+  const maps = doc.maps.map((m, position) => {
+    const repaired = repairMapData(m.data);
+    for (const problem of repaired.problems) warnings.push(`Map "${m.title}": ${problem}`);
+    let template = m.template;
+    if (!(MAP_TEMPLATES as readonly string[]).includes(template)) {
+      warnings.push(`Map "${m.title}": unknown template "${template}" was changed to blank.`);
+      template = 'blank';
+    }
+    // Links are kept even when their target is not in the file; the map then shows "(missing)".
+    let dangling = 0;
+    for (const node of repaired.data.nodes) {
+      for (const link of node.data.links) {
+        if (!(link.type === 'node' ? sectionIdSet : entryIdSet).has(ids.get(link.id) ?? link.id))
+          dangling += 1;
+      }
+    }
+    if (dangling > 0) {
+      warnings.push(
+        `Map "${m.title}": ${dangling} link(s) point to a section or codex entry that is not in this backup; they are kept and show "(missing)".`,
+      );
+    }
+    return {
+      id: mapped(m.id),
+      bookId,
+      title: m.title.trim().slice(0, MAP_TITLE_MAX) || 'Untitled map',
+      template,
+      data: JSON.stringify(remapMapLinks(repaired.data, (id) => ids.get(id))),
+      position,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+    };
+  });
+
   const writtenFiles: string[] = [];
   try {
     for (const { data, row } of assets) {
@@ -372,6 +413,7 @@ export function restoreColdBackup(
       for (const category of categories) insertCategory(db, category);
       for (const entry of entries) insertEntry(db, entry);
       for (const snapshot of snapshots) insertSnapshot(db, snapshot);
+      for (const map of maps) insertMap(db, map);
       try {
         assertTreeInvariants(listNodes(db, bookId));
       } catch (err) {

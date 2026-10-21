@@ -7,6 +7,7 @@ import { useBook } from '../../api/books.ts';
 import { treeKey, useTree } from '../../api/nodes.ts';
 import { Button } from '../../components/ui.tsx';
 import { CodexView } from '../../features/codex/CodexView.tsx';
+import { MapsView } from '../../features/maps/MapsView.tsx';
 import { computeDisplayTitles } from '../../../shared/numbering.ts';
 import { EditorPanel } from '../../features/editor/EditorPanel.tsx';
 import { saverRegistry } from '../../features/editor/save-registry.ts';
@@ -24,8 +25,8 @@ import libraryStyles from '../library/library.module.css';
 import styles from '../../features/manuscript/manuscript.module.css';
 
 /** Workspace layout: top bar with save status, resizable sidebar, editor, details panel. */
-export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' }) {
-  const { bookId, nodeId, entryId } = useParams();
+export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' }) {
+  const { bookId, nodeId, entryId, mapId } = useParams();
   const book = useBook(bookId);
   const tree = useTree(book.data && !book.data.deletedAt ? bookId : undefined);
   const sidebarWidth = useWorkspaceStore((s) => s.sidebarWidth);
@@ -46,6 +47,7 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' }) {
   const nodes = tree.data;
   const selected = nodes?.find((n) => n.id === nodeId && n.deletedAt === null);
   const lastNode = useWorkspaceStore((s) => (bookId ? s.lastNodeByBook[bookId] : undefined));
+  const lastMap = useWorkspaceStore((s) => (bookId ? s.lastMapByBook[bookId] : undefined));
   useEffect(() => {
     if (bookId && selected) useWorkspaceStore.getState().setLastNode(bookId, selected.id);
   }, [bookId, selected]);
@@ -94,16 +96,19 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' }) {
         <nav className={styles.viewTabs} aria-label="Views">
           {(
             [
-              ['Manuscript', `/book/${book.data.id}/manuscript${lastNode ? `/${lastNode}` : ''}`],
-              ['Codex', `/book/${book.data.id}/codex`],
+              [
+                'Manuscript',
+                'manuscript',
+                `/book/${book.data.id}/manuscript${lastNode ? `/${lastNode}` : ''}`,
+              ],
+              ['Story Maps', 'maps', `/book/${book.data.id}/maps${lastMap ? `/${lastMap}` : ''}`],
+              ['Codex', 'codex', `/book/${book.data.id}/codex`],
             ] as const
-          ).map(([label, to]) => (
+          ).map(([label, target, to]) => (
             <NavLink
               key={label}
               to={to}
-              className={() =>
-                `${styles.viewTab} ${(label === 'Codex') === (view === 'codex') ? styles.viewTabActive : ''}`
-              }
+              className={() => `${styles.viewTab} ${target === view ? styles.viewTabActive : ''}`}
             >
               {label}
             </NavLink>
@@ -136,6 +141,15 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' }) {
       </header>
       {view === 'codex' ? (
         <CodexView key={book.data.id} bookId={book.data.id} entryId={entryId} />
+      ) : view === 'maps' ? (
+        <MapsView
+          key={book.data.id}
+          bookId={book.data.id}
+          mapId={mapId}
+          nodes={nodes}
+          treeFailed={tree.isError}
+          structure={book.data.structure}
+        />
       ) : (
         <div
           className={styles.body}

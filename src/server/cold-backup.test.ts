@@ -6,6 +6,7 @@ import type { Book } from '../shared/schemas/book.ts';
 import type { ColdBackupDoc, ColdSection } from '../shared/schemas/cold-backup.ts';
 import type { ExportResult } from '../shared/schemas/cold-backup-settings.ts';
 import { COLD_BACKUP_README } from '../shared/cold-backup.ts';
+import type { MapData, StoryMap } from '../shared/schemas/map.ts';
 import { CHINESE_STRUCTURE } from '../shared/schemas/structure.ts';
 import { assertTreeInvariants } from '../shared/tree.ts';
 import { readConfig } from './config.ts';
@@ -93,7 +94,39 @@ async function addCodex(harness: Harness, bookId: string, imageAssetId: string) 
   };
 }
 
-/** A book with every kind of data M5 has: nesting, formatting, trash, a cover, display settings, snapshots. */
+/** A plot-tree map whose first node links a section, a trashed section and a codex entry, plus a blank map. */
+async function addMaps(
+  harness: Harness,
+  bookId: string,
+  targets: { section: string; trashed: string; entry: string },
+) {
+  const created = (
+    await harness.api('POST', `/api/books/${bookId}/maps`, {
+      template: 'plot-tree',
+      title: 'Main plot',
+    })
+  ).json<{ map: StoryMap }>().map;
+  const data = structuredClone(created.data);
+  data.nodes[0]!.data.links = [
+    { type: 'node', id: targets.section },
+    { type: 'node', id: targets.trashed },
+    { type: 'codex', id: targets.entry },
+  ];
+  data.nodes[1]!.data.storyTime = 'Spring 1923';
+  data.nodes[1]!.data.description = '她没有抬头。';
+  data.edges[0]!.label = 'because';
+  data.nodes[2]!.position = { x: 321, y: -45 };
+  data.viewport = { x: -10, y: 20, zoom: 0.75 };
+  data.layoutDirection = 'LR';
+  const saved = await harness.api('PUT', `/api/maps/${created.id}/data`, { data });
+  expect(saved.statusCode).toBe(200);
+  const blank = (
+    await harness.api('POST', `/api/books/${bookId}/maps`, { template: 'blank', title: 'Scratch' })
+  ).json<{ map: StoryMap }>().map;
+  return { mapMain: created.id, mapBlank: blank.id };
+}
+
+/** A book with every kind of data M6 has: nesting, formatting, trash, a cover, display settings, snapshots. */
 async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<string, string> }> {
   const book = await harness.createBook('The Lantern Road');
   const volume = await harness.createNode(book.id, 'volume', null, 'Old Roads');
@@ -140,10 +173,16 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
     },
   });
   const codex = await addCodex(harness, book.id, asset.id);
+  const maps = await addMaps(harness, book.id, {
+    section: ch1.id,
+    trashed: gone.id,
+    entry: codex.codexLin,
+  });
   return {
     book,
     ids: {
       ...codex,
+      ...maps,
       volume: volume.id,
       part: part.id,
       ch1: ch1.id,
@@ -176,6 +215,7 @@ function allIds(doc: ColdBackupDoc): string[] {
     ...doc.assets.map((a) => a.id),
     ...doc.codex.categories.map((c) => c.id),
     ...doc.codex.entries.map((e) => e.id),
+    ...doc.maps.map((m) => m.id),
     ...(doc.snapshots ?? []).map((s) => s.id),
   ];
   const visit = (s: ColdSection) => {
@@ -773,22 +813,6 @@ describe('restore validation and safety', () => {
     expect(row.parent_id).toBeNull();
   });
 
-  it('warns that story maps from a later version are skipped, not silently dropped', async () => {
-    const doc = await exportedDoc();
-    doc.maps = [
-      {
-        id: crypto.randomUUID(),
-        title: 'm',
-        template: 'blank',
-        position: 0,
-        createdAt: 'x',
-        updatedAt: 'x',
-        data: {},
-      },
-    ];
-    expect(restore(doc).warnings.join(' ')).toContain('Story maps');
-  });
-
   it('recomputes plain text and word counts instead of trusting the file', async () => {
     const doc = await exportedDoc();
     const ch1 = doc.manuscript[0]!.children[0]!.children[0]!;
@@ -982,6 +1006,166 @@ describe('codex (COLD-09, CDX-01..06)', () => {
     fs.writeFileSync(file, JSON.stringify(tampered));
     fs.rmSync(file + '.sha256');
     expect(verifyColdBackup(file).problems.join(' ')).toContain('stats.codexEntries');
+  });
+});
+
+describe('story maps (COLD-09, MAP-01..08)', () => {
+  const restoreDoc = (doc: unknown, harness = h) =>
+    restoreColdBackup(harness.store.db, harness.store.paths, Buffer.from(JSON.stringify(doc)));
+  const mapsOf = async (harness: Harness, bookId: string) =>
+    (await harness.api('GET', `/api/books/${bookId}/maps`)).json<{ maps: StoryMap[] }>().maps;
+
+  async function exportedMapDoc(): Promise<ColdBackupDoc> {
+    const { book } = await buildRichBook();
+    return readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+  }
+
+  it('exports maps in order with nodes, edges, links, positions, viewport and the stats count', async () => {
+    const { book, ids } = await buildRichBook();
+    const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+    expect(doc.maps.map((m) => [m.id, m.title, m.template, m.position])).toEqual([
+      [ids.mapMain, 'Main plot', 'plot-tree', 0],
+      [ids.mapBlank, 'Scratch', 'blank', 1],
+    ]);
+    const data = doc.maps[0]!.data as MapData;
+    expect(data.nodes[0]!.data.links).toEqual([
+      { type: 'node', id: ids.ch1 },
+      { type: 'node', id: ids.gone },
+      { type: 'codex', id: ids.codexLin },
+    ]);
+    expect(data.nodes[1]!.data.storyTime).toBe('Spring 1923');
+    expect(data.nodes[2]!.position).toEqual({ x: 321, y: -45 });
+    expect(data.edges[0]!.label).toBe('because');
+    expect(data).toMatchObject({ viewport: { x: -10, y: 20, zoom: 0.75 }, layoutDirection: 'LR' });
+    expect(doc.stats.maps).toBe(2);
+  });
+
+  it('restores maps into an empty data directory unchanged, with links that still resolve', async () => {
+    const original = await exportedMapDoc();
+    other = await new Harness().start();
+    expect(restoreDoc(original, other)).toMatchObject({ remapped: false, warnings: [] });
+    const maps = await mapsOf(other, original.book.id);
+    expect(maps.map((m) => m.title)).toEqual(['Main plot', 'Scratch']);
+    expect(maps[0]!.data).toEqual(original.maps[0]!.data);
+    expect(maps.every((m) => !m.damaged)).toBe(true);
+  });
+
+  it('remaps section and codex links on an id collision and leaves the original maps alone', async () => {
+    const { book, ids } = await buildRichBook();
+    const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+    const before = await mapsOf(h, book.id);
+
+    const result = restoreDoc(doc);
+    expect(result.remapped).toBe(true);
+    expect(result.warnings).toEqual([]);
+    expect(await mapsOf(h, book.id)).toEqual(before);
+
+    const copy = await mapsOf(h, result.book.id);
+    expect(copy).toHaveLength(2);
+    expect(copy.map((m) => m.id)).not.toContain(ids.mapMain);
+    const newNodes = new Map(listNodes(h.store.db, result.book.id).map((n) => [n.title, n.id]));
+    const newLin = (await h.api('GET', `/api/books/${result.book.id}/codex`))
+      .json<{ entries: { id: string; title: string }[] }>()
+      .entries.find((e) => e.title === 'Lin Yao')!.id;
+    expect(copy[0]!.data.nodes[0]!.data.links).toEqual([
+      { type: 'node', id: newNodes.get('Reunion') },
+      { type: 'node', id: newNodes.get('Cut chapter') },
+      { type: 'codex', id: newLin },
+    ]);
+    for (const link of copy[0]!.data.nodes[0]!.data.links) {
+      expect([ids.ch1, ids.gone, ids.codexLin]).not.toContain(link.id);
+    }
+  });
+
+  it('keeps a link whose target is not in the file and warns, so "(missing)" stays visible later', async () => {
+    const doc = await exportedMapDoc();
+    const lost = crypto.randomUUID();
+    const data = doc.maps[0]!.data as MapData;
+    data.nodes[0]!.data.links.push({ type: 'node', id: lost }, { type: 'codex', id: lost });
+    other = await new Harness().start();
+    const result = restoreDoc(doc, other);
+    expect(result.warnings.join(' ')).toContain('2 link(s)');
+    expect(result.warnings.join(' ')).toContain('(missing)');
+
+    const restored = (await mapsOf(other, result.book.id))[0]!;
+    expect(restored.data.nodes[0]!.data.links).toContainEqual({ type: 'node', id: lost });
+    expect(restored.data.nodes[0]!.data.links).toContainEqual({ type: 'codex', id: lost });
+
+    // The links survive another export, so nothing is lost on the way.
+    const again = readDoc(
+      service(other, () => new Date(T0 + 1000)).exportBook(result.book.id, {
+        dir: path.join(other.tmp, 'cold'),
+      }).file,
+    );
+    expect((again.maps[0]!.data as MapData).nodes[0]!.data.links).toContainEqual({
+      type: 'node',
+      id: lost,
+    });
+  });
+
+  it('repairs damaged maps item by item with warnings instead of failing the restore', async () => {
+    const doc = await exportedMapDoc();
+    const data = doc.maps[0]!.data as unknown as { nodes: unknown[]; edges: unknown[] };
+    const total = data.nodes.length;
+    data.nodes.push({ id: 'bad', position: 'x' });
+    data.edges.push({ id: 'e-bad', source: 'bad', target: 'bad', label: '' });
+    doc.maps[1]!.template = 'invented';
+    doc.maps[1]!.data = { nodes: 'nope' };
+    other = await new Harness().start();
+    const result = restoreDoc(doc, other);
+    const text = result.warnings.join(' ');
+    expect(text).toContain('could not be read and was left out');
+    expect(text).toContain('unknown template');
+    const maps = await mapsOf(other, result.book.id);
+    expect(maps[0]!.data.nodes).toHaveLength(total);
+    expect(maps[1]).toMatchObject({ template: 'blank', title: 'Scratch' });
+    expect(maps[1]!.data.nodes).toEqual([]);
+  });
+
+  it('rejects duplicate map ids inside one file and changes nothing', async () => {
+    const doc = await exportedMapDoc();
+    doc.maps[1]!.id = doc.maps[0]!.id;
+    const before = (h.store.db.prepare('SELECT COUNT(*) AS n FROM books').get() as { n: number }).n;
+    expect(() => restoreDoc(doc)).toThrowError(expect.objectContaining({ code: 'INVALID_BACKUP' }));
+    expect((h.store.db.prepare('SELECT COUNT(*) AS n FROM books').get() as { n: number }).n).toBe(
+      before,
+    );
+  });
+
+  it('rolls back the whole restore when a map cannot be stored', async () => {
+    const doc = await exportedMapDoc();
+    other = await new Harness().start();
+    other.store.db.exec(
+      "CREATE TRIGGER fail_maps BEFORE INSERT ON maps BEGIN SELECT RAISE(ABORT, 'boom'); END;",
+    );
+    expect(() => restoreDoc(doc, other!)).toThrow();
+    for (const table of ['books', 'nodes', 'maps', 'codex_entries', 'assets']) {
+      const n = (
+        other.store.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }
+      ).n;
+      expect(n, table).toBe(0);
+    }
+  });
+
+  it('warns in the export when a stored map is partly unreadable, and still exports the rest', async () => {
+    const { book, ids } = await buildRichBook();
+    h.store.db
+      .prepare('UPDATE maps SET data = ? WHERE id = ?')
+      .run(JSON.stringify({ nodes: [{ id: 'x' }], edges: [] }), ids.mapBlank);
+    const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+    expect(doc.warnings.join(' ')).toContain('Map "Scratch"');
+    expect(doc.maps).toHaveLength(2);
+    expect(doc.maps[0]!.data).toMatchObject({ layoutDirection: 'LR' });
+  });
+
+  it('verify reports a map stats mismatch', async () => {
+    const { book } = await buildRichBook();
+    const { file } = service().exportBook(book.id, { dir: backupDir });
+    const tampered = readDoc(file);
+    tampered.stats.maps += 1;
+    fs.writeFileSync(file, JSON.stringify(tampered));
+    fs.rmSync(file + '.sha256');
+    expect(verifyColdBackup(file).problems.join(' ')).toContain('stats.maps');
   });
 });
 

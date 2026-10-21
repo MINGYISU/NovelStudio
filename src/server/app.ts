@@ -11,9 +11,11 @@ import { registerBookRoutes } from './routes/books.ts';
 import { registerColdBackupRoutes } from './routes/cold-backup.ts';
 import { registerCodexRoutes } from './routes/codex.ts';
 import { registerContentRoutes } from './routes/content.ts';
+import { registerMapRoutes } from './routes/maps.ts';
 import { registerNodeRoutes } from './routes/nodes.ts';
 import { registerSecurity } from './security.ts';
 import { CodexService } from './services/codex.ts';
+import { MapService } from './services/maps.ts';
 import { ColdBackupService } from './services/cold-backup.ts';
 import { ContentService } from './services/content.ts';
 import { chooseFolderWithOsascript, type FolderPicker } from './services/folder-picker.ts';
@@ -91,6 +93,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     registerAssetRoutes(app, options.db, options.paths, library);
     registerNodeRoutes(app, new ManuscriptService(options.db, library));
     registerCodexRoutes(app, new CodexService(options.db, options.paths, library));
+    registerMapRoutes(app, new MapService(options.db, library));
     const snapshots = new SnapshotService(options.db, library);
     registerContentRoutes(app, new ContentService(options.db, library, snapshots), snapshots);
     registerColdBackupRoutes(app, {

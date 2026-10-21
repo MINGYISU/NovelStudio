@@ -26,7 +26,15 @@ function tableNames(db: Database.Database): string[] {
     .sort();
 }
 
-const ALL_TABLES = ['assets', 'books', 'codex_categories', 'codex_entries', 'nodes', 'snapshots'];
+const ALL_TABLES = [
+  'assets',
+  'books',
+  'codex_categories',
+  'codex_entries',
+  'maps',
+  'nodes',
+  'snapshots',
+];
 
 describe('migrate', () => {
   it('builds the schema from an empty database', () => {
@@ -57,6 +65,30 @@ describe('migrate', () => {
     expect(tableNames(db)).toEqual(ALL_TABLES);
     expect(db.prepare('SELECT title FROM books').get()).toEqual({ title: 'Keep me' });
     expect(db.prepare('SELECT title FROM nodes').get()).toEqual({ title: 'Ch' });
+    db.close();
+  });
+
+  it('003 adds the maps table to a version-2 database without touching existing rows', () => {
+    const db = openDatabase(path.join(tmp, 'novelstudio.db'));
+    migrate(db, { migrations: loadMigrations().slice(0, 2) });
+    db.prepare(
+      "INSERT INTO books (id, title, created_at, updated_at) VALUES ('b1', 'Keep me', 'x', 'x')",
+    ).run();
+    db.prepare(
+      `INSERT INTO codex_categories (id, book_id, name, position) VALUES ('c1', 'b1', 'People', 0)`,
+    ).run();
+    expect(tableNames(db)).not.toContain('maps');
+
+    expect(migrate(db)).toEqual({ from: 2, to: loadMigrations().length });
+    expect(tableNames(db)).toEqual(ALL_TABLES);
+    expect(db.prepare('SELECT name FROM codex_categories').get()).toEqual({ name: 'People' });
+    db.prepare(
+      `INSERT INTO maps (id, book_id, title, template, data, position, created_at, updated_at)
+       VALUES ('m1', 'b1', 'Map', 'blank', '{}', 0, 'x', 'x')`,
+    ).run();
+    db.prepare("DELETE FROM books WHERE id = 'b1'").run();
+    db.prepare('DELETE FROM codex_categories').run();
+    expect(db.prepare('SELECT COUNT(*) AS n FROM maps').get()).toEqual({ n: 0 });
     db.close();
   });
 

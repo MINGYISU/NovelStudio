@@ -41,6 +41,7 @@ import {
   type FullNodeRow,
 } from '../repos/cold-backup.ts';
 import { listCategories, listEntries } from '../repos/codex.ts';
+import { listMaps } from '../repos/maps.ts';
 import { listBookSnapshots } from '../repos/snapshots.ts';
 import { assetFilePath } from './assets.ts';
 import {
@@ -107,6 +108,7 @@ export function buildColdBackup(
       assets: listBookAssets(db, bookId),
       categories: listCategories(db, bookId),
       entries: listEntries(db, bookId),
+      maps: listMaps(db, bookId),
       snapshots: options.includeSnapshots ? listBookSnapshots(db, bookId) : null,
       schemaVersion: getSchemaVersion(db),
     };
@@ -230,11 +232,28 @@ export function buildColdBackup(
       })),
   };
 
+  const maps: ColdBackupDoc['maps'] = loaded.maps.map((m, position) => {
+    if (m.damaged) {
+      warnings.push(
+        `Map "${m.title}": part of its stored data could not be read and is left out of this backup.`,
+      );
+    }
+    return {
+      id: m.id,
+      title: m.title,
+      template: m.template,
+      position,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+      data: m.data,
+    };
+  });
+
   const partial = {
     manuscript,
     trash,
     codex,
-    maps: [],
+    maps,
     foreshadows: [],
     assets,
     snapshots,
