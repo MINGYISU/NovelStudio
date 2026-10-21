@@ -6,6 +6,7 @@ import type { Book } from '../shared/schemas/book.ts';
 import type { ColdBackupDoc, ColdSection } from '../shared/schemas/cold-backup.ts';
 import type { ExportResult } from '../shared/schemas/cold-backup-settings.ts';
 import { COLD_BACKUP_README } from '../shared/cold-backup.ts';
+import type { Thread } from '../shared/schemas/foreshadow.ts';
 import type { MapData, StoryMap } from '../shared/schemas/map.ts';
 import { CHINESE_STRUCTURE } from '../shared/schemas/structure.ts';
 import { assertTreeInvariants } from '../shared/tree.ts';
@@ -126,7 +127,45 @@ async function addMaps(
   return { mapMain: created.id, mapBlank: blank.id };
 }
 
-/** A book with every kind of data M6 has: nesting, formatting, trash, a cover, display settings, snapshots. */
+/**
+ * Two threads: one with all three roles in live sections, one whose setup and payoff sit in sections
+ * that are trashed afterwards (so they are exported with the trash).
+ */
+async function addForeshadows(
+  harness: Harness,
+  bookId: string,
+  targets: { ch1: string; scene: string; prologue: string; gone: string; nested: string },
+) {
+  const thread = async (body: object) =>
+    (await harness.api('POST', `/api/books/${bookId}/foreshadows`, body)).json<{
+      thread: { id: string };
+    }>().thread.id;
+  const occurrence = async (threadId: string, body: object) => {
+    const res = await harness.api('POST', `/api/foreshadows/${threadId}/occurrences`, body);
+    expect(res.statusCode).toBe(201);
+  };
+  const compass = await thread({
+    title: 'The broken compass',
+    description: 'Points the wrong way.',
+    status: 'planted',
+    color: '#336699',
+    notes: '她没有抬头。 Notes.',
+  });
+  await occurrence(compass, {
+    nodeId: targets.ch1,
+    role: 'setup',
+    excerpt: 'The needle shook.',
+    note: 'first look',
+  });
+  await occurrence(compass, { nodeId: targets.scene, role: 'hint' });
+  await occurrence(compass, { nodeId: targets.prologue, role: 'payoff', note: 'it points home' });
+  const door = await thread({ title: 'The red door' });
+  await occurrence(door, { nodeId: targets.gone, role: 'setup' });
+  await occurrence(door, { nodeId: targets.nested, role: 'payoff' });
+  return { threadCompass: compass, threadDoor: door };
+}
+
+/** A book with every kind of data M7 has: nesting, formatting, trash, a cover, display settings, snapshots. */
 async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<string, string> }> {
   const book = await harness.createBook('The Lantern Road');
   const volume = await harness.createNode(book.id, 'volume', null, 'Old Roads');
@@ -152,6 +191,13 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
   await save(gone.id, ['Deleted words.']);
   await save(goneChild.id, ['Deleted scene words.']);
   await save(nested.id, ['Trashed first.']);
+  const threads = await addForeshadows(harness, book.id, {
+    ch1: ch1.id,
+    scene: scene.id,
+    prologue: prologue.id,
+    gone: gone.id,
+    nested: nested.id,
+  });
   await harness.api('DELETE', `/api/nodes/${nested.id}`);
   await harness.api('DELETE', `/api/nodes/${gone.id}`);
 
@@ -183,6 +229,7 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
     ids: {
       ...codex,
       ...maps,
+      ...threads,
       volume: volume.id,
       part: part.id,
       ch1: ch1.id,
@@ -216,6 +263,7 @@ function allIds(doc: ColdBackupDoc): string[] {
     ...doc.codex.categories.map((c) => c.id),
     ...doc.codex.entries.map((e) => e.id),
     ...doc.maps.map((m) => m.id),
+    ...doc.foreshadows.flatMap((f) => [f.id, ...f.occurrences.map((o) => o.id)]),
     ...(doc.snapshots ?? []).map((s) => s.id),
   ];
   const visit = (s: ColdSection) => {
@@ -1166,6 +1214,167 @@ describe('story maps (COLD-09, MAP-01..08)', () => {
     fs.writeFileSync(file, JSON.stringify(tampered));
     fs.rmSync(file + '.sha256');
     expect(verifyColdBackup(file).problems.join(' ')).toContain('stats.maps');
+  });
+});
+
+describe('foreshadows (COLD-09, FS-01, FS-02)', () => {
+  const restoreDoc = (doc: unknown, harness = h) =>
+    restoreColdBackup(harness.store.db, harness.store.paths, Buffer.from(JSON.stringify(doc)));
+  const threadsOf = async (harness: Harness, bookId: string) =>
+    (await harness.api('GET', `/api/books/${bookId}/foreshadows`)).json<{ threads: Thread[] }>()
+      .threads;
+
+  async function exportedDoc(): Promise<ColdBackupDoc> {
+    const { book } = await buildRichBook();
+    return readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+  }
+
+  it('exports threads with their occurrences, including sections that are in the trash', async () => {
+    const { book, ids } = await buildRichBook();
+    const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+    expect(doc.foreshadows.map((f) => [f.id, f.title, f.status, f.color])).toEqual([
+      [ids.threadCompass, 'The broken compass', 'planted', '#336699'],
+      [ids.threadDoor, 'The red door', 'planned', '#c0841a'],
+    ]);
+    expect(doc.foreshadows[0]!.occurrences.map((o) => [o.nodeId, o.role])).toEqual([
+      [ids.ch1, 'setup'],
+      [ids.scene, 'hint'],
+      [ids.prologue, 'payoff'],
+    ]);
+    expect(doc.foreshadows[0]!.occurrences[0]).toMatchObject({
+      excerpt: 'The needle shook.',
+      note: 'first look',
+      anchored: false,
+      anchorState: null,
+    });
+    expect(doc.foreshadows[1]!.occurrences.map((o) => o.nodeId)).toEqual([ids.gone, ids.nested]);
+    expect(doc.stats).toMatchObject({ foreshadows: 2, occurrences: 5 });
+  });
+
+  it('restores threads into an empty data directory unchanged', async () => {
+    const original = await exportedDoc();
+    other = await new Harness().start();
+    expect(restoreDoc(original, other)).toMatchObject({ remapped: false, warnings: [] });
+    const threads = await threadsOf(other, original.book.id);
+    expect(threads.map((t) => t.title)).toEqual(['The broken compass', 'The red door']);
+    expect(threads[0]!.occurrences).toHaveLength(3);
+    expect(threads[0]!.notes).toBe('她没有抬头。 Notes.');
+  });
+
+  it('keeps an occurrence whose section was purged (node id null) through a round trip', async () => {
+    const { book, ids } = await buildRichBook();
+    h.store.db.pragma('foreign_keys = OFF');
+    h.store.db
+      .prepare('UPDATE foreshadow_occurrences SET node_id = NULL WHERE foreshadow_id = ?')
+      .run(ids.threadDoor);
+    h.store.db.pragma('foreign_keys = ON');
+    const exported = service().exportBook(book.id, { dir: backupDir });
+    expect(readDoc(exported.file).foreshadows[1]!.occurrences.map((o) => o.nodeId)).toEqual([
+      null,
+      null,
+    ]);
+    other = await new Harness().start();
+    expect(restoreDoc(readDoc(exported.file), other)).toMatchObject({
+      remapped: false,
+      warnings: [],
+    });
+    const again = readDoc(
+      service(other, () => new Date(T0 + 1000)).exportBook(book.id, {
+        dir: path.join(other.tmp, 'cold'),
+      }).file,
+    );
+    expect(again.foreshadows).toEqual(readDoc(exported.file).foreshadows);
+  });
+
+  it('remaps thread, occurrence and section ids on an id collision and leaves the original alone', async () => {
+    const { book, ids } = await buildRichBook();
+    const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
+    const before = await threadsOf(h, book.id);
+
+    const result = restoreDoc(doc);
+    expect(result.remapped).toBe(true);
+    expect(result.warnings).toEqual([]);
+    expect(await threadsOf(h, book.id)).toEqual(before);
+
+    const copy = await threadsOf(h, result.book.id);
+    expect(copy).toHaveLength(2);
+    expect(copy.map((t) => t.id)).not.toContain(ids.threadCompass);
+    const oldOccurrenceIds = new Set(before.flatMap((t) => t.occurrences.map((o) => o.id)));
+    for (const o of copy.flatMap((t) => t.occurrences))
+      expect(oldOccurrenceIds.has(o.id)).toBe(false);
+    const titleOf = new Map(listNodes(h.store.db, result.book.id).map((n) => [n.id, n.title]));
+    expect(copy[0]!.occurrences.map((o) => titleOf.get(o.nodeId!))).toEqual([
+      'Reunion',
+      'Rain',
+      'Prologue',
+    ]);
+    expect(copy[1]!.occurrences.map((o) => titleOf.get(o.nodeId!))).toEqual([
+      'Cut chapter',
+      'Trashed earlier',
+    ]);
+    expect(copy.flatMap((t) => t.occurrences).every((o) => o.foreshadowId !== '')).toBe(true);
+    expect(copy[0]!.occurrences.every((o) => o.foreshadowId === copy[0]!.id)).toBe(true);
+  });
+
+  it('repairs an unknown status, a bad color and a missing section with warnings', async () => {
+    const doc = await exportedDoc();
+    doc.foreshadows[0]!.status = 'mystery';
+    doc.foreshadows[0]!.color = 'red';
+    doc.foreshadows[0]!.occurrences[1]!.nodeId = crypto.randomUUID();
+    other = await new Harness().start();
+    const result = restoreDoc(doc, other);
+    const text = result.warnings.join(' ');
+    expect(text).toContain('unknown status "mystery"');
+    expect(text).toContain('invalid color');
+    expect(text).toContain('1 occurrence(s) pointed to a section that is not in this backup');
+
+    const threads = await threadsOf(other, result.book.id);
+    expect(threads[0]).toMatchObject({ status: 'planned', color: '#c0841a' });
+    expect(threads[0]!.occurrences.map((o) => o.nodeId === null)).toEqual([false, true, false]);
+  });
+
+  it('rejects duplicate thread or occurrence ids inside one file and changes nothing', async () => {
+    const doc = await exportedDoc();
+    const books = () =>
+      (h.store.db.prepare('SELECT COUNT(*) AS n FROM books').get() as { n: number }).n;
+    const before = books();
+    const twin = structuredClone(doc);
+    twin.foreshadows[1]!.id = twin.foreshadows[0]!.id;
+    expect(() => restoreDoc(twin)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_BACKUP' }),
+    );
+    const twinOccurrence = structuredClone(doc);
+    twinOccurrence.foreshadows[1]!.occurrences[0]!.id =
+      twinOccurrence.foreshadows[0]!.occurrences[0]!.id;
+    expect(() => restoreDoc(twinOccurrence)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_BACKUP' }),
+    );
+    expect(books()).toBe(before);
+  });
+
+  it('rolls back the whole restore when an occurrence cannot be stored', async () => {
+    const doc = await exportedDoc();
+    other = await new Harness().start();
+    other.store.db.exec(
+      "CREATE TRIGGER fail_occ BEFORE INSERT ON foreshadow_occurrences BEGIN SELECT RAISE(ABORT, 'boom'); END;",
+    );
+    expect(() => restoreDoc(doc, other!)).toThrow();
+    for (const table of ['books', 'nodes', 'foreshadows', 'foreshadow_occurrences']) {
+      const n = (
+        other.store.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }
+      ).n;
+      expect(n, table).toBe(0);
+    }
+  });
+
+  it('verify reports a foreshadow stats mismatch', async () => {
+    const { book } = await buildRichBook();
+    const { file } = service().exportBook(book.id, { dir: backupDir });
+    const tampered = readDoc(file);
+    tampered.stats.occurrences += 1;
+    fs.writeFileSync(file, JSON.stringify(tampered));
+    fs.rmSync(file + '.sha256');
+    expect(verifyColdBackup(file).problems.join(' ')).toContain('stats.occurrences');
   });
 });
 

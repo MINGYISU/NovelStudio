@@ -42,6 +42,7 @@ import {
 } from '../repos/cold-backup.ts';
 import { listCategories, listEntries } from '../repos/codex.ts';
 import { listMaps } from '../repos/maps.ts';
+import { listThreads } from '../repos/foreshadows.ts';
 import { listBookSnapshots } from '../repos/snapshots.ts';
 import { assetFilePath } from './assets.ts';
 import {
@@ -109,6 +110,7 @@ export function buildColdBackup(
       categories: listCategories(db, bookId),
       entries: listEntries(db, bookId),
       maps: listMaps(db, bookId),
+      threads: listThreads(db, bookId),
       snapshots: options.includeSnapshots ? listBookSnapshots(db, bookId) : null,
       schemaVersion: getSchemaVersion(db),
     };
@@ -249,12 +251,33 @@ export function buildColdBackup(
     };
   });
 
+  const foreshadows: ColdBackupDoc['foreshadows'] = loaded.threads.map((t) => ({
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    status: t.status,
+    color: t.color,
+    notes: t.notes,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+    occurrences: t.occurrences.map((o) => ({
+      id: o.id,
+      nodeId: o.nodeId,
+      role: o.role,
+      excerpt: o.excerpt,
+      note: o.note,
+      anchored: o.anchored,
+      anchorState: o.anchorState,
+      createdAt: o.createdAt,
+    })),
+  }));
+
   const partial = {
     manuscript,
     trash,
     codex,
     maps,
-    foreshadows: [],
+    foreshadows,
     assets,
     snapshots,
   };

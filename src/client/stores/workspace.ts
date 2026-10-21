@@ -20,6 +20,8 @@ function readSidebarWidth(): number {
 
 export interface Notice {
   id: number;
+  /** When the notice was raised (ms since the epoch). */
+  at: number;
   tone: 'error' | 'info';
   message: string;
   action?: { label: string; run: () => void };
@@ -37,7 +39,7 @@ interface WorkspaceState {
   sidebarWidth: number;
   setSidebarWidth: (width: number) => void;
   notice: Notice | null;
-  notify: (notice: Omit<Notice, 'id'>) => void;
+  notify: (notice: Omit<Notice, 'id' | 'at'>) => void;
   dismissNotice: () => void;
   lastMove: UndoableMove | null;
   setLastMove: (move: UndoableMove | null) => void;
@@ -66,7 +68,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     set({ sidebarWidth: next });
   },
   notice: null,
-  notify: (notice) => set({ notice: { ...notice, id: ++noticeCounter } }),
+  notify: (notice) => set({ notice: { ...notice, id: ++noticeCounter, at: Date.now() } }),
   dismissNotice: () => set({ notice: null }),
   lastMove: null,
   setLastMove: (lastMove) => set({ lastMove }),

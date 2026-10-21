@@ -6,6 +6,11 @@ import {
   type DisplaySettings,
 } from '../../shared/schemas/display.ts';
 import {
+  DEFAULT_FORESHADOW_SETTINGS,
+  foreshadowSettingsSchema,
+  type ForeshadowSettings,
+} from '../../shared/schemas/foreshadow.ts';
+import {
   DEFAULT_STRUCTURE,
   structureSettingsSchema,
   type StructureSettings,
@@ -47,6 +52,13 @@ export function parseDisplay(settingsJson: string | null): DisplaySettings {
   return parsed.success ? parsed.data : DEFAULT_DISPLAY;
 }
 
+export function parseForeshadowSettings(settingsJson: string | null): ForeshadowSettings {
+  const parsed = foreshadowSettingsSchema.safeParse(
+    parseSettingsObject(settingsJson).foreshadow ?? {},
+  );
+  return parsed.success ? parsed.data : DEFAULT_FORESHADOW_SETTINGS;
+}
+
 function toBook(row: RawBook, wordCount: number): Book {
   return {
     id: row.id,
@@ -58,6 +70,7 @@ function toBook(row: RawBook, wordCount: number): Book {
     wordCount,
     structure: parseStructure(row.settings),
     display: parseDisplay(row.settings),
+    foreshadow: parseForeshadowSettings(row.settings),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -134,6 +147,7 @@ export interface BookUpdate {
   coverAssetId?: string | null;
   structure?: StructureSettings;
   display?: DisplaySettings;
+  foreshadow?: ForeshadowSettings;
 }
 
 export function updateBookFields(db: Db, id: string, update: BookUpdate, now: string): void {
@@ -155,10 +169,15 @@ export function updateBookFields(db: Db, id: string, update: BookUpdate, now: st
     columns.push('cover_asset_id = ?');
     values.push(update.coverAssetId);
   }
-  if (update.structure !== undefined || update.display !== undefined) {
+  if (
+    update.structure !== undefined ||
+    update.display !== undefined ||
+    update.foreshadow !== undefined
+  ) {
     const changes: Record<string, unknown> = {};
     if (update.structure !== undefined) changes.structure = update.structure;
     if (update.display !== undefined) changes.display = update.display;
+    if (update.foreshadow !== undefined) changes.foreshadow = update.foreshadow;
     columns.push('settings = ?');
     values.push(mergeSettings(getBookSettingsJson(db, id), changes));
   }

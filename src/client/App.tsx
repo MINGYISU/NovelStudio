@@ -20,6 +20,7 @@ export function App() {
           />
           <Route path="/book/:bookId/codex/:entryId?" element={<WorkspacePage view="codex" />} />
           <Route path="/book/:bookId/maps/:mapId?" element={<WorkspacePage view="maps" />} />
+          <Route path="/book/:bookId/foreshadow" element={<WorkspacePage view="foreshadow" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

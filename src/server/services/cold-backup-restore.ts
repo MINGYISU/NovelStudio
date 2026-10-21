@@ -6,6 +6,13 @@ import { CODEX_SUMMARY_MAX, CODEX_TITLE_MAX } from '../../shared/schemas/codex.t
 import { remapMapLinks } from '../../shared/map-links.ts';
 import { docToPlainText } from '../../shared/prosemirror-text.ts';
 import { MAP_TEMPLATES, MAP_TITLE_MAX, repairMapData } from '../../shared/schemas/map.ts';
+import {
+  DEFAULT_THREAD_COLOR,
+  FORESHADOW_STATUSES,
+  OCCURRENCE_TEXT_MAX,
+  THREAD_TEXT_MAX,
+  THREAD_TITLE_MAX,
+} from '../../shared/schemas/foreshadow.ts';
 import { contentSchema, docFromPlainText, type ContentDoc } from '../../shared/schemas/content.ts';
 import {
   COLD_BACKUP_FORMAT,
@@ -31,6 +38,12 @@ import {
 } from '../repos/cold-backup.ts';
 import { insertCategory, insertEntry } from '../repos/codex.ts';
 import { insertMap } from '../repos/maps.ts';
+import {
+  insertOccurrence,
+  insertThread,
+  type NewOccurrenceRow,
+  type NewThreadRow,
+} from '../repos/foreshadows.ts';
 import { listNodes } from '../repos/nodes.ts';
 import { insertSnapshot } from '../repos/snapshots.ts';
 import { writeFileAtomic } from '../config.ts';
@@ -97,6 +110,8 @@ function collectIds(doc: ColdBackupDoc): {
   categoryIds: string[];
   entryIds: string[];
   mapIds: string[];
+  threadIds: string[];
+  occurrenceIds: string[];
 } {
   const nodeIds: string[] = [];
   const visit = (s: ColdSection): void => {
@@ -112,6 +127,8 @@ function collectIds(doc: ColdBackupDoc): {
     categoryIds: doc.codex.categories.map((c) => c.id),
     entryIds: doc.codex.entries.map((e) => e.id),
     mapIds: doc.maps.map((m) => m.id),
+    threadIds: doc.foreshadows.map((f) => f.id),
+    occurrenceIds: doc.foreshadows.flatMap((f) => f.occurrences.map((o) => o.id)),
   };
 }
 
@@ -149,17 +166,24 @@ export function restoreColdBackup(
   }
 
   const doc = parseColdBackup(bytes);
-  const { nodeIds, assetIds, snapshotIds, categoryIds, entryIds, mapIds } = collectIds(doc);
+  const {
+    nodeIds,
+    assetIds,
+    snapshotIds,
+    categoryIds,
+    entryIds,
+    mapIds,
+    threadIds,
+    occurrenceIds,
+  } = collectIds(doc);
   assertNoDuplicates('section', nodeIds);
   assertNoDuplicates('image', assetIds);
   assertNoDuplicates('snapshot', snapshotIds);
   assertNoDuplicates('codex category', categoryIds);
   assertNoDuplicates('codex entry', entryIds);
   assertNoDuplicates('map', mapIds);
-
-  if (doc.foreshadows.length > 0) {
-    warnings.push('Foreshadow threads are not supported by this version and were skipped.');
-  }
+  assertNoDuplicates('foreshadow thread', threadIds);
+  assertNoDuplicates('foreshadow occurrence', occurrenceIds);
 
   const remapped =
     anyIdExists(db, 'books', [doc.book.id]) ||
@@ -168,7 +192,9 @@ export function restoreColdBackup(
     anyIdExists(db, 'snapshots', snapshotIds) ||
     anyIdExists(db, 'codex_categories', categoryIds) ||
     anyIdExists(db, 'codex_entries', entryIds) ||
-    anyIdExists(db, 'maps', mapIds);
+    anyIdExists(db, 'maps', mapIds) ||
+    anyIdExists(db, 'foreshadows', threadIds) ||
+    anyIdExists(db, 'foreshadow_occurrences', occurrenceIds);
   const ids = new Map<string, string>();
   for (const id of [
     doc.book.id,
@@ -178,6 +204,8 @@ export function restoreColdBackup(
     ...categoryIds,
     ...entryIds,
     ...mapIds,
+    ...threadIds,
+    ...occurrenceIds,
   ]) {
     ids.set(id, remapped ? crypto.randomUUID() : id);
   }
@@ -388,6 +416,56 @@ export function restoreColdBackup(
     };
   });
 
+  const threads: NewThreadRow[] = [];
+  const occurrences: NewOccurrenceRow[] = [];
+  for (const f of doc.foreshadows) {
+    const label = f.title.trim() || 'Untitled thread';
+    let status = f.status;
+    if (!(FORESHADOW_STATUSES as readonly string[]).includes(status)) {
+      warnings.push(`Foreshadow "${label}": unknown status "${status}" was changed to planned.`);
+      status = 'planned';
+    }
+    let color = f.color;
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+      warnings.push(`Foreshadow "${label}": invalid color was reset to the default.`);
+      color = DEFAULT_THREAD_COLOR;
+    }
+    const threadId = mapped(f.id);
+    threads.push({
+      id: threadId,
+      bookId,
+      title: label.slice(0, THREAD_TITLE_MAX),
+      description: f.description.slice(0, THREAD_TEXT_MAX),
+      status,
+      color,
+      notes: f.notes.slice(0, THREAD_TEXT_MAX),
+      createdAt: f.createdAt,
+      updatedAt: f.updatedAt,
+    });
+    let unlinked = 0;
+    for (const o of f.occurrences) {
+      const target = o.nodeId === null ? null : (ids.get(o.nodeId) ?? null);
+      const nodeId = target !== null && sectionIdSet.has(target) ? target : null;
+      if (nodeId === null && o.nodeId !== null) unlinked += 1;
+      occurrences.push({
+        id: mapped(o.id),
+        foreshadowId: threadId,
+        nodeId,
+        role: o.role,
+        excerpt: o.excerpt.slice(0, OCCURRENCE_TEXT_MAX),
+        note: o.note.slice(0, OCCURRENCE_TEXT_MAX),
+        anchored: o.anchored,
+        anchorState: o.anchorState,
+        createdAt: o.createdAt,
+      });
+    }
+    if (unlinked > 0) {
+      warnings.push(
+        `Foreshadow "${label}": ${unlinked} occurrence(s) pointed to a section that is not in this backup; they are kept without a section.`,
+      );
+    }
+  }
+
   const writtenFiles: string[] = [];
   try {
     for (const { data, row } of assets) {
@@ -414,6 +492,8 @@ export function restoreColdBackup(
       for (const entry of entries) insertEntry(db, entry);
       for (const snapshot of snapshots) insertSnapshot(db, snapshot);
       for (const map of maps) insertMap(db, map);
+      for (const thread of threads) insertThread(db, thread);
+      for (const occurrence of occurrences) insertOccurrence(db, occurrence);
       try {
         assertTreeInvariants(listNodes(db, bookId));
       } catch (err) {

@@ -11,10 +11,12 @@ import { registerBookRoutes } from './routes/books.ts';
 import { registerColdBackupRoutes } from './routes/cold-backup.ts';
 import { registerCodexRoutes } from './routes/codex.ts';
 import { registerContentRoutes } from './routes/content.ts';
+import { registerForeshadowRoutes } from './routes/foreshadows.ts';
 import { registerMapRoutes } from './routes/maps.ts';
 import { registerNodeRoutes } from './routes/nodes.ts';
 import { registerSecurity } from './security.ts';
 import { CodexService } from './services/codex.ts';
+import { ForeshadowService } from './services/foreshadows.ts';
 import { MapService } from './services/maps.ts';
 import { ColdBackupService } from './services/cold-backup.ts';
 import { ContentService } from './services/content.ts';
@@ -94,6 +96,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     registerNodeRoutes(app, new ManuscriptService(options.db, library));
     registerCodexRoutes(app, new CodexService(options.db, options.paths, library));
     registerMapRoutes(app, new MapService(options.db, library));
+    registerForeshadowRoutes(app, new ForeshadowService(options.db, library));
     const snapshots = new SnapshotService(options.db, library);
     registerContentRoutes(app, new ContentService(options.db, library, snapshots), snapshots);
     registerColdBackupRoutes(app, {

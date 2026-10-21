@@ -31,6 +31,8 @@ const ALL_TABLES = [
   'books',
   'codex_categories',
   'codex_entries',
+  'foreshadow_occurrences',
+  'foreshadows',
   'maps',
   'nodes',
   'snapshots',
@@ -89,6 +91,47 @@ describe('migrate', () => {
     db.prepare("DELETE FROM books WHERE id = 'b1'").run();
     db.prepare('DELETE FROM codex_categories').run();
     expect(db.prepare('SELECT COUNT(*) AS n FROM maps').get()).toEqual({ n: 0 });
+    db.close();
+  });
+
+  it('004 adds the foreshadow tables to a version-3 database without touching existing rows', () => {
+    const db = openDatabase(path.join(tmp, 'novelstudio.db'));
+    migrate(db, { migrations: loadMigrations().slice(0, 3) });
+    db.prepare(
+      "INSERT INTO books (id, title, created_at, updated_at) VALUES ('b1', 'Keep me', 'x', 'x')",
+    ).run();
+    db.prepare(
+      `INSERT INTO maps (id, book_id, title, template, data, position, created_at, updated_at)
+       VALUES ('m1', 'b1', 'Map', 'blank', '{}', 0, 'x', 'x')`,
+    ).run();
+    expect(tableNames(db)).not.toContain('foreshadows');
+
+    expect(migrate(db)).toEqual({ from: 3, to: loadMigrations().length });
+    expect(tableNames(db)).toEqual(ALL_TABLES);
+    expect(db.prepare('SELECT title FROM maps').get()).toEqual({ title: 'Map' });
+    db.prepare(
+      `INSERT INTO foreshadows (id, book_id, title, created_at, updated_at)
+       VALUES ('f1', 'b1', 'Thread', 'x', 'x')`,
+    ).run();
+    expect(db.prepare('SELECT status, color FROM foreshadows').get()).toEqual({
+      status: 'planned',
+      color: '#c0841a',
+    });
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO foreshadow_occurrences (id, foreshadow_id, role, created_at)
+           VALUES ('o1', 'f1', 'bogus', 'x')`,
+        )
+        .run(),
+    ).toThrow();
+    db.prepare(
+      `INSERT INTO foreshadow_occurrences (id, foreshadow_id, role, created_at)
+       VALUES ('o1', 'f1', 'setup', 'x')`,
+    ).run();
+    db.prepare("DELETE FROM books WHERE id = 'b1'").run();
+    expect(db.prepare('SELECT COUNT(*) AS n FROM foreshadows').get()).toEqual({ n: 0 });
+    expect(db.prepare('SELECT COUNT(*) AS n FROM foreshadow_occurrences').get()).toEqual({ n: 0 });
     db.close();
   });
 

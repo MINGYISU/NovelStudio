@@ -8,17 +8,22 @@ import {
 } from '../../../shared/schemas/node.ts';
 import { NODE_STATUSES, type NodeStatus, type TreeNode } from '../../../shared/types.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
+import type { ForeshadowWarning } from '../../../shared/foreshadow.ts';
+import type { Thread } from '../../../shared/schemas/foreshadow.ts';
 import { CharactersInSection } from '../codex/CharactersInSection.tsx';
+import { SectionThreads } from '../foreshadow/SectionThreads.tsx';
 import styles from './manuscript.module.css';
 
 interface DetailsPanelProps {
   bookId: string;
   node: TreeNode | undefined;
   displayTitle: string | undefined;
+  threads: readonly Thread[] | undefined;
+  warnings: readonly ForeshadowWarning[];
 }
 
 /** Right panel (TREE-09, TREE-10): title, status, numbering and synopsis of the selected section. */
-export function DetailsPanel({ bookId, node, displayTitle }: DetailsPanelProps) {
+export function DetailsPanel({ bookId, node, displayTitle, threads, warnings }: DetailsPanelProps) {
   return (
     <aside className={styles.details} aria-label="Section details">
       {node ? (
@@ -30,6 +35,7 @@ export function DetailsPanel({ bookId, node, displayTitle }: DetailsPanelProps) 
             node={node}
             displayTitle={displayTitle ?? node.title}
           />
+          <SectionThreads bookId={bookId} nodeId={node.id} threads={threads} warnings={warnings} />
           <CharactersInSection key={node.id} bookId={bookId} nodeId={node.id} />
         </>
       ) : (

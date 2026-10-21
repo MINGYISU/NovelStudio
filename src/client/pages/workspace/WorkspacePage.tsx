@@ -2,11 +2,13 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Download, MoreHorizontal, Settings, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, useParams } from 'react-router';
+import { Link, NavLink, useNavigate, useParams } from 'react-router';
 import { useBook } from '../../api/books.ts';
 import { treeKey, useTree } from '../../api/nodes.ts';
 import { Button } from '../../components/ui.tsx';
 import { CodexView } from '../../features/codex/CodexView.tsx';
+import { ForeshadowView } from '../../features/foreshadow/ForeshadowView.tsx';
+import { useForeshadowAnalysis } from '../../features/foreshadow/useForeshadowAnalysis.ts';
 import { MapsView } from '../../features/maps/MapsView.tsx';
 import { computeDisplayTitles } from '../../../shared/numbering.ts';
 import { EditorPanel } from '../../features/editor/EditorPanel.tsx';
@@ -19,13 +21,15 @@ import { Sidebar } from '../../features/manuscript/Sidebar.tsx';
 import { totalWords } from '../../features/manuscript/build-items.ts';
 import { StructureDialog } from '../../features/manuscript/StructureDialog.tsx';
 import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
+import { warningsByNode } from '../../../shared/foreshadow.ts';
+import { DEFAULT_DORMANT_AFTER } from '../../../shared/schemas/foreshadow.ts';
 import type { TreeNode } from '../../../shared/types.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import libraryStyles from '../library/library.module.css';
 import styles from '../../features/manuscript/manuscript.module.css';
 
 /** Workspace layout: top bar with save status, resizable sidebar, editor, details panel. */
-export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' }) {
+export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' | 'foreshadow' }) {
   const { bookId, nodeId, entryId, mapId } = useParams();
   const book = useBook(bookId);
   const tree = useTree(book.data && !book.data.deletedAt ? bookId : undefined);
@@ -45,6 +49,14 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
   }, [bookId, client]);
 
   const nodes = tree.data;
+  const navigate = useNavigate();
+  const analysis = useForeshadowAnalysis(
+    book.data && !book.data.deletedAt ? bookId : undefined,
+    nodes,
+    book.data?.foreshadow.dormantAfter ?? DEFAULT_DORMANT_AFTER,
+    () => navigate(`/book/${bookId}/foreshadow`),
+  );
+  const warnings = useMemo(() => warningsByNode(analysis.warnings), [analysis.warnings]);
   const selected = nodes?.find((n) => n.id === nodeId && n.deletedAt === null);
   const lastNode = useWorkspaceStore((s) => (bookId ? s.lastNodeByBook[bookId] : undefined));
   const lastMap = useWorkspaceStore((s) => (bookId ? s.lastMapByBook[bookId] : undefined));
@@ -102,6 +114,7 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
                 `/book/${book.data.id}/manuscript${lastNode ? `/${lastNode}` : ''}`,
               ],
               ['Story Maps', 'maps', `/book/${book.data.id}/maps${lastMap ? `/${lastMap}` : ''}`],
+              ['Foreshadowing', 'foreshadow', `/book/${book.data.id}/foreshadow`],
               ['Codex', 'codex', `/book/${book.data.id}/codex`],
             ] as const
           ).map(([label, target, to]) => (
@@ -141,6 +154,17 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
       </header>
       {view === 'codex' ? (
         <CodexView key={book.data.id} bookId={book.data.id} entryId={entryId} />
+      ) : view === 'foreshadow' ? (
+        <ForeshadowView
+          key={book.data.id}
+          bookId={book.data.id}
+          nodes={nodes}
+          structure={book.data.structure}
+          dormantAfter={book.data.foreshadow.dormantAfter}
+          threads={analysis.threads}
+          warnings={analysis.warnings}
+          failed={analysis.failed}
+        />
       ) : view === 'maps' ? (
         <MapsView
           key={book.data.id}
@@ -162,6 +186,7 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
               nodes={nodes}
               structure={book.data.structure}
               selectedId={selected?.id}
+              warnings={warnings}
             />
           ) : (
             <aside className={styles.sidebar}>
@@ -185,7 +210,13 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
               <p className={styles.mainPlaceholder}>Select a section to start writing.</p>
             )}
           </main>
-          <DetailsPanel bookId={book.data.id} node={selected} displayTitle={displayTitle} />
+          <DetailsPanel
+            bookId={book.data.id}
+            node={selected}
+            displayTitle={displayTitle}
+            threads={analysis.threads}
+            warnings={analysis.warnings}
+          />
         </div>
       )}
       <NoticeBar />

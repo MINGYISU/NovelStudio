@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { NodeRendererProps } from 'react-arborist';
 import { NODE_TITLE_MAX } from '../../../shared/schemas/node.ts';
 import { childKindOf, type TreeItem } from './build-items.ts';
-import { useSidebarActions } from './sidebar-context.ts';
+import { useSectionWarnings, useSidebarActions } from './sidebar-context.ts';
 import styles from './manuscript.module.css';
 
 const AUTO_EXPAND_MS = 600;
@@ -12,6 +12,7 @@ const AUTO_EXPAND_MS = 600;
 export function TreeRow({ node, style, dragHandle }: NodeRendererProps<TreeItem>) {
   const actions = useSidebarActions();
   const { node: section, displayTitle } = node.data;
+  const warnings = useSectionWarnings(section.id);
   const hasChildren = (node.data.children?.length ?? 0) > 0;
 
   // MOVE-10: hovering a collapsed parent during a drag opens it after a short delay.
@@ -80,6 +81,18 @@ export function TreeRow({ node, style, dragHandle }: NodeRendererProps<TreeItem>
                 >
                   {displayTitle}
                 </span>
+                {warnings && warnings.length > 0 ? (
+                  <span
+                    className={`${styles.badge} ${warnings.some((w) => w.level === 'warning') ? '' : styles.badgeInfo}`}
+                    data-testid="foreshadow-badge"
+                    data-kinds={warnings.map((w) => w.kind).join(' ')}
+                    title={warnings.map((w) => w.message).join('\n')}
+                    role="img"
+                    aria-label={`${warnings.length} foreshadowing warning${warnings.length === 1 ? '' : 's'}`}
+                  >
+                    {warnings.length}
+                  </span>
+                ) : null}
                 <span className={styles.words}>{section.wordCount.toLocaleString()} w</span>
               </>
             )}

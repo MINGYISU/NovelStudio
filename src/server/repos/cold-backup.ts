@@ -132,7 +132,15 @@ export function listBookAssets(db: Db, bookId: string): AssetRow[] {
 }
 
 export type IdTable =
-  'books' | 'nodes' | 'assets' | 'snapshots' | 'codex_categories' | 'codex_entries' | 'maps';
+  | 'books'
+  | 'nodes'
+  | 'assets'
+  | 'snapshots'
+  | 'codex_categories'
+  | 'codex_entries'
+  | 'maps'
+  | 'foreshadows'
+  | 'foreshadow_occurrences';
 
 /** Which of these ids already exist in the table (restore remaps everything if any do). */
 export function anyIdExists(db: Db, table: IdTable, ids: readonly string[]): boolean {
