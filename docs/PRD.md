@@ -63,7 +63,7 @@ Views: **Manuscript** (default), **Story Maps**, **Foreshadowing**, **Codex**.
 | ID | Pri | Requirement |
 |---|---|---|
 | WS-01 | Must | The URL reflects the open book, view and item, so reload returns to the same place. |
-| WS-02 | Must | The last opened section per book is remembered. |
+| WS-02 | Must | The last opened section per book is remembered, also after a restart and when the book is opened from the library. |
 | WS-03 | Should | Focus mode (`Cmd+Shift+F`) hides sidebar, panels and top bar. |
 
 ---
@@ -83,7 +83,7 @@ Four kinds, ranked: **Volume (0) > Part (1) > Chapter (2) > Scene (3)**.
 | TREE-05 | Must | Sidebar shows the hierarchy with indentation per level, expand/collapse arrows on sections that have children, and the computed display title. |
 | TREE-06 | Must | Create (as sibling after / as child), rename inline (double-click or `F2`), duplicate (with subtree), and move to trash. |
 | TREE-07 | Must | Expand/collapse state is remembered per book. |
-| TREE-08 | Must | Trash: trashed sections (with their subtree) disappear from the tree and numbering, appear in the book's Trash list, and can be restored. Restore puts the section back at the end of its original parent, or at the root if that parent no longer exists. |
+| TREE-08 | Must | Trash: trashed sections (with their subtree) disappear from the tree and numbering, appear in the book's Trash list (opened from the sidebar), and can be restored from there at any time. Restore puts the section back at the end of its original parent, or at the root if that parent no longer exists. |
 | TREE-09 | Should | Each section has a status (`idea`, `draft`, `revising`, `done`) shown as a small dot. |
 | TREE-10 | Should | Each section has a synopsis (plain text), shown in the right panel and as a tooltip. |
 | TREE-11 | Should | Sidebar footer: total words; per-row word count on hover. |
@@ -147,6 +147,7 @@ Defaults:
 | ED-09 | Should | Find & replace across the whole book (e.g. rename a character). Shows matches per section before replacing; snapshots every affected section first. Matches do not span formatting boundaries (documented limitation). |
 | ED-10 | Should | Section snapshots: browse previous versions of a section with timestamps and restore one (restoring snapshots the current text first). |
 | ED-11 | Later | Typewriter scrolling, writing goals/streaks, spell-check settings. |
+| ED-12 | Must | No silent loss of typed text: leaving or closing the page while any text is unsaved, saving, or failed to save asks for confirmation; a save the server rejects shows a persistent message with a way to copy the section's text; actions that replace or move text (trash, snapshot restore, export) save pending text first and warn if they cannot. |
 
 ### 5.1 Display settings (per book, not stored in the text)
 
