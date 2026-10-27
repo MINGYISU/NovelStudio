@@ -16,8 +16,11 @@ A personal, local-first writing app for long-form fiction. It runs on your own m
 
 ## Documents
 
+**New to writing in NovelStudio?** Start with the [illustrated user guide](docs/USER_GUIDE.md): create a book, write and organize chapters, use the planning tools, and back up or recover your work.
+
 | Document | Purpose |
 |---|---|
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Customer walkthroughs with screenshots |
 | [docs/PRD.md](docs/PRD.md) | Product requirements (what) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical design (how) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and prompts for each step |
