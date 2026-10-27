@@ -2,6 +2,8 @@
 
 Companion to [PRD.md](./PRD.md). This document fixes the technical decisions so an AI coding agent does not have to guess. Change it deliberately, not as a side effect.
 
+For a phased walkthrough of the implemented system, with component charts, a source map, and detailed runtime flows, see [DEVELOPER_ARCHITECTURE.md](./DEVELOPER_ARCHITECTURE.md).
+
 ---
 
 ## 1. Overview
