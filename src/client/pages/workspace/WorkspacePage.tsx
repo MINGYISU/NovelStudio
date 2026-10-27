@@ -31,7 +31,9 @@ import { Resizer } from '../../features/manuscript/Resizer.tsx';
 import { Sidebar } from '../../features/manuscript/Sidebar.tsx';
 import { FindReplaceDialog } from '../../features/search/FindReplaceDialog.tsx';
 import { totalWords } from '../../features/manuscript/build-items.ts';
+import { rememberedSection, saveLastNode } from '../../features/manuscript/last-node.ts';
 import { StructureDialog } from '../../features/manuscript/StructureDialog.tsx';
+import { triggerDownload, useExportGuard } from '../../features/settings/export-guard.tsx';
 import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
 import { warningsByNode } from '../../../shared/foreshadow.ts';
 import { DEFAULT_DORMANT_AFTER } from '../../../shared/schemas/foreshadow.ts';
@@ -53,6 +55,7 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
   const setFocusMode = useWorkspaceStore((s) => s.setFocusMode);
   const client = useQueryClient();
   const focused = focusMode && view === 'manuscript';
+  const { guard, element: exportGuard } = useExportGuard();
 
   // WS-03: Cmd/Ctrl+Shift+F toggles focus mode, Escape leaves it; Cmd/Ctrl+Alt+F opens find & replace.
   useEffect(() => {
@@ -106,11 +109,16 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
   );
   const warnings = useMemo(() => warningsByNode(analysis.warnings), [analysis.warnings]);
   const selected = nodes?.find((n) => n.id === nodeId && n.deletedAt === null);
-  const lastNode = useWorkspaceStore((s) => (bookId ? s.lastNodeByBook[bookId] : undefined));
   const lastMap = useWorkspaceStore((s) => (bookId ? s.lastMapByBook[bookId] : undefined));
   useEffect(() => {
-    if (bookId && selected) useWorkspaceStore.getState().setLastNode(bookId, selected.id);
+    if (bookId && selected) saveLastNode(bookId, selected.id);
   }, [bookId, selected]);
+  // WS-02: the Manuscript view without a section reopens the last one (library cards, the tab).
+  useEffect(() => {
+    if (view !== 'manuscript' || nodeId || !bookId || !nodes) return;
+    const remembered = rememberedSection(bookId, nodes);
+    if (remembered) navigate(`/book/${bookId}/manuscript/${remembered}`, { replace: true });
+  }, [view, nodeId, bookId, nodes, navigate]);
   const displayTitle = useMemo(
     () =>
       nodes && selected && book.data
@@ -164,11 +172,7 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
           <nav className={styles.viewTabs} aria-label="Views">
             {(
               [
-                [
-                  'Manuscript',
-                  'manuscript',
-                  `/book/${book.data.id}/manuscript${lastNode ? `/${lastNode}` : ''}`,
-                ],
+                ['Manuscript', 'manuscript', `/book/${book.data.id}/manuscript`],
                 ['Story Maps', 'maps', `/book/${book.data.id}/maps${lastMap ? `/${lastMap}` : ''}`],
                 ['Foreshadowing', 'foreshadow', `/book/${book.data.id}/foreshadow`],
                 ['Codex', 'codex', `/book/${book.data.id}/codex`],
@@ -209,15 +213,25 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
                     </DropdownMenu.Item>
                   </>
                 ) : null}
-                <DropdownMenu.Item className={libraryStyles.menuItem} asChild>
-                  <a href={`/api/books/${book.data.id}/export?format=md`} download>
-                    <FileText size={16} /> Export Markdown
-                  </a>
+                <DropdownMenu.Item
+                  className={libraryStyles.menuItem}
+                  onSelect={() =>
+                    guard(false, () =>
+                      triggerDownload(`/api/books/${book.data.id}/export?format=md`),
+                    )
+                  }
+                >
+                  <FileText size={16} /> Export Markdown
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={libraryStyles.menuItem} asChild>
-                  <a href={`/api/books/${book.data.id}/export?format=txt`} download>
-                    <FileText size={16} /> Export plain text
-                  </a>
+                <DropdownMenu.Item
+                  className={libraryStyles.menuItem}
+                  onSelect={() =>
+                    guard(false, () =>
+                      triggerDownload(`/api/books/${book.data.id}/export?format=txt`),
+                    )
+                  }
+                >
+                  <FileText size={16} /> Export plain text
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   className={libraryStyles.menuItem}
@@ -307,6 +321,7 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
         </div>
       )}
       <NoticeBar />
+      {exportGuard}
       {exporting ? (
         <ExportDialog
           scope={{ kind: 'book', bookId: book.data.id, title: book.data.title }}

@@ -9,6 +9,7 @@ import {
 import { Button, Dialog, FormError, uiStyles } from '../../components/ui.tsx';
 import { formatWords } from '../../pages/library/format.ts';
 import type { NodeContent } from '../../../shared/schemas/node.ts';
+import { copyText } from './clipboard.ts';
 import styles from './editor.module.css';
 
 const REASONS: Record<string, string> = {
@@ -24,6 +25,10 @@ interface SnapshotDialogProps {
   nodeId: string;
   /** Sends any unsaved text first, so the newest text is what the restore snapshots. */
   beforeRestore: () => Promise<void>;
+  /** True when, after `beforeRestore`, the section still has text the server does not have. */
+  hasUnsaved: () => boolean;
+  /** The section's current text, for copying it before it is discarded. */
+  unsavedText: () => string;
   onRestored: (node: NodeContent) => void;
   onClose: () => void;
 }
@@ -32,6 +37,8 @@ interface SnapshotDialogProps {
 export function SnapshotDialog({
   nodeId,
   beforeRestore,
+  hasUnsaved,
+  unsavedText,
   onRestored,
   onClose,
 }: SnapshotDialogProps) {
@@ -41,13 +48,24 @@ export function SnapshotDialog({
   const detail = useSnapshotDetail(selected);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unsavedWarning, setUnsavedWarning] = useState(false);
+  const [copyNote, setCopyNote] = useState<string | null>(null);
 
-  const restore = async () => {
+  const restore = async (discardUnsaved = false) => {
     if (!selected) return;
     setBusy(true);
     setError(null);
     try {
-      await beforeRestore();
+      if (!discardUnsaved) {
+        await beforeRestore();
+        // ED-12: restoring reloads the section, which would silently drop text the server lacks.
+        if (hasUnsaved()) {
+          setUnsavedWarning(true);
+          setBusy(false);
+          return;
+        }
+      }
+      setUnsavedWarning(false);
       const node = await restoreSnapshot(selected);
       await client.invalidateQueries({ queryKey: snapshotsKey(nodeId) });
       onRestored(node);
@@ -101,12 +119,37 @@ export function SnapshotDialog({
         </div>
       ) : null}
       <FormError message={error} />
-      <div className={uiStyles.actions}>
-        <Button onClick={onClose}>Close</Button>
-        <Button variant="primary" disabled={!selected || busy} onClick={() => void restore()}>
-          Restore this version
-        </Button>
-      </div>
+      {unsavedWarning ? (
+        <div className={styles.unsavedWarning} role="alertdialog" aria-label="Unsaved text">
+          <p>This section has text that is not saved. Restoring the snapshot will discard it.</p>
+          <div className={uiStyles.actions}>
+            <Button
+              onClick={() =>
+                void copyText(unsavedText()).then(
+                  () => setCopyNote('Copied.'),
+                  (err: Error) => setCopyNote(`Could not copy: ${err.message}`),
+                )
+              }
+            >
+              Copy unsaved text
+            </Button>
+            {copyNote ? <span role="status">{copyNote}</span> : null}
+            <Button variant="danger" disabled={busy} onClick={() => void restore(true)}>
+              Restore anyway
+            </Button>
+            <Button autoFocus onClick={() => setUnsavedWarning(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className={uiStyles.actions}>
+          <Button onClick={onClose}>Close</Button>
+          <Button variant="primary" disabled={!selected || busy} onClick={() => void restore()}>
+            Restore this version
+          </Button>
+        </div>
+      )}
     </Dialog>
   );
 }

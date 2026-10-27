@@ -5,7 +5,7 @@ import type { DataPaths } from '../config.ts';
 import type { Db } from '../db/connection.ts';
 import { ApiError } from '../errors.ts';
 import { deleteAsset, getAsset, type AssetRow } from '../repos/assets.ts';
-import { isAssetInUse } from '../repos/codex.ts';
+import { insertDefaultCategories, isAssetInUse } from '../repos/codex.ts';
 import {
   deleteBook,
   getBook,
@@ -22,8 +22,13 @@ export class LibraryService {
     private readonly paths: DataPaths,
   ) {}
 
+  /** A new book starts with the default Codex categories (CDX-01), in the same transaction. */
   create(body: CreateBookBody): Book {
-    return insertBook(this.db, body, new Date().toISOString());
+    return this.db.transaction(() => {
+      const book = insertBook(this.db, body, new Date().toISOString());
+      insertDefaultCategories(this.db, book.id);
+      return book;
+    })();
   }
 
   requireBook(id: string): Book {

@@ -10,7 +10,11 @@ export const IMPORT_MAX_SECTIONS = 3000;
 /** Longer lines are body text that happens to start like a heading. */
 const HEADING_MAX_CHARS = 100;
 
-const ZH_HEADING = /^\s*第([0-9０-９一二三四五六七八九十百千万零〇两]+)([章回节卷部篇])\s*(.*)$/u;
+const ZH_HEADING = /^\s*第([0-9０-９一二三四五六七八九十百千万零〇两]+)([章回节卷部篇])(.*)$/u;
+const ZH_TITLE_SEPARATOR = /^[ \t\u3000：:、．.—-]/u;
+const ZH_TITLE_MAX_CHARS = 20;
+const ZH_SENTENCE_END = /[。！？；…]$/u;
+const ZH_CLOSING_QUOTES = /[”」』]+$/u;
 const EN_HEADING = /^\s*(?:Chapter|CHAPTER)\s+(?:[0-9]+|[IVXLCDM]+)\b[\s.:—-]*(.*)$/;
 const MD_HEADING = /^(#{1,2})\s+(.*)$/;
 const SCENE_BREAK_LINE = /^\s*(?:(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,})$/;
@@ -91,12 +95,27 @@ function cleanTitle(raw: string): string {
     .trim();
 }
 
+/**
+ * After `第<number><marker>` the rest of the line is the title (ARCHITECTURE §12). Prose such as
+ * `第二节课下课后，她走出教室。` or `第二部手机响了。` starts the same way, so the line is a heading only
+ * if the title is empty, starts with a separator, or is short and has no comma; and it must not end
+ * like a sentence (closing quotes ignored).
+ */
+export function isChineseHeadingTitle(rest: string): boolean {
+  const title = rest.replace(/\s+$/u, '');
+  if (title === '') return true;
+  const shaped =
+    ZH_TITLE_SEPARATOR.test(title) ||
+    ([...title].length <= ZH_TITLE_MAX_CHARS && !title.includes('，'));
+  return shaped && !ZH_SENTENCE_END.test(title.replace(ZH_CLOSING_QUOTES, ''));
+}
+
 function matchNumbered(
   line: string,
 ): { kind: 'volume' | 'chapter'; title: string; zh: boolean } | null {
   if (line.length > HEADING_MAX_CHARS) return null;
   const zh = ZH_HEADING.exec(line);
-  if (zh) {
+  if (zh && isChineseHeadingTitle(zh[3] ?? '')) {
     const unit = zh[2] ?? '';
     return {
       kind: '卷部篇'.includes(unit) ? 'volume' : 'chapter',

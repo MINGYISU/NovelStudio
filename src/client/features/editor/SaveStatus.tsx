@@ -14,14 +14,21 @@ export function SaveStatus() {
         className={`${styles.statusButton} ${styles.statusError}`}
         onClick={() => setShowDetails((v) => !v)}
         aria-live="polite"
+        data-testid="save-status"
       >
-        {showDetails ? `Error — ${status.message} (retrying)` : 'Error — click for details'}
+        {showDetails
+          ? `Error — ${status.message} (${status.retrying ? 'retrying' : 'not saved; copy your text'})`
+          : 'Error — click for details'}
       </button>
     );
   }
   if (status.kind === 'stale') {
     return (
-      <span className={`${styles.statusButton} ${styles.statusStale}`} role="status">
+      <span
+        className={`${styles.statusButton} ${styles.statusStale}`}
+        role="status"
+        data-testid="save-status"
+      >
         Changed elsewhere — reload
       </span>
     );

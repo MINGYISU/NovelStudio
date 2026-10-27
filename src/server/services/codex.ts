@@ -1,9 +1,5 @@
 import crypto from 'node:crypto';
-import {
-  DEFAULT_CATEGORIES,
-  fieldsFromTemplate,
-  NEW_CATEGORY_TEMPLATE,
-} from '../../shared/codex.ts';
+import { fieldsFromTemplate, NEW_CATEGORY_TEMPLATE } from '../../shared/codex.ts';
 import type {
   CodexCategory,
   CodexData,
@@ -24,6 +20,7 @@ import {
   getCategory,
   getEntry,
   insertCategory,
+  insertDefaultCategories,
   insertEntry,
   isAssetInUse,
   listCategories,
@@ -65,20 +62,15 @@ export class CodexService {
     };
   }
 
-  /** CDX-01: creates the default categories once, for a book that has none (older books, or new ones). */
+  /**
+   * CDX-01: creates the default categories for a book that has none. New books already get them
+   * when created; this is the explicit "Add default categories" action (also for pre-M5 books).
+   */
   seedDefaults(bookId: string): CodexCategory[] {
     return this.db.transaction(() => {
       this.library.requireLiveBook(bookId);
       if (listCategories(this.db, bookId).length === 0) {
-        DEFAULT_CATEGORIES.forEach((def, position) =>
-          insertCategory(this.db, {
-            id: crypto.randomUUID(),
-            bookId,
-            name: def.name,
-            position,
-            fieldTemplate: def.fieldTemplate.map((f) => ({ ...f })),
-          }),
-        );
+        insertDefaultCategories(this.db, bookId);
         touchBook(this.db, bookId, new Date().toISOString());
       }
       return listCategories(this.db, bookId);

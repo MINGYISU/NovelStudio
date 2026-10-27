@@ -106,11 +106,38 @@ export class MapSaver {
 }
 
 // Unmounting flushes in the normal way; `pagehide` is the last chance, so it asks for keepalive.
+// A released saver (its map was closed) stays listed until everything it holds is saved, so
+// leaving the page still warns about a map that failed to save (ED-12). Holds are counted because
+// a remount (React StrictMode) can track the same saver again before the old release arrives.
 const active = new Set<MapSaver>();
+const holds = new Map<MapSaver, number>();
 
+function prune(): void {
+  for (const saver of active) {
+    if ((holds.get(saver) ?? 0) === 0 && saver.state === 'saved' && !saver.hasUnsaved()) {
+      active.delete(saver);
+      holds.delete(saver);
+    }
+  }
+}
+
+/** Lists the saver of an open map; call the returned function once the map closed and was flushed. */
 export function trackMapSaver(saver: MapSaver): () => void {
   active.add(saver);
-  return () => active.delete(saver);
+  holds.set(saver, (holds.get(saver) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    holds.set(saver, Math.max(0, (holds.get(saver) ?? 1) - 1));
+    prune();
+  };
+}
+
+/** Savers of open maps, and of closed maps that still hold unsaved data. */
+export function mapSavers(): MapSaver[] {
+  prune();
+  return [...active];
 }
 
 if (typeof window !== 'undefined') {

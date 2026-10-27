@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { openDataStore } from '../bootstrap.ts';
+import { openDataStore, PendingRestoreError } from '../bootstrap.ts';
 import { DataDirError } from '../config.ts';
 import { ApiError } from '../errors.ts';
 import { restoreColdBackup } from '../services/cold-backup-restore.ts';
@@ -31,6 +31,8 @@ try {
   const dataDir = values['data-dir'];
   const store = openDataStore({
     env: dataDir ? { ...process.env, NOVEL_DATA_DIR: path.resolve(dataDir) } : process.env,
+    // A book restored now would disappear when the pending hot restore is applied at the next start.
+    refuseIfRestorePending: true,
     log: (msg, err) => console.error(msg, err),
   });
   try {
@@ -49,7 +51,9 @@ try {
     console.error(`${err.message} (${err.code})`);
     if (err.code === 'CHECKSUM_MISMATCH') console.error('Use --ignore-checksum to restore anyway.');
   } else {
-    console.error(err instanceof DataDirError ? err.message : err);
+    console.error(
+      err instanceof DataDirError || err instanceof PendingRestoreError ? err.message : err,
+    );
   }
   process.exit(1);
 }

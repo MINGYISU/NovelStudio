@@ -8,6 +8,8 @@ import { useWorkspaceStore } from '../../stores/workspace.ts';
 import { treeKey } from '../../api/nodes.ts';
 import { fetchNodeContent } from '../../api/content.ts';
 import { Button } from '../../components/ui.tsx';
+import { normalizeContent } from '../../../shared/content-normalize.ts';
+import { docToPlainText } from '../../../shared/prosemirror-text.ts';
 import type { ContentDoc } from '../../../shared/schemas/content.ts';
 import { FONT_STACKS, type DisplaySettings } from '../../../shared/schemas/display.ts';
 import { countWords } from '../../../shared/wordcount.ts';
@@ -16,8 +18,10 @@ import { DisplaySettingsDialog } from './DisplaySettingsDialog.tsx';
 import { AnchorColors, anchorColorsKey } from './anchor-extension.ts';
 import { createExtensions } from './extensions.ts';
 import { FindBar } from './FindBar.tsx';
+import { copyText } from './clipboard.ts';
 import { cleanPastedHtml } from './paste.ts';
 import { saverRegistry, useSaverState } from './save-registry.ts';
+import { hasUnsavedWork } from './unsaved-work.ts';
 import { SnapshotDialog } from './SnapshotDialog.tsx';
 import { Toolbar } from './Toolbar.tsx';
 import styles from './editor.module.css';
@@ -45,12 +49,13 @@ async function openSection(nodeId: string): Promise<Opened> {
   if (existing) {
     await existing.flush();
     const unsaved = existing.unsavedContent();
-    if (unsaved) return { content: unsaved, saver: existing };
+    if (unsaved) return { content: normalizeContent(unsaved), saver: existing };
   }
   const node = await fetchNodeContent(nodeId);
   const saver = saverRegistry.getOrCreate(nodeId, node.rev);
   saver.reset(node.rev);
-  return { content: node.content, saver };
+  // Shown exactly as it will be saved (ED-02: quotes never nest).
+  return { content: normalizeContent(node.content), saver };
 }
 
 function displayStyle(display: DisplaySettings): CSSProperties {
@@ -169,6 +174,8 @@ function SectionEditor({
   const [dialog, setDialog] = useState<'snapshots' | 'display' | null>(null);
   const state = useSaverState(saver);
   const stale = state === 'stale';
+  const rejected = state === 'error' && saver.rejected;
+  const [copyNote, setCopyNote] = useState<string | null>(null);
 
   const editor = useEditor({
     extensions,
@@ -177,7 +184,7 @@ function SectionEditor({
       attributes: { 'aria-label': 'Section text', 'data-testid': 'editor' },
       transformPastedHTML: cleanPastedHtml,
     },
-    onUpdate: ({ editor: e }) => saver.update(e.getJSON() as ContentDoc),
+    onUpdate: ({ editor: e }) => saver.update(normalizeContent(e.getJSON() as ContentDoc)),
   });
 
   // Leaving the section (switch, view change, route change) saves it right away.
@@ -200,8 +207,9 @@ function SectionEditor({
     }
   }, [editor, threads.data, anchorColors]);
 
+  // No update event: toggling editability is not an edit, and would mark the section unsaved.
   useEffect(() => {
-    editor?.setEditable(!stale);
+    editor?.setEditable(!stale, false);
   }, [editor, stale]);
 
   // Cmd/Ctrl+F finds in this section instead of the browser's page search.
@@ -275,6 +283,25 @@ function SectionEditor({
           <Button onClick={onReload}>Reload</Button>
         </div>
       ) : null}
+      {rejected ? (
+        <div className={styles.banner} role="alert" data-testid="save-rejected">
+          <span>
+            This section could not be saved: {saver.error ?? 'the server refused the text.'} What
+            you type now is only in this window. Copy the text to keep it safe.
+          </span>
+          <Button
+            onClick={() =>
+              void copyText(docToPlainText(editor.getJSON() as ContentDoc)).then(
+                () => setCopyNote('Copied.'),
+                (err: Error) => setCopyNote(`Could not copy: ${err.message}`),
+              )
+            }
+          >
+            Copy section text
+          </Button>
+          {copyNote ? <span role="status">{copyNote}</span> : null}
+        </div>
+      ) : null}
       <div className={styles.scroller}>
         <div className={styles.page}>
           <h2 className={styles.title}>{displayTitle}</h2>
@@ -294,6 +321,8 @@ function SectionEditor({
         <SnapshotDialog
           nodeId={nodeId}
           beforeRestore={() => saver.flush()}
+          hasUnsaved={() => hasUnsavedWork([saver], [])}
+          unsavedText={() => docToPlainText(editor.getJSON() as ContentDoc)}
           onClose={() => setDialog(null)}
           onRestored={() => {
             setDialog(null);

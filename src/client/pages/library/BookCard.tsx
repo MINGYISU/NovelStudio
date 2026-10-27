@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { useTrashBook } from '../../api/books.ts';
 import type { Book } from '../../../shared/schemas/book.ts';
 import { isBackupOverdue } from '../../../shared/cold-backup.ts';
+import { triggerDownload, useExportGuard } from '../../features/settings/export-guard.tsx';
 import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
 import { BookCover } from './BookCover.tsx';
 import { EditBookDialog } from './BookDialogs.tsx';
@@ -33,6 +34,7 @@ export function BookCard({ book, backup }: { book: Book; backup?: BackupInfo }) 
   const [editing, setEditing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const trash = useTrashBook();
+  const { guard, element: exportGuard } = useExportGuard();
 
   return (
     <li className={styles.card}>
@@ -55,15 +57,21 @@ export function BookCard({ book, backup }: { book: Book; backup?: BackupInfo }) 
             <DropdownMenu.Item className={styles.menuItem} onSelect={() => setEditing(true)}>
               <Pencil size={16} /> Edit metadata
             </DropdownMenu.Item>
-            <DropdownMenu.Item className={styles.menuItem} asChild>
-              <a href={`/api/books/${book.id}/export?format=md`} download>
-                <FileText size={16} /> Export Markdown
-              </a>
+            <DropdownMenu.Item
+              className={styles.menuItem}
+              onSelect={() =>
+                guard(false, () => triggerDownload(`/api/books/${book.id}/export?format=md`))
+              }
+            >
+              <FileText size={16} /> Export Markdown
             </DropdownMenu.Item>
-            <DropdownMenu.Item className={styles.menuItem} asChild>
-              <a href={`/api/books/${book.id}/export?format=txt`} download>
-                <FileText size={16} /> Export plain text
-              </a>
+            <DropdownMenu.Item
+              className={styles.menuItem}
+              onSelect={() =>
+                guard(false, () => triggerDownload(`/api/books/${book.id}/export?format=txt`))
+              }
+            >
+              <FileText size={16} /> Export plain text
             </DropdownMenu.Item>
             <DropdownMenu.Item className={styles.menuItem} onSelect={() => setExporting(true)}>
               <Download size={16} /> Export cold backup…
@@ -80,6 +88,7 @@ export function BookCard({ book, backup }: { book: Book; backup?: BackupInfo }) 
           {trash.error.message}
         </p>
       ) : null}
+      {exportGuard}
       {editing ? <EditBookDialog book={book} onClose={() => setEditing(false)} /> : null}
       {exporting ? (
         <ExportDialog

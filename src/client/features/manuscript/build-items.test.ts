@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_STRUCTURE } from '../../../shared/schemas/structure.ts';
 import type { NodeKind, TreeNode } from '../../../shared/types.ts';
-import { buildItems, childKindOf, totalWords } from './build-items.ts';
+import { buildItems, childKindOf, totalWords, trashEntries } from './build-items.ts';
 
 function node(
   id: string,
@@ -62,5 +62,27 @@ describe('childKindOf and totalWords', () => {
 
   it('sums live sections only', () => {
     expect(totalWords(nodes)).toBe(40);
+  });
+});
+
+describe('trashEntries (TREE-08)', () => {
+  it('lists trashed sections newest first with what comes back when each is restored', () => {
+    const list = trashEntries([
+      node('p1', 'part', null, 0),
+      node('c1', 'chapter', 'p1', 0, { deletedAt: '2026-01-01T10:00:00.000Z', wordCount: 100 }),
+      node('s1', 'scene', 'c1', 0, { wordCount: 5 }),
+      node('s2', 'scene', 'c1', 1, { wordCount: 7, deletedAt: '2026-01-01T09:00:00.000Z' }),
+      node('s3', 'scene', 'c1', 2, { wordCount: 3 }),
+      node('c2', 'chapter', null, 1, { deletedAt: '2026-01-02T10:00:00.000Z', wordCount: 0 }),
+    ]);
+    expect(list.map((e) => [e.node.id, e.sections, e.words])).toEqual([
+      ['c2', 1, 0],
+      ['c1', 3, 108],
+      ['s2', 1, 7],
+    ]);
+  });
+
+  it('is empty when nothing is trashed', () => {
+    expect(trashEntries([node('p1', 'part', null, 0), node('c1', 'chapter', 'p1', 0)])).toEqual([]);
   });
 });

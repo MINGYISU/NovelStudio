@@ -14,6 +14,7 @@ import {
   THREAD_TEXT_MAX,
   THREAD_TITLE_MAX,
 } from '../../shared/schemas/foreshadow.ts';
+import { normalizeContent } from '../../shared/content-normalize.ts';
 import { contentSchema, docFromPlainText, type ContentDoc } from '../../shared/schemas/content.ts';
 import {
   COLD_BACKUP_FORMAT,
@@ -240,7 +241,7 @@ export function restoreColdBackup(
     section: ColdSection,
   ): { content: string; plainText: string; wordCount: number } => {
     let content: ContentDoc;
-    const parsed = contentSchema.safeParse(section.content);
+    const parsed = contentSchema.safeParse(normalizeContent(section.content));
     if (parsed.success) {
       content = parsed.data;
     } else {
@@ -343,7 +344,7 @@ export function restoreColdBackup(
   const settings = remapBackgroundImage(doc.book.settings, ids, assetIdSet, warnings);
 
   const snapshots = (doc.snapshots ?? []).flatMap((s) => {
-    const parsed = contentSchema.safeParse(s.content);
+    const parsed = contentSchema.safeParse(normalizeContent(s.content));
     if (!parsed.success || !nodeIdSet.has(mapped(s.nodeId))) {
       warnings.push('A snapshot could not be restored and was skipped.');
       return [];

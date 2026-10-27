@@ -93,10 +93,22 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+const DATA_KEYS = ['nodes', 'edges', 'viewport', 'layoutDirection'];
+const NODE_KEYS = ['id', 'position', 'data'];
+const NODE_DATA_KEYS = ['title', 'description', 'color', 'storyTime', 'links'];
+const EDGE_KEYS = ['id', 'source', 'target', 'label'];
+const LINK_KEYS = ['type', 'id'];
+
+function unknownKeys(value: unknown, known: readonly string[]): string[] {
+  const record = asRecord(value);
+  return record ? Object.keys(record).filter((k) => !known.includes(k)) : [];
+}
+
 /**
  * Reads untrusted map data item by item, so one damaged node, edge or link never hides the rest
  * (used when reading a stored map and when restoring a backup). Nothing is dropped without being
- * listed in `problems`.
+ * listed in `problems`, including keys this version does not know (MAP-08): saving would lose them,
+ * so a stored map with such keys counts as damaged.
  */
 export function repairMapData(raw: unknown): RepairedMapData {
   const problems: string[] = [];
@@ -104,6 +116,12 @@ export function repairMapData(raw: unknown): RepairedMapData {
   if (!record) {
     return { data: emptyMapData(), problems: ['The map data could not be read.'] };
   }
+  const unknown = (where: string, keys: string[]) => {
+    if (keys.length > 0) {
+      problems.push(`${where} has data this version does not know: ${keys.join(', ')}.`);
+    }
+  };
+  unknown('The map', unknownKeys(record, DATA_KEYS));
 
   const nodes: MapNode[] = [];
   const nodeIds = new Set<string>();
@@ -113,6 +131,13 @@ export function repairMapData(raw: unknown): RepairedMapData {
     const title = asRecord(asRecord(item)?.['data'])?.['title'];
     const label = typeof title === 'string' && title ? `"${title}"` : 'A node';
     const data = asRecord(asRecord(item)?.['data']);
+    unknown(label, [
+      ...unknownKeys(item, NODE_KEYS),
+      ...unknownKeys(data, NODE_DATA_KEYS).map((k) => `data.${k}`),
+      ...(Array.isArray(data?.['links'])
+        ? data['links'].flatMap((l: unknown) => unknownKeys(l, LINK_KEYS).map((k) => `links.${k}`))
+        : []),
+    ]);
     let candidate: unknown = item;
     if (data && Array.isArray(data['links'])) {
       const links = data['links'].filter((l) => mapLinkSchema.safeParse(l).success);
@@ -139,6 +164,7 @@ export function repairMapData(raw: unknown): RepairedMapData {
   const rawEdges = Array.isArray(record['edges']) ? record['edges'] : [];
   if (!Array.isArray(record['edges'])) problems.push('The list of edges could not be read.');
   for (const item of rawEdges) {
+    unknown('An edge', unknownKeys(item, EDGE_KEYS));
     const parsed = mapEdgeSchema.safeParse(item);
     if (!parsed.success) {
       problems.push('An edge could not be read and was left out.');

@@ -15,6 +15,7 @@ import type { TreeNode } from '../../shared/types.ts';
 import type { Db } from '../db/connection.ts';
 import { ApiError } from '../errors.ts';
 import { getBook, insertBook, updateBookFields } from '../repos/books.ts';
+import { insertDefaultCategories } from '../repos/codex.ts';
 import { insertNodeRow, listNodes, setNodeText } from '../repos/nodes.ts';
 
 const EXCERPT_CHARS = 120;
@@ -88,6 +89,7 @@ export function commitTextImport(db: Db, input: TextImportInput): ImportTextComm
 
   const bookId = db.transaction(() => {
     const created = insertBook(db, { title }, now);
+    insertDefaultCategories(db, created.id);
     if (preset === 'chinese') updateBookFields(db, created.id, { structure }, now);
 
     const ids = result.sections.map(() => crypto.randomUUID());

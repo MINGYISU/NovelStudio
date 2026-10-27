@@ -146,6 +146,41 @@ describe('SectionSaver', () => {
     expect(saver.state).toBe('error');
   });
 
+  it('stays in error after a refused save while typing continues, until a save succeeds (ED-12)', async () => {
+    const { calls, transport } = manualTransport();
+    const states: string[] = [];
+    const saver = new SectionSaver('n1', 0, {
+      transport,
+      debounceMs: 100,
+      onChange: () => states.push(saver.state),
+    });
+    saver.update(doc('x'));
+    void saver.flush();
+    await settle();
+    calls[0]!.reject(new SaveError('failed', 'Content is nested too deeply.', false));
+    await settle();
+    expect(saver).toMatchObject({ state: 'error', rejected: true });
+    states.length = 0;
+
+    saver.update(doc('xy'));
+    expect(saver.state).toBe('error');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(calls).toHaveLength(2);
+    expect(saver.state).toBe('error');
+    calls[1]!.reject(new SaveError('failed', 'Still refused.', false));
+    await settle();
+    expect(saver).toMatchObject({ state: 'error', error: 'Still refused.', rejected: true });
+    expect(saver.unsavedContent()).toEqual(doc('xy'));
+
+    saver.update(doc('xyz'));
+    await vi.advanceTimersByTimeAsync(100);
+    calls[2]!.resolve({ rev: 1, wordCount: 1 });
+    await settle();
+    expect(saver).toMatchObject({ state: 'saved', rejected: false, error: null });
+    expect(states.slice(0, -2)).toEqual(['error']);
+    expect(states.slice(-2)).toEqual(['saving', 'saved']);
+  });
+
   it('asks for a keepalive request when the page is going away', async () => {
     const { calls, transport } = manualTransport();
     const saver = new SectionSaver('n1', 0, { transport });
@@ -199,7 +234,7 @@ describe('SaverRegistry', () => {
     await settle();
     calls[1]!.reject(new SaveError('failed', 'down'));
     await flushB;
-    expect(registry.status()).toEqual({ kind: 'error', message: 'down' });
+    expect(registry.status()).toEqual({ kind: 'error', message: 'down', retrying: true });
 
     await vi.advanceTimersByTimeAsync(5000);
     calls[2]!.reject(new SaveError('stale', 'conflict'));

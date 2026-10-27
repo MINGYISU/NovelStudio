@@ -13,7 +13,10 @@ import {
 import { checkMove, keyboardMoveTarget, type KeyboardMove } from '../../../shared/tree.ts';
 import type { NodeKind, TreeNode } from '../../../shared/types.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
+import { saverRegistry } from '../editor/save-registry.ts';
+import { hasUnsavedWork } from '../editor/unsaved-work.ts';
 import { childKindOf } from './build-items.ts';
+import { recordMoveUndo } from './move-undo.ts';
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong.';
@@ -30,6 +33,30 @@ export interface TreeActions {
   rename: (nodeId: string, title: string) => void;
   setNumbered: (node: TreeNode, numbered: boolean) => void;
   trash: (node: TreeNode) => void;
+  /** Restores a trashed section and opens it; rejects with the server's message. */
+  restore: (node: TreeNode) => Promise<void>;
+}
+
+const TRASH_UNSAVED_MESSAGE =
+  'Could not save the latest text, so the section was not moved to the trash.';
+
+/** The section and every section below it, trashed or not. */
+function subtreeIds(nodes: readonly TreeNode[], rootId: string): string[] {
+  const ids = [rootId];
+  for (let i = 0; i < ids.length; i++) {
+    for (const n of nodes) if (n.parentId === ids[i]) ids.push(n.id);
+  }
+  return ids;
+}
+
+/**
+ * Saves pending text of a section and its subtree before it goes to the trash (ED-12): a save
+ * that arrives after the trash would be refused. False when anything could not be saved.
+ */
+async function flushSubtree(nodes: readonly TreeNode[], rootId: string): Promise<boolean> {
+  const savers = subtreeIds(nodes, rootId).flatMap((id) => saverRegistry.get(id) ?? []);
+  await Promise.all(savers.map((s) => s.flush()));
+  return !hasUnsavedWork(savers, []);
 }
 
 /** All sidebar write actions. Failures surface as a notice; moves keep one level of undo. */
@@ -65,10 +92,12 @@ export function useTreeActions(bookId: string, nodes: readonly TreeNode[]): Tree
         .findIndex((n) => n.id === nodeId);
       if (node.parentId === parentId && before === index) return;
       if (!checkMove(current, nodeId, parentId, index).ok) return;
-      const previousUndo = useWorkspaceStore.getState().lastMove;
-      setLastMove({ bookId, nodeId, parentId: node.parentId, index: before });
+      const undo = recordMoveUndo(
+        { get: () => useWorkspaceStore.getState().lastMove, set: setLastMove },
+        { bookId, nodeId, parentId: node.parentId, index: before },
+      );
       moveMutation.mutateAsync({ id: nodeId, parentId, index }).catch((error: unknown) => {
-        setLastMove(previousUndo);
+        undo.failed();
         fail('The move was not saved and has been reverted.')(error);
       });
     };
@@ -131,8 +160,13 @@ export function useTreeActions(bookId: string, nodes: readonly TreeNode[]): Tree
           .mutateAsync({ id: node.id, patch: { numbered } })
           .catch(fail('Could not change numbering.')),
       trash: (node) =>
-        trashMutation
-          .mutateAsync(node.id)
+        void flushSubtree(latest(), node.id)
+          .then((saved) => {
+            if (!saved) throw new Error(TRASH_UNSAVED_MESSAGE);
+            return trashMutation.mutateAsync(node.id).catch((error: unknown) => {
+              throw new Error(`Could not move the section to the trash. ${messageOf(error)}`);
+            });
+          })
           .then(() => {
             setLastMove(null);
             notify({
@@ -148,7 +182,11 @@ export function useTreeActions(bookId: string, nodes: readonly TreeNode[]): Tree
               },
             });
           })
-          .catch(fail('Could not move the section to the trash.')),
+          .catch((error: unknown) => notify({ tone: 'error', message: messageOf(error) })),
+      restore: async (node) => {
+        await restoreMutation.mutateAsync(node.id);
+        navigate(`/book/${bookId}/manuscript/${node.id}`, { replace: true });
+      },
     };
   }, [
     bookId,

@@ -344,3 +344,16 @@
   background: #fff4dc;
   font-weight: 600;
 }
+
+.unsavedWarning {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-warn);
+  border-radius: var(--radius);
+  background: #fff4dc;
+  color: #5c3d00;
+}
+
+.unsavedWarning p {
+  margin: 0 0 0.5rem;
+}

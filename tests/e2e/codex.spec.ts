@@ -69,7 +69,7 @@ test.describe('codex', () => {
     const book = await seedBook(request, 'E2E codex fields', async () => {});
     await page.goto(`/book/${book.id}/codex`);
 
-    // The first visit creates the eight default categories.
+    // A new book comes with the eight default categories (CDX-01).
     await expect(page.getByRole('button', { name: /^Characters/ })).toBeVisible();
     await expect(
       page.getByRole('navigation', { name: 'Codex categories' }).getByRole('button'),
@@ -175,6 +175,7 @@ test.describe('codex', () => {
     await rename.press('Enter');
 
     await page.reload();
+    await expect(page.getByTestId('category-name')).toHaveCount(9);
     const names = await page.getByTestId('category-name').allTextContents();
     expect(names.slice(0, 3)).toEqual(['Characters', 'Locations', 'Era & Timeline']);
     expect(names).toContain('Spells');

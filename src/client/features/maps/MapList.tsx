@@ -12,6 +12,7 @@ import { useCreateMap, useDeleteMap, useDuplicateMap, useRenameMap } from '../..
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import libraryStyles from '../../pages/library/library.module.css';
+import { mapSavers } from './map-saver.ts';
 import styles from './maps.module.css';
 
 const TEMPLATE_INFO: Record<MapTemplate, { name: string; text: string }> = {
@@ -236,12 +237,24 @@ export function MapList({ bookId, maps, selectedId }: MapListProps) {
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   className={libraryStyles.menuItem}
-                  onSelect={() =>
-                    duplicate.mutate(map.id, {
-                      onSuccess: (copy) => navigate(`/book/${bookId}/maps/${copy.id}`),
-                      onError: report('The map was not duplicated.'),
-                    })
-                  }
+                  onSelect={() => {
+                    // The copy is made from the stored map, so the latest edits are saved first.
+                    const saver = mapSavers().find((s) => s.mapId === map.id);
+                    void (saver?.flush() ?? Promise.resolve()).then(() => {
+                      if (saver && (saver.state !== 'saved' || saver.hasUnsaved())) {
+                        report('The map was not duplicated.')(
+                          new Error(
+                            `Its latest changes could not be saved: ${saver.error ?? 'unknown error'}`,
+                          ),
+                        );
+                        return;
+                      }
+                      duplicate.mutate(map.id, {
+                        onSuccess: (copy) => navigate(`/book/${bookId}/maps/${copy.id}`),
+                        onError: report('The map was not duplicated.'),
+                      });
+                    });
+                  }}
                 >
                   <Copy size={16} /> Duplicate
                 </DropdownMenu.Item>

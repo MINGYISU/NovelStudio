@@ -16,14 +16,27 @@ pause_on_error() {
   exit 1
 }
 
+# Only the production server counts: a development server on this port would write to dev data.
 is_running() {
-  curl -fs --max-time 2 "${URL}/api/health" 2>/dev/null | grep -q '"status":"ok"'
+  local body
+  body="$(curl -fs --max-time 2 "${URL}/api/health" 2>/dev/null)" || return 1
+  grep -q '"status":"ok"' <<<"${body}" && grep -q '"mode":"production"' <<<"${body}"
+}
+
+# Anything at all answering on the port (curl exit code 7 means nothing is listening).
+port_in_use() {
+  curl -s --max-time 2 -o /dev/null "${URL}/" 2>/dev/null
+  [ $? -ne 7 ]
 }
 
 if is_running; then
   echo "NovelStudio is already running. Opening ${URL}"
   open "${URL}"
   exit 0
+fi
+if port_in_use; then
+  echo "Port ${PORT} is used by a NovelStudio development server (or another program). Stop it, or set PORT."
+  pause_on_error
 fi
 
 # A window opened from Finder may not have the PATH of your usual terminal.

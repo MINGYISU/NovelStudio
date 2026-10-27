@@ -29,7 +29,9 @@ export class Harness {
   }
 
   async start(): Promise<this> {
+    // The harness plays the server, which is the only place a pending hot restore is applied.
     this.store = openDataStore({
+      applyPendingRestore: true,
       env: { NODE_ENV: 'test', NOVEL_DATA_DIR: this.dataDir },
       homedir: this.home,
     });

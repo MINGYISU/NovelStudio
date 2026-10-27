@@ -94,6 +94,13 @@ describe('create and list', () => {
     });
     expect(book.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(await list()).toEqual([book]);
+    // CDX-01: the default Codex categories are created with the book.
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/books/${book.id}/codex`,
+      headers: HOST,
+    });
+    expect(res.json<{ categories: unknown[] }>().categories).toHaveLength(8);
   });
 
   it('accepts author and description', async () => {

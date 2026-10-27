@@ -47,15 +47,21 @@ const assetFiles = (bookId: string) => {
   return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
 };
 
-describe('default categories (CDX-01..03)', () => {
-  it('a book starts with no categories and seeding creates the eight defaults once', async () => {
-    const book = await h.createBook();
-    expect((await codex(book.id)).categories).toEqual([]);
+/** A book whose categories were all deleted (or one from before M5): it has none. */
+async function bookWithoutCategories() {
+  const book = await h.createBook();
+  for (const c of (await codex(book.id)).categories) {
+    expect((await h.api('DELETE', `/api/codex/categories/${c.id}`)).statusCode).toBe(200);
+  }
+  expect((await codex(book.id)).categories).toEqual([]);
+  return book;
+}
 
-    const first = (await h.api('POST', `/api/books/${book.id}/codex/seed`)).json<{
-      categories: CodexCategory[];
-    }>();
-    expect(first.categories.map((c) => c.name)).toEqual([
+describe('default categories (CDX-01..03)', () => {
+  it('a new book is created with the eight defaults', async () => {
+    const book = await h.createBook();
+    const { categories } = await codex(book.id);
+    expect(categories.map((c) => c.name)).toEqual([
       'Characters',
       'Locations',
       'Era & Timeline',
@@ -65,8 +71,8 @@ describe('default categories (CDX-01..03)', () => {
       'Rules & Concepts',
       'Other',
     ]);
-    expect(first.categories.map((c) => c.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-    expect(first.categories[0]!.fieldTemplate.map((f) => f.label)).toEqual([
+    expect(categories.map((c) => c.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(categories[0]!.fieldTemplate.map((f) => f.label)).toEqual([
       'Name',
       'Aliases',
       'Role',
@@ -79,10 +85,22 @@ describe('default categories (CDX-01..03)', () => {
       'Arc notes',
       'Notes',
     ]);
-    expect(first.categories[1]!.fieldTemplate.map((f) => f.label)).toEqual([
-      'Description',
-      'Notes',
-    ]);
+    expect(categories[1]!.fieldTemplate.map((f) => f.label)).toEqual(['Description', 'Notes']);
+  });
+
+  it('stays empty after every category is deleted, also after a restart', async () => {
+    const book = await bookWithoutCategories();
+    await h.restart();
+    expect((await codex(book.id)).categories).toEqual([]);
+  });
+
+  it('seeding a book with no categories creates the eight defaults once', async () => {
+    const book = await bookWithoutCategories();
+    const first = (await h.api('POST', `/api/books/${book.id}/codex/seed`)).json<{
+      categories: CodexCategory[];
+    }>();
+    expect(first.categories.map((c) => c.name)).toHaveLength(8);
+    expect(first.categories[0]!.name).toBe('Characters');
 
     const second = (await h.api('POST', `/api/books/${book.id}/codex/seed`)).json<{
       categories: CodexCategory[];
@@ -92,7 +110,7 @@ describe('default categories (CDX-01..03)', () => {
   });
 
   it('does not seed a book that already has categories, however few', async () => {
-    const book = await h.createBook();
+    const book = await bookWithoutCategories();
     await h.api('POST', `/api/books/${book.id}/codex/categories`, { name: 'Magic' });
     const res = await h.api('POST', `/api/books/${book.id}/codex/seed`);
     expect(res.json<{ categories: CodexCategory[] }>().categories.map((c) => c.name)).toEqual([
@@ -101,7 +119,7 @@ describe('default categories (CDX-01..03)', () => {
   });
 
   it('seeding a trashed or unknown book fails and writes nothing', async () => {
-    const book = await h.createBook();
+    const book = await bookWithoutCategories();
     await h.api('DELETE', `/api/books/${book.id}`);
     expect((await h.api('POST', `/api/books/${book.id}/codex/seed`)).statusCode).toBe(409);
     expect((await codex(book.id)).categories).toEqual([]);

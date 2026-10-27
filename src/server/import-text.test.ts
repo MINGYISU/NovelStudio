@@ -138,6 +138,9 @@ describe('POST /api/import/text: commit (IMP-02/03)', () => {
     ]);
     const first = (await h.api('GET', `/api/nodes/${nodes[0]!.id}`)).json();
     expect(JSON.stringify(first.node.content)).toContain('他回来了。');
+    // CDX-01: the default Codex categories are created with the book.
+    const codex = (await h.api('GET', `/api/books/${body.book.id}/codex`)).json();
+    expect(codex.categories).toHaveLength(8);
 
     // The book survives a restart.
     await h.restart();
@@ -211,5 +214,8 @@ describe('POST /api/import/text: commit (IMP-02/03)', () => {
     expect(res.statusCode).toBe(500);
     expect(await books()).toHaveLength(0);
     expect(h.store.db.prepare('SELECT COUNT(*) AS n FROM nodes').get()).toEqual({ n: 0 });
+    expect(h.store.db.prepare('SELECT COUNT(*) AS n FROM codex_categories').get()).toEqual({
+      n: 0,
+    });
   });
 });

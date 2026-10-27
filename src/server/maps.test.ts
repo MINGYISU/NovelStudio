@@ -226,6 +226,36 @@ describe('trashed books and damaged data', () => {
     expect(copyRow.data).toBe(stored);
   });
 
+  it('a stored map with a key this version does not know is damaged and never overwritten (MAP-08)', async () => {
+    const book = await h.createBook();
+    const map = await createMap(book.id, { template: 'timeline', title: 'Newer' });
+    const raw = JSON.parse(JSON.stringify(map.data)) as { nodes: Record<string, unknown>[] };
+    raw.nodes[0]!['futureField'] = { keep: 'me' };
+    const stored = JSON.stringify(raw);
+    h.store.db.prepare('UPDATE maps SET data = ? WHERE id = ?').run(stored, map.id);
+
+    const listed = (await listMaps(book.id))[0]!;
+    expect(listed.damaged).toBe(true);
+    const res = await h.api('PUT', `/api/maps/${map.id}/data`, { data: dataOf('x') });
+    expect(res.statusCode).toBe(409);
+    expect(res.json<{ error: { code: string } }>().error.code).toBe('MAP_DAMAGED');
+    const row = h.store.db.prepare('SELECT data FROM maps WHERE id = ?').get(map.id) as {
+      data: string;
+    };
+    expect(row.data).toBe(stored);
+  });
+
+  it('accepts and strips React Flow keys such as measured in a PUT body', async () => {
+    const book = await h.createBook();
+    const map = await createMap(book.id);
+    const data = dataOf('x') as unknown as { nodes: Record<string, unknown>[] };
+    data.nodes[0]!['measured'] = { width: 100, height: 40 };
+    expect((await h.api('PUT', `/api/maps/${map.id}/data`, { data })).statusCode).toBe(200);
+    const listed = (await listMaps(book.id))[0]!;
+    expect(listed.damaged).toBe(false);
+    expect(listed.data.nodes[0]).not.toHaveProperty('measured');
+  });
+
   it('deletes a book purge with its maps', async () => {
     const book = await h.createBook('Gone');
     await createMap(book.id);

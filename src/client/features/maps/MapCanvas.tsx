@@ -151,10 +151,10 @@ function MapCanvasInner({
 
   // Leaving the map (or the page) saves what is still waiting; a failure is reported once.
   useEffect(() => {
-    const untrack = trackMapSaver(saver);
+    const release = trackMapSaver(saver);
     return () => {
-      untrack();
       void saver.flush().then(() => {
+        release();
         if (saver.state === 'error') {
           useWorkspaceStore.getState().notify({
             tone: 'error',

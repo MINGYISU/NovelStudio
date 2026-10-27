@@ -98,6 +98,39 @@ describe('repairMapData', () => {
     expect(problems).toEqual([]);
   });
 
+  it('reports keys this version does not know, so the map counts as damaged (MAP-08)', () => {
+    const raw = good() as unknown as Record<string, unknown> & {
+      nodes: Record<string, unknown>[];
+      edges: Record<string, unknown>[];
+    };
+    raw.nodes[0]!['shape'] = 'circle';
+    const { data, problems } = repairMapData(raw);
+    expect(problems).toEqual(['"a" has data this version does not know: shape.']);
+    expect(data.nodes[0]).toEqual(goodNode('a'));
+    expect(readMapData(JSON.stringify(raw)).problems).toHaveLength(1);
+
+    const more = good() as unknown as Record<string, unknown> & {
+      nodes: { data: Record<string, unknown> }[];
+      edges: Record<string, unknown>[];
+    };
+    more['lanes'] = [];
+    more.nodes[1]!.data['mood'] = 'calm';
+    more.nodes[1]!.data['links'] = [{ type: 'node', id: LINK_ID, weight: 2 }];
+    more.edges[0]!['animated'] = true;
+    expect(repairMapData(more).problems).toEqual([
+      'The map has data this version does not know: lanes.',
+      '"b" has data this version does not know: data.mood, links.weight.',
+      'An edge has data this version does not know: animated.',
+    ]);
+  });
+
+  it("request bodies still strip keys such as React Flow's measured", () => {
+    const body = good() as unknown as { nodes: Record<string, unknown>[] };
+    body.nodes[0]!['measured'] = { width: 10, height: 10 };
+    const parsed = mapDataSchema.parse(body);
+    expect(parsed.nodes[0]).toEqual(goodNode('a'));
+  });
+
   it('treats anything that is not an object, and broken JSON, as unreadable', () => {
     for (const raw of [null, 'text', 5, [1]]) {
       const result = repairMapData(raw);

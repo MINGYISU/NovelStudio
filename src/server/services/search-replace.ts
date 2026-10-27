@@ -1,5 +1,6 @@
 import { extractAnchorIds } from '../../shared/foreshadow-anchors.ts';
 import { docToPlainText, findInDoc, replaceInDoc } from '../../shared/prosemirror-text.ts';
+import { normalizeContent } from '../../shared/content-normalize.ts';
 import { contentSchema, type ContentDoc } from '../../shared/schemas/content.ts';
 import type {
   ReplaceBody,
@@ -22,7 +23,7 @@ import type { SnapshotService } from './snapshots.ts';
 
 function parseContent(row: NodeContentRow): ContentDoc | null {
   try {
-    const parsed = contentSchema.safeParse(JSON.parse(row.content));
+    const parsed = contentSchema.safeParse(normalizeContent(JSON.parse(row.content)));
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

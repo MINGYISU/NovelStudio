@@ -2,10 +2,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { openDataStore } from './bootstrap.ts';
+import { openDataStore, PendingRestoreError } from './bootstrap.ts';
 import { DataDirError, realDataDir } from './config.ts';
 import { loadMigrations } from './db/migrate.ts';
-import { listBackups } from './services/hot-backup.ts';
+import { createHotBackup, listBackups } from './services/hot-backup.ts';
+import { requestHotRestore } from './services/hot-backup-restore.ts';
+import { LibraryService } from './services/library.ts';
 
 let tmp: string;
 let home: string;
@@ -87,5 +89,66 @@ describe('openDataStore', () => {
       openDataStore({ env: { NODE_ENV: 'test', NOVEL_DATA_DIR: dataDir }, homedir: home }),
     ).toThrow(/config.json/);
     expect(fs.readFileSync(path.join(dataDir, 'config.json'), 'utf8')).toBe('oops');
+  });
+});
+
+describe('a pending hot backup restore (HOT-02)', () => {
+  function stagePending() {
+    const env = { NODE_ENV: 'test', NOVEL_DATA_DIR: path.join(tmp, 'data') };
+    const store = openDataStore({ env, homedir: home });
+    const library = new LibraryService(store.db, store.paths);
+    library.create({ title: 'Before' });
+    const name = path.basename(
+      createHotBackup(store.db, store.paths.backupsDir, new Date(2020, 0, 1)),
+    );
+    requestHotRestore(store.db, store.paths, name);
+    library.create({ title: 'After' });
+    return { env, store };
+  }
+  const titles = (store: ReturnType<typeof openDataStore>) =>
+    (store.db.prepare('SELECT title FROM books ORDER BY title').all() as { title: string }[]).map(
+      (r) => r.title,
+    );
+
+  it('is left alone by default: database files and marker stay untouched', () => {
+    const { env, store: server } = stagePending();
+    const dbFile = server.paths.dbFile;
+    const files = [dbFile, `${dbFile}-wal`, `${dbFile}-shm`];
+    const before = files.map((f) => fs.statSync(f).ino);
+    const marker = path.join(server.paths.dataDir, 'pending-restore.json');
+    const markerText = fs.readFileSync(marker, 'utf8');
+
+    const script = openDataStore({ env, homedir: home });
+    expect(script.pendingRestore?.name).toMatch(/^novelstudio-/);
+    expect(titles(script)).toEqual(['After', 'Before']);
+    expect(files.map((f) => fs.statSync(f).ino)).toEqual(before);
+    expect(fs.readFileSync(marker, 'utf8')).toBe(markerText);
+    expect(fs.existsSync(path.join(server.paths.dataDir, 'pending-restore.db'))).toBe(true);
+    expect(fs.readdirSync(server.paths.backupsDir).some((n) => n.startsWith('replaced-'))).toBe(
+      false,
+    );
+    script.close();
+    server.close();
+  });
+
+  it('can be refused before the database is opened', () => {
+    const { env, store } = stagePending();
+    store.close();
+    expect(() => openDataStore({ env, homedir: home, refuseIfRestorePending: true })).toThrow(
+      PendingRestoreError,
+    );
+  });
+
+  it('is applied when asked, as the server does', () => {
+    const { env, store } = stagePending();
+    store.close();
+    const server = openDataStore({ env, homedir: home, applyPendingRestore: true });
+    expect(server.pendingRestore).toBeNull();
+    expect(titles(server)).toEqual(['Before']);
+    expect(fs.existsSync(path.join(server.paths.dataDir, 'pending-restore.json'))).toBe(false);
+    expect(fs.readdirSync(server.paths.backupsDir).some((n) => n.startsWith('replaced-'))).toBe(
+      true,
+    );
+    server.close();
   });
 });

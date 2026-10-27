@@ -15,6 +15,12 @@ try {
     },
   });
   const store = openDataStore({ log: (msg, err) => console.error(msg, err) });
+  if (store.pendingRestore) {
+    console.warn(
+      `Note: a hot backup restore (${store.pendingRestore.name}) is waiting for the next start. ` +
+        'This backs up the current database, not the one that will be restored.',
+    );
+  }
   let failed = false;
   try {
     const service = new ColdBackupService({ db: store.db, paths: store.paths });

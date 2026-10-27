@@ -53,6 +53,11 @@ export function hotBackupState(paths: DataPaths): HotBackupState {
   };
 }
 
+/** The restore waiting for the next server start, if any. */
+export function pendingHotRestore(paths: DataPaths): RestoreMarker | null {
+  return readMarker(path.join(paths.dataDir, PENDING_MARKER));
+}
+
 function removeStaged(paths: DataPaths): void {
   fs.rmSync(path.join(paths.dataDir, STAGED_DB), { force: true });
 }

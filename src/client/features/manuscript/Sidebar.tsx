@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Tree, type TreeApi } from 'react-arborist';
 import { useNavigate } from 'react-router';
@@ -11,6 +11,7 @@ import { useWorkspaceStore } from '../../stores/workspace.ts';
 import { buildItems, totalWords, type TreeItem } from './build-items.ts';
 import { initialOpenState, saveOpenState } from './fold-state.ts';
 import { SectionWarningsContext, SidebarContext } from './sidebar-context.ts';
+import { TrashDialog } from './TrashDialog.tsx';
 import { TreeRow } from './TreeRow.tsx';
 import { useTreeActions } from './useTreeActions.ts';
 import styles from './manuscript.module.css';
@@ -48,6 +49,8 @@ export function Sidebar({ bookId, nodes, structure, selectedId, warnings }: Side
   const actions = useTreeActions(bookId, nodes);
   const items = useMemo(() => buildItems(nodes, structure), [nodes, structure]);
   const words = useMemo(() => totalWords(nodes), [nodes]);
+  const trashed = useMemo(() => nodes.filter((n) => n.deletedAt !== null).length, [nodes]);
+  const [trashOpen, setTrashOpen] = useState(false);
   const treeRef = useRef<TreeApi<TreeItem> | null>(null);
   const [initialOpen] = useState(() => initialOpenState(bookId, nodes));
   const { ref: boxRef, width, height } = useElementSize<HTMLDivElement>();
@@ -177,7 +180,27 @@ export function Sidebar({ bookId, nodes, structure, selectedId, warnings }: Side
               </Tree>
             ) : null}
           </div>
-          <div className={styles.sidebarFooter}>{words.toLocaleString()} words</div>
+          <div className={styles.sidebarFooter}>
+            <span>{words.toLocaleString()} words</span>
+            <button
+              type="button"
+              className={styles.trashButton}
+              onClick={() => setTrashOpen(true)}
+              aria-label={trashed > 0 ? `Trash (${trashed})` : 'Trash'}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+              Trash
+              {trashed > 0 ? <span data-testid="trash-count">{trashed}</span> : null}
+            </button>
+          </div>
+          {trashOpen ? (
+            <TrashDialog
+              nodes={nodes}
+              structure={structure}
+              onRestore={actions.restore}
+              onClose={() => setTrashOpen(false)}
+            />
+          ) : null}
         </aside>
       </SectionWarningsContext.Provider>
     </SidebarContext.Provider>

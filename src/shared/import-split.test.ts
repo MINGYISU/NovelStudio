@@ -54,6 +54,34 @@ describe('splitImport: Chinese headings (PRD scenario 15)', () => {
     expect(plan.sections).toHaveLength(1);
     expect(plan.sections[0]?.plainText).toBe(long);
   });
+
+  it.each([
+    ['第一章', 'chapter', ''],
+    ['第一章 重逢', 'chapter', '重逢'],
+    ['第十二章：风起', 'chapter', '风起'],
+    ['第三章重逢', 'chapter', '重逢'],
+    ['第一卷 少年', 'volume', '少年'],
+    ['第五章　归来', 'chapter', '归来'],
+    ['第二章 “你好”', 'chapter', '“你好”'],
+    ['第七回 林黛玉进贾府，宝玉初见', 'chapter', '林黛玉进贾府，宝玉初见'],
+  ])('treats %s as a heading', (line, kind, title) => {
+    const plan = splitImport(`${line}\n正文。`, txt);
+    expect(plan.detected).toBe(true);
+    expect(plan.sections.map((s) => [s.kind, s.title])).toEqual([[kind, title]]);
+  });
+
+  it.each([
+    '第二节课下课后，她走出教室。',
+    '第二部手机响了。',
+    '第一次见面时，他笑了。',
+    '第三章节的内容很多，大家都看不完',
+    '第二部电影真好看！',
+    '第一章就这样结束了？”',
+  ])('does not treat the sentence %s as a heading', (line) => {
+    const plan = splitImport(`第一章 开始\n${line}\n第二章 结束\n完。`, txt);
+    expect(plan.sections.map((s) => s.title)).toEqual(['开始', '结束']);
+    expect(plan.sections[0]?.plainText).toBe(line);
+  });
 });
 
 describe('splitImport: English headings', () => {

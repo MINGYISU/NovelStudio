@@ -63,6 +63,8 @@ npm run restore:cold -- <file>                                          # restor
 
 The command-line scripts use `./.data-dev` unless `NOVEL_DATA_DIR` is set. For your real data run them with `NODE_ENV=production`, for example `NODE_ENV=production npm run backup:cold`. A backup can also be restored from the library: **New → Import cold backup**.
 
+While a database backup restore is waiting for the next start (Settings → **Automatic database backups**), `restore:cold` and `seed:dev` refuse to run: restart NovelStudio (or cancel the restore in Settings) first. `backup:cold` still runs, and backs up the current database, not the one that will be restored.
+
 ## Where your data lives
 
 | What | Where |

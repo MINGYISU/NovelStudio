@@ -844,6 +844,55 @@ describe('restore validation and safety', () => {
     expect(JSON.parse(restoredNodes[0]!.content).type).toBe('doc');
   });
 
+  it('restores a section and a snapshot with 6 nested quotes with their formatting (ED-02)', async () => {
+    const { book } = await buildRichBook();
+    const doc = readDoc(
+      service().exportBook(book.id, { dir: backupDir, includeSnapshots: true }).file,
+    );
+    let quote: Record<string, unknown> = {
+      type: 'blockquote',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'deepest', marks: [{ type: 'bold' }] }],
+        },
+      ],
+    };
+    for (let i = 0; i < 5; i++) quote = { type: 'blockquote', content: [quote] };
+    const nested = { type: 'doc', content: [quote] };
+    const ch1 = doc.manuscript[0]!.children[0]!.children[0]!;
+    ch1.content = nested;
+    doc.snapshots![0]!.content = nested;
+    const flat = {
+      type: 'doc',
+      content: [
+        {
+          type: 'blockquote',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'deepest', marks: [{ type: 'bold' }] }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = restore(doc);
+    expect(result.warnings.join(' ')).not.toContain('rebuilt from plain text');
+    expect(result.warnings.join(' ')).not.toContain('snapshot could not be restored');
+    const row = h.store.db
+      .prepare('SELECT id, content FROM nodes WHERE book_id = ? AND title = ?')
+      .get(result.book.id, ch1.title) as { id: string; content: string };
+    expect(JSON.parse(row.content)).toEqual(flat);
+    const snaps = h.store.db
+      .prepare(
+        'SELECT s.content FROM snapshots s JOIN nodes n ON n.id = s.node_id WHERE n.book_id = ?',
+      )
+      .all(result.book.id) as { content: string }[];
+    expect(snaps.map((s) => JSON.parse(s.content))).toContainEqual(flat);
+  });
+
   it('skips images that are not real PNG/JPEG/WebP/GIF files (an SVG is refused)', async () => {
     const doc = await exportedDoc();
     for (const asset of doc.assets) {
@@ -1026,8 +1075,9 @@ describe('codex (COLD-09, CDX-01..06)', () => {
     expect((await h.api('GET', `/api/books/${book.id}/codex`)).json()).toEqual(before);
   });
 
-  it('restores a backup made before the codex was used without inventing categories', async () => {
+  it('keeps a book with zero categories at zero through a round trip (CDX-01)', async () => {
     const book = await h.createBook('Plain');
+    h.store.db.prepare('DELETE FROM codex_categories WHERE book_id = ?').run(book.id);
     const doc = readDoc(service().exportBook(book.id, { dir: backupDir }).file);
     expect(doc.codex).toEqual({ categories: [], entries: [] });
     const result = restoreDoc(doc);
@@ -1213,6 +1263,15 @@ describe('story maps (COLD-09, MAP-01..08)', () => {
     expect(maps[0]!.data.nodes).toHaveLength(total);
     expect(maps[1]).toMatchObject({ template: 'blank', title: 'Scratch' });
     expect(maps[1]!.data.nodes).toEqual([]);
+  });
+
+  it('warns about map keys this version does not know (MAP-08)', async () => {
+    const doc = await exportedMapDoc();
+    const data = doc.maps[0]!.data as unknown as { nodes: Record<string, unknown>[] };
+    data.nodes[0]!['futureField'] = 1;
+    other = await new Harness().start();
+    const result = restoreDoc(doc, other);
+    expect(result.warnings.join(' ')).toContain('has data this version does not know: futureField');
   });
 
   it('rejects duplicate map ids inside one file and changes nothing', async () => {

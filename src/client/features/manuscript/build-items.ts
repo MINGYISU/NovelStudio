@@ -40,3 +40,33 @@ export function totalWords(nodes: readonly TreeNode[]): number {
 function branchWords(branch: TreeBranch<TreeNode>): number {
   return branch.children.reduce((sum, c) => sum + branchWords(c), branch.node.wordCount);
 }
+
+export interface TrashEntry {
+  node: TreeNode;
+  /** Sections that come back with this one: itself and its descendants not trashed on their own. */
+  sections: number;
+  words: number;
+}
+
+/** The book's trash list (TREE-08): every trashed section, newest first. */
+export function trashEntries(nodes: readonly TreeNode[]): TrashEntry[] {
+  const children = new Map<string, TreeNode[]>();
+  for (const n of nodes) {
+    if (n.parentId === null) continue;
+    const list = children.get(n.parentId) ?? [];
+    list.push(n);
+    children.set(n.parentId, list);
+  }
+  const measure = (node: TreeNode): { sections: number; words: number } =>
+    (children.get(node.id) ?? [])
+      .filter((c) => c.deletedAt === null)
+      .map(measure)
+      .reduce((a, b) => ({ sections: a.sections + b.sections, words: a.words + b.words }), {
+        sections: 1,
+        words: node.wordCount,
+      });
+  return nodes
+    .filter((n) => n.deletedAt !== null)
+    .map((node) => ({ node, ...measure(node) }))
+    .sort((a, b) => (b.node.deletedAt ?? '').localeCompare(a.node.deletedAt ?? ''));
+}

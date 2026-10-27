@@ -1,10 +1,10 @@
 import { Search } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { searchEntries } from '../../../shared/codex.ts';
 import type { CodexCategory, CodexEntry } from '../../../shared/schemas/codex.ts';
 import { useCodex, useSeedCodex } from '../../api/codex.ts';
-import { uiStyles } from '../../components/ui.tsx';
+import { Button, uiStyles } from '../../components/ui.tsx';
 import { CategoryList } from './CategoryList.tsx';
 import styles from './codex.module.css';
 import { EntryCard } from './EntryCard.tsx';
@@ -28,17 +28,8 @@ export function CodexView({ bookId, entryId }: CodexViewProps) {
   const [categoryId, setCategoryId] = useState<string | undefined>();
   const [openedEntryId, setOpenedEntryId] = useState<string | undefined>();
   const [query, setQuery] = useState('');
-  const seeded = useRef(false);
 
   const data = codex.data;
-  // CDX-01: a book without categories (an older book, or a new one) gets the defaults once.
-  useEffect(() => {
-    if (!data || data.categories.length > 0 || seeded.current) return;
-    seeded.current = true;
-    seed.mutate(undefined, {
-      onError: reportCodexError('The default categories were not created.'),
-    });
-  }, [data, seed]);
 
   const categories = data?.categories ?? NONE;
   const entries = data?.entries ?? NONE_ENTRIES;
@@ -139,9 +130,24 @@ export function CodexView({ bookId, entryId }: CodexViewProps) {
           />
         ) : (
           <div className={styles.scroll}>
-            <p className={styles.empty}>
-              {seed.isPending ? 'Setting up the default categories…' : 'Add a category to begin.'}
-            </p>
+            {categories.length === 0 ? (
+              // CDX-01: defaults come with a new book; an empty Codex stays empty until asked.
+              <div className={styles.empty}>
+                <p>This book has no Codex categories. Add one, or start from the defaults.</p>
+                <Button
+                  disabled={seed.isPending}
+                  onClick={() =>
+                    seed.mutate(undefined, {
+                      onError: reportCodexError('The default categories were not created.'),
+                    })
+                  }
+                >
+                  Add default categories
+                </Button>
+              </div>
+            ) : (
+              <p className={styles.empty}>Add a category to begin.</p>
+            )}
           </div>
         )}
       </section>

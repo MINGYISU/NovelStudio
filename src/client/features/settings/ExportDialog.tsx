@@ -11,6 +11,7 @@ import type {
   ExportAllResponse,
   ExportResult,
 } from '../../../shared/schemas/cold-backup-settings.ts';
+import { useExportGuard } from './export-guard.tsx';
 import styles from './settings.module.css';
 
 export type ExportScope = { kind: 'book'; bookId: string; title: string } | { kind: 'all' };
@@ -42,6 +43,7 @@ export function ExportDialog({ scope, onClose }: { scope: ExportScope; onClose: 
   const [dir, setDir] = useState('');
   const [snapshots, setSnapshots] = useState<boolean | null>(null);
   const [pickerError, setPickerError] = useState<string | null>(null);
+  const { guard, element: exportGuard } = useExportGuard();
 
   const saved = settings.data?.settings;
   const includeSnapshots = snapshots ?? saved?.includeSnapshots ?? false;
@@ -53,8 +55,11 @@ export function ExportDialog({ scope, onClose }: { scope: ExportScope; onClose: 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const body = { dir: useOneOff ? dir.trim() : undefined, includeSnapshots };
-    if (scope.kind === 'book') exportBook.mutate({ bookId: scope.bookId, ...body });
-    else exportAll.mutate(body);
+    // The backup is read from the server, so text and maps still being saved go first.
+    guard(true, () => {
+      if (scope.kind === 'book') exportBook.mutate({ bookId: scope.bookId, ...body });
+      else exportAll.mutate(body);
+    });
   };
 
   const pick = async () => {
@@ -149,6 +154,7 @@ export function ExportDialog({ scope, onClose }: { scope: ExportScope; onClose: 
           </Button>
         </div>
       </form>
+      {exportGuard}
     </Dialog>
   );
 }

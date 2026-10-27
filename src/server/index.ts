@@ -18,6 +18,7 @@ async function main(): Promise<void> {
   const port = parsePort(process.env.PORT, 4317);
 
   const store = openDataStore({
+    applyPendingRestore: true,
     log: (msg, err) => console.error(msg, err),
   });
   console.log(`Data directory: ${store.paths.dataDir}`);

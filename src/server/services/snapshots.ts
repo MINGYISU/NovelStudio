@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { extractAnchorIds } from '../../shared/foreshadow-anchors.ts';
 import { docToPlainText } from '../../shared/prosemirror-text.ts';
+import { normalizeContent } from '../../shared/content-normalize.ts';
 import { contentSchema } from '../../shared/schemas/content.ts';
 import type { NodeContent } from '../../shared/schemas/node.ts';
 import {
@@ -33,7 +34,7 @@ const EXCERPT_LENGTH = 160;
 
 function plainTextOf(content: string): string {
   try {
-    const parsed = contentSchema.safeParse(JSON.parse(content));
+    const parsed = contentSchema.safeParse(normalizeContent(JSON.parse(content)));
     return parsed.success ? docToPlainText(parsed.data) : '';
   } catch {
     return '';
@@ -111,7 +112,7 @@ export class SnapshotService {
 
       let doc;
       try {
-        doc = contentSchema.parse(JSON.parse(snapshot.content));
+        doc = contentSchema.parse(normalizeContent(JSON.parse(snapshot.content)));
       } catch {
         throw new ApiError(409, 'SNAPSHOT_INVALID', 'This snapshot cannot be restored.');
       }

@@ -121,6 +121,36 @@ describe('PUT /api/nodes/:id/content (ED-05, ED-07)', () => {
     expect(await get(node.id)).toMatchObject({ rev: 0 });
   });
 
+  it('flattens 6 nested quotes instead of refusing the save (ED-02)', async () => {
+    const { node } = await setup();
+    let quote: Record<string, unknown> = {
+      type: 'blockquote',
+      content: [paragraphs('deep').content![0]],
+    };
+    for (let i = 0; i < 5; i++) {
+      quote = { type: 'blockquote', content: [paragraphs(`level ${5 - i}`).content![0], quote] };
+    }
+    const res = await h.api('PUT', `/api/nodes/${node.id}/content`, {
+      content: { type: 'doc', content: [quote] },
+      rev: 0,
+    });
+    expect(res.statusCode).toBe(200);
+    const stored = (await get(node.id)).content;
+    expect(stored).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'blockquote',
+          content: paragraphs('level 1', 'level 2', 'level 3', 'level 4', 'level 5', 'deep')
+            .content,
+        },
+      ],
+    });
+    expect(getNodeContentRow(h.store.db, node.id)!.plainText).toBe(
+      'level 1\n\nlevel 2\n\nlevel 3\n\nlevel 4\n\nlevel 5\n\ndeep',
+    );
+  });
+
   it('rejects a missing rev and a negative rev', async () => {
     const { node } = await setup();
     const doc = paragraphs('x');

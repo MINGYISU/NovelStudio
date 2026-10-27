@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createHotBackup } from '../services/hot-backup.ts';
+import { requestHotRestore } from '../services/hot-backup-restore.ts';
 import { Harness, paragraphs } from '../test-support.ts';
 
 const SCRIPTS = import.meta.dirname;
@@ -78,4 +80,53 @@ describe('cold backup CLI (COLD-07)', () => {
     expect(result.out).toContain('Refusing to start');
     expect(fs.existsSync(realish)).toBe(false);
   }, 60_000);
+});
+
+describe('scripts while a hot backup restore is pending (HOT-02)', () => {
+  async function exportOne(): Promise<string> {
+    const book = await h.createBook('Pending Novel');
+    const exported = run('cold-backup.ts', ['--book', book.id, '--out', out]);
+    expect(exported.code, exported.out).toBe(0);
+    const folder = path.join(out, fs.readdirSync(out)[0]!);
+    return path.join(
+      folder,
+      fs.readdirSync(folder).find((n) => n.endsWith('.json'))!,
+    );
+  }
+  function stage(): void {
+    const name = path.basename(createHotBackup(h.store.db, h.store.paths.backupsDir));
+    requestHotRestore(h.store.db, h.store.paths, name);
+  }
+  const bookCount = () =>
+    (h.store.db.prepare('SELECT COUNT(*) AS n FROM books').get() as { n: number }).n;
+
+  it('restore:cold refuses with exit code 1 and inserts nothing', async () => {
+    const file = await exportOne();
+    stage();
+    const before = bookCount();
+    const refused = run('restore-cold.ts', [file]);
+    expect(refused.code, refused.out).toBe(1);
+    expect(refused.out).toContain('A hot backup restore is waiting for the next start.');
+    expect(bookCount()).toBe(before);
+    expect(fs.existsSync(path.join(h.dataDir, 'pending-restore.json'))).toBe(true);
+  });
+
+  it('seed:dev refuses with exit code 1', () => {
+    stage();
+    const refused = run('seed-dev.ts', []);
+    expect(refused.code, refused.out).toBe(1);
+    expect(refused.out).toContain('Restart NovelStudio (or cancel the restore in Settings) first.');
+    expect(bookCount()).toBe(0);
+  });
+
+  it('backup:cold still runs and says what it backs up', async () => {
+    await h.createBook('Still Backed Up');
+    stage();
+    const exported = run('cold-backup.ts', ['--out', out]);
+    expect(exported.code, exported.out).toBe(0);
+    expect(exported.out).toContain(
+      'backs up the current database, not the one that will be restored',
+    );
+    expect(fs.existsSync(path.join(h.dataDir, 'pending-restore.json'))).toBe(true);
+  });
 });

@@ -55,6 +55,11 @@ export class SectionSaver {
   rev: number;
   state: SaveState = 'saved';
   error: string | null = null;
+  /**
+   * The server refused the last save and retrying the same request will not help (ED-12). The
+   * state stays `error` while the user keeps typing, until a later save succeeds.
+   */
+  rejected = false;
 
   private pending: ContentDoc | null = null;
   private timer: unknown = null;
@@ -88,7 +93,7 @@ export class SectionSaver {
   update(content: ContentDoc): void {
     this.pending = content;
     if (this.state === 'stale') return;
-    this.setState(this.inflight ? 'saving' : 'dirty');
+    if (!this.rejected) this.setState(this.inflight ? 'saving' : 'dirty');
     this.schedule(this.debounceMs);
   }
 
@@ -107,6 +112,7 @@ export class SectionSaver {
     this.rev = rev;
     this.pending = null;
     this.error = null;
+    this.rejected = false;
     this.setState('saved');
   }
 
@@ -120,13 +126,17 @@ export class SectionSaver {
       while (this.pending && this.flushing && this.state !== 'stale') {
         const content = this.pending;
         this.pending = null;
-        this.setState('saving');
+        if (!this.rejected) this.setState('saving');
         try {
           const result = await this.deps.transport.save(this.nodeId, content, this.rev, {
             keepalive: this.keepalive,
           });
           this.rev = result.rev;
           this.error = null;
+          if (this.rejected) {
+            this.rejected = false;
+            this.setState('saving');
+          }
           this.deps.onSaved?.(this.nodeId, result);
         } catch (err) {
           this.pending = this.pending ?? content;
@@ -136,6 +146,9 @@ export class SectionSaver {
           if (failure.kind === 'stale') {
             this.setState('stale');
           } else {
+            this.rejected = !failure.retryable;
+            // The banner shows the newest message, also when the state was already `error`.
+            if (this.state === 'error') this.deps.onChange?.();
             this.setState('error');
             if (failure.retryable) this.schedule(this.retryMs);
           }
@@ -175,7 +188,10 @@ export class SectionSaver {
 }
 
 export type OverallStatus =
-  { kind: 'saved' } | { kind: 'saving' } | { kind: 'error'; message: string } | { kind: 'stale' };
+  | { kind: 'saved' }
+  | { kind: 'saving' }
+  | { kind: 'error'; message: string; retrying: boolean }
+  | { kind: 'stale' };
 
 /** One saver per section, so text typed in a section stays safe while the user is in another. */
 export class SaverRegistry {
@@ -184,6 +200,10 @@ export class SaverRegistry {
   private readonly savedListeners = new Set<(nodeId: string, result: SaveResult) => void>();
 
   constructor(private readonly base: Omit<SaverDeps, 'onChange' | 'onSaved'>) {}
+
+  all(): SectionSaver[] {
+    return [...this.savers.values()];
+  }
 
   get(nodeId: string): SectionSaver | undefined {
     return this.savers.get(nodeId);
@@ -217,12 +237,16 @@ export class SaverRegistry {
   status(): OverallStatus {
     let saving = false;
     let error: string | null = null;
+    let retrying = true;
     for (const saver of this.savers.values()) {
       if (saver.state === 'stale') return { kind: 'stale' };
-      if (saver.state === 'error') error = saver.error ?? 'The text could not be saved.';
+      if (saver.state === 'error') {
+        error = saver.error ?? 'The text could not be saved.';
+        if (saver.rejected) retrying = false;
+      }
       if (saver.state === 'saving' || saver.state === 'dirty') saving = true;
     }
-    if (error !== null) return { kind: 'error', message: error };
+    if (error !== null) return { kind: 'error', message: error, retrying };
     return saving ? { kind: 'saving' } : { kind: 'saved' };
   }
 

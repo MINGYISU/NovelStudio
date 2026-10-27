@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptyMapData, type MapData } from '../../../shared/schemas/map.ts';
-import { MapSaver, type MapSaveTransport } from './map-saver.ts';
+import { mapSavers, MapSaver, trackMapSaver, type MapSaveTransport } from './map-saver.ts';
 
 const withTitle = (title: string): MapData => ({
   ...emptyMapData(),
@@ -135,5 +135,35 @@ describe('MapSaver', () => {
     saver.dispose();
     await settle();
     expect(calls.map((c) => c.title)).toEqual(['late']);
+  });
+});
+
+describe('trackMapSaver / mapSavers (ED-12)', () => {
+  it('lists an open map, and a closed one until its data is saved', async () => {
+    const { calls, transport } = manualTransport();
+    const saver = new MapSaver('tracked', { transport });
+    const release = trackMapSaver(saver);
+    expect(mapSavers()).toContain(saver);
+
+    saver.update(withTitle('x'));
+    release();
+    expect(mapSavers()).toContain(saver);
+    void saver.flush();
+    await settle();
+    calls[0]!.resolve();
+    await settle();
+    expect(mapSavers()).not.toContain(saver);
+  });
+
+  it('keeps a remounted map listed when the old release arrives late (StrictMode)', () => {
+    const { transport } = manualTransport();
+    const saver = new MapSaver('remounted', { transport });
+    const first = trackMapSaver(saver);
+    const second = trackMapSaver(saver);
+    first();
+    first();
+    expect(mapSavers()).toContain(saver);
+    second();
+    expect(mapSavers()).not.toContain(saver);
   });
 });

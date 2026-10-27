@@ -6,6 +6,8 @@ import {
   type CodexField,
   type CodexFieldDef,
 } from '../../shared/schemas/codex.ts';
+import crypto from 'node:crypto';
+import { DEFAULT_CATEGORIES } from '../../shared/codex.ts';
 import type { Db } from '../db/connection.ts';
 
 interface RawCategory {
@@ -108,6 +110,19 @@ export function insertCategory(db: Db, category: CodexCategory): void {
     category.name,
     category.position,
     JSON.stringify(category.fieldTemplate),
+  );
+}
+
+/** CDX-01: the eight default categories, appended in order. Call inside the caller's transaction. */
+export function insertDefaultCategories(db: Db, bookId: string): void {
+  DEFAULT_CATEGORIES.forEach((def, position) =>
+    insertCategory(db, {
+      id: crypto.randomUUID(),
+      bookId,
+      name: def.name,
+      position,
+      fieldTemplate: def.fieldTemplate.map((f) => ({ ...f })),
+    }),
   );
 }
 
