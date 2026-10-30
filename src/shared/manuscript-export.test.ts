@@ -112,4 +112,39 @@ describe('renderManuscript', () => {
     );
     expect(out).toBe('T\n\n\nA\n\nOne.\n\nTwo.\n');
   });
+  describe('images (IMG-11)', () => {
+    const img = (caption: string): ContentNode => ({
+      type: 'image',
+      attrs: { assetId: '11111111-1111-4111-8111-111111111111', size: 'medium', caption },
+    });
+    const withImages: ExportSection[] = [
+      {
+        depth: 0,
+        displayTitle: 'Ch',
+        doc: doc(
+          para({ text: 'Before.' }),
+          img('The [harbour] *at* dawn'),
+          img(''),
+          para({ text: 'After.' }),
+        ),
+        plainText: '',
+      },
+    ];
+
+    it('writes each image as its own line in English', () => {
+      const md = renderManuscript({ title: 'T', author: '' }, withImages, 'md');
+      expect(md).toContain(
+        'Before.\n\n[Image: The \\[harbour\\] \\*at\\* dawn]\n\n[Image]\n\nAfter.',
+      );
+      const txt = renderManuscript({ title: 'T', author: '' }, withImages, 'txt');
+      expect(txt).toContain('Before.\n\n[Image: The [harbour] *at* dawn]\n\n[Image]\n\nAfter.');
+    });
+
+    it('uses the export language', () => {
+      const txt = renderManuscript({ title: 'T', author: '' }, withImages, 'txt', 'zh-CN');
+      expect(txt).toContain('[插图：The [harbour] *at* dawn]\n\n[插图]');
+      const md = renderManuscript({ title: 'T', author: '' }, withImages, 'md', 'zh-CN');
+      expect(md).toContain('[插图]');
+    });
+  });
 });

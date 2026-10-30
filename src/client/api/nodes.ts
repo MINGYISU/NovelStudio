@@ -10,6 +10,8 @@ import {
 import { applyMove } from '../../shared/tree.ts';
 import type { TreeNode } from '../../shared/types.ts';
 import { currentLocale } from '../i18n/index.ts';
+import { assetsKey } from './assets.ts';
+import { fetchNodeContent } from './content.ts';
 import { apiRequest } from './http.ts';
 
 export const treeKey = (bookId: string) => ['tree', bookId] as const;
@@ -157,4 +159,41 @@ export function useTrashNode(bookId: string) {
 
 export function useRestoreNode(bookId: string) {
   return useTreeReplacingMutation(bookId, (id) => `/api/nodes/${id}/restore`, 'POST');
+}
+
+export const nodeHeaderKey = (nodeId: string) => ['node-header', nodeId] as const;
+
+export interface NodeHeader {
+  headerAssetId: string | null;
+  headerImageUrl: string | null;
+}
+
+/** The header image of a section (IMG-20); the tree does not carry it. */
+export function useNodeHeader(nodeId: string) {
+  return useQuery({
+    queryKey: nodeHeaderKey(nodeId),
+    queryFn: async ({ signal }): Promise<NodeHeader> => {
+      const node = await fetchNodeContent(nodeId, signal);
+      return { headerAssetId: node.headerAssetId, headerImageUrl: node.headerImageUrl };
+    },
+  });
+}
+
+/** Sets (an image of this book) or removes (`null`) the header image of a section (IMG-21). */
+export function useSetHeaderImage(bookId: string, nodeId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (headerAssetId: string | null) => {
+      await apiRequest(`/api/nodes/${nodeId}`, { method: 'PATCH', json: { headerAssetId } });
+      return headerAssetId;
+    },
+    onSuccess: (headerAssetId) => {
+      client.setQueryData<NodeHeader>(nodeHeaderKey(nodeId), {
+        headerAssetId,
+        headerImageUrl: headerAssetId ? `/assets/${bookId}/${headerAssetId}` : null,
+      });
+      // A replaced header file may have been deleted with its row.
+      void client.invalidateQueries({ queryKey: assetsKey(bookId) });
+    },
+  });
 }

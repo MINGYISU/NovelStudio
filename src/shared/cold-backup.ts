@@ -9,9 +9,13 @@ export const COLD_BACKUP_README = [
   "- 'trash' holds deleted-but-recoverable sections; 'codex' holds characters and worldbuilding;",
   "  'maps' holds story diagrams; 'foreshadows' holds setup/payoff threads.",
   "- Images are in 'assets' as base64 ('dataBase64').",
+  "  Sections refer to images by 'assetId' ('image' nodes in 'content') and 'headerAssetId'.",
   '- Restore with NovelStudio: Library > New > Import, or `npm run restore:cold -- <this file>`.',
   '- Format specification: docs/COLD_BACKUP_FORMAT.md in the NovelStudio repository.',
 ].join('\n');
+
+/** A cold backup is one JSON file, so a book's image files have a ceiling (IMG-14). */
+export const COLD_BACKUP_MAX_IMAGE_BYTES = 300 * 1024 * 1024;
 
 export function walkSections(
   sections: readonly ColdSection[],

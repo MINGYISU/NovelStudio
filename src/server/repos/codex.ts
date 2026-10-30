@@ -238,17 +238,54 @@ export function setEntryPositions(db: Db, orderedIds: readonly string[]): void {
   orderedIds.forEach((id, index) => stmt.run(index, id));
 }
 
-/** True when an entry, the book cover or a book's background image still uses the asset, so the file must stay. */
+/** True when stored section or snapshot text holds an `image` node for the asset. */
+function textMentionsAsset(db: Db, assetId: string): boolean {
+  const rows = [
+    ...(db.prepare('SELECT content FROM nodes WHERE instr(content, ?) > 0').all(assetId) as {
+      content: string;
+    }[]),
+    ...(db.prepare('SELECT content FROM snapshots WHERE instr(content, ?) > 0').all(assetId) as {
+      content: string;
+    }[]),
+  ];
+  return rows.some(({ content }) => {
+    try {
+      return hasImage(JSON.parse(content), assetId);
+    } catch {
+      // Unreadable text that still names the asset: keep the file rather than risk losing it.
+      return true;
+    }
+  });
+}
+
+function hasImage(node: unknown, assetId: string): boolean {
+  if (typeof node !== 'object' || node === null) return false;
+  const { type, attrs, content } = node as {
+    type?: unknown;
+    attrs?: { assetId?: unknown } | null;
+    content?: unknown;
+  };
+  if (type === 'image' && attrs?.assetId === assetId) return true;
+  return Array.isArray(content) && content.some((child) => hasImage(child, assetId));
+}
+
+/**
+ * True when anything still uses the asset, so the file must stay (IMG-07): a codex entry, the book
+ * cover or background, a section header image, or an image in any section (trashed ones included)
+ * or snapshot.
+ */
 export function isAssetInUse(db: Db, assetId: string): boolean {
   return (
     db.prepare('SELECT 1 FROM codex_entries WHERE image_asset_id = ?').get(assetId) !== undefined ||
     db.prepare('SELECT 1 FROM books WHERE cover_asset_id = ?').get(assetId) !== undefined ||
+    db.prepare('SELECT 1 FROM nodes WHERE header_asset_id = ?').get(assetId) !== undefined ||
     db
       .prepare(
         `SELECT 1 FROM books
           WHERE CASE WHEN json_valid(settings)
                      THEN json_extract(settings, '$.display.backgroundImageAssetId') END = ?`,
       )
-      .get(assetId) !== undefined
+      .get(assetId) !== undefined ||
+    textMentionsAsset(db, assetId)
   );
 }

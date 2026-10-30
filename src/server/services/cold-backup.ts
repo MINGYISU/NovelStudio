@@ -7,9 +7,11 @@ import {
   bookFolderName,
   bookFolderSuffix,
   CHECKSUM_SUFFIX,
+  COLD_BACKUP_MAX_IMAGE_BYTES,
   COLD_BACKUP_README,
   computeStats,
 } from '../../shared/cold-backup.ts';
+import { formatBytes } from '../../shared/image-sizing.ts';
 import { computeDisplayTitles, UNTITLED } from '../../shared/numbering.ts';
 import type { AutoDailyLast } from '../../shared/schemas/config.ts';
 import type {
@@ -66,6 +68,16 @@ export interface ColdBackupContext extends LocationContext {
   db: Db;
   paths: DataPaths;
   now?: () => Date;
+  /** Ceiling for a book's image files (IMG-14); tests lower it. */
+  maxImageBytes?: number;
+}
+
+function tooLarge(title: string, imageBytes: number): ApiError {
+  return new ApiError(
+    413,
+    'COLD_BACKUP_TOO_LARGE',
+    `The images of "${title}" total ${formatBytes(imageBytes)}, which is too much for a single cold backup file. Nothing was written. Remove some images or use the hot backup instead.`,
+  );
 }
 
 export interface ExportOptions {
@@ -124,6 +136,11 @@ export function buildColdBackup(
     };
   })();
 
+  const imageBytes = loaded.assets.reduce((sum, a) => sum + a.bytes, 0);
+  if (imageBytes > (ctx.maxImageBytes ?? COLD_BACKUP_MAX_IMAGE_BYTES)) {
+    throw tooLarge(loaded.book.title, imageBytes);
+  }
+
   const warnings: string[] = [];
   const structure = parseStructure(loaded.book.settings);
   const titles = computeDisplayTitles(loaded.nodes, structure);
@@ -153,6 +170,7 @@ export function buildColdBackup(
       wordCount: node.wordCount,
       plainText: node.plainText,
       content,
+      headerAssetId: node.headerAssetId,
       rev: node.rev,
       createdAt: node.createdAt,
       updatedAt: node.updatedAt,
@@ -363,8 +381,12 @@ export function verifyColdBackup(file: string): VerifyResult {
   let json: unknown;
   try {
     json = JSON.parse(bytes.toString('utf8'));
-  } catch {
-    problems.push('The file is not valid JSON.');
+  } catch (err) {
+    problems.push(
+      err instanceof RangeError
+        ? 'The file is too large to read in one piece (too many or too large images).'
+        : 'The file is not valid JSON.',
+    );
   }
   if (json !== undefined) {
     const header = json as { format?: unknown; formatVersion?: unknown } | null;
@@ -620,7 +642,17 @@ export class ColdBackupService {
       includeSnapshots: options.includeSnapshots ?? config.includeSnapshots,
       now,
     });
-    const bytes = Buffer.from(JSON.stringify(doc, null, 2) + '\n', 'utf8');
+    const bytes = (() => {
+      try {
+        return Buffer.from(JSON.stringify(doc, null, 2) + '\n', 'utf8');
+      } catch (err) {
+        if (!(err instanceof RangeError)) throw err;
+        throw tooLarge(
+          doc.book.title,
+          doc.assets.reduce((sum, a) => sum + a.bytes, 0),
+        );
+      }
+    })();
     const hash = sha256Hex(bytes);
 
     const createdDirs: string[] = [];

@@ -130,6 +130,12 @@ describe('displaySettingsSchema', () => {
     expect(displaySettingsSchema.safeParse({ theme: 'neon' }).success).toBe(false);
   });
 
+  it('shows images unless told otherwise (IMG-12)', () => {
+    expect(displaySettingsSchema.parse({}).showImages).toBe(true);
+    expect(displaySettingsSchema.parse({ showImages: false }).showImages).toBe(false);
+    expect(DEFAULT_DISPLAY.showImages).toBe(true);
+  });
+
   it('accepts the sepia theme, paragraph spacing and background options (DISP-02)', () => {
     expect(displaySettingsSchema.parse({ theme: 'sepia' }).theme).toBe('sepia');
     expect(DEFAULT_DISPLAY).toMatchObject({
@@ -149,5 +155,33 @@ describe('displaySettingsSchema', () => {
     ]) {
       expect(displaySettingsSchema.safeParse(bad).success).toBe(false);
     }
+  });
+});
+
+describe('contentSchema images', () => {
+  const image = {
+    type: 'image',
+    attrs: { assetId: '11111111-1111-4111-8111-111111111111', size: 'medium', caption: '' },
+  };
+
+  it('accepts a top-level image', () => {
+    expect(contentSchema.safeParse({ type: 'doc', content: [image] }).success).toBe(true);
+  });
+
+  it.each([
+    ['inside a paragraph', { type: 'doc', content: [{ type: 'paragraph', content: [image] }] }],
+    ['inside a quote', { type: 'doc', content: [{ type: 'blockquote', content: [image] }] }],
+    [
+      'with a bad size',
+      { type: 'doc', content: [{ ...image, attrs: { ...image.attrs, size: 'x' } }] },
+    ],
+    [
+      'with a long caption',
+      { type: 'doc', content: [{ ...image, attrs: { ...image.attrs, caption: 'x'.repeat(301) } }] },
+    ],
+    ['with children', { type: 'doc', content: [{ ...image, content: [{ type: 'hardBreak' }] }] }],
+    ['without attributes', { type: 'doc', content: [{ type: 'image' }] }],
+  ])('rejects an image %s', (_name, doc) => {
+    expect(contentSchema.safeParse(doc).success).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ import * as codex from './messages/codex.ts';
 import * as common from './messages/common.ts';
 import * as editor from './messages/editor.ts';
 import * as foreshadow from './messages/foreshadow.ts';
+import * as images from './messages/images.ts';
 import * as library from './messages/library.ts';
 import * as maps from './messages/maps.ts';
 import * as settings from './messages/settings.ts';
@@ -17,4 +18,5 @@ export const MESSAGE_AREAS = {
   codex,
   maps,
   foreshadow,
+  images,
 };

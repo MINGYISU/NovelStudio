@@ -12,6 +12,8 @@ function blockTexts(node: ContentNode): string[] {
   switch (node.type) {
     case 'horizontalRule':
       return [SCENE_BREAK];
+    case 'image':
+      return [];
     case 'blockquote':
       return (node.content ?? []).flatMap(blockTexts);
     case 'doc':

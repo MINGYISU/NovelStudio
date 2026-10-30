@@ -82,3 +82,84 @@ describe('normalizeContent', () => {
     expect(normalizeContent(odd)).toBe(odd);
   });
 });
+
+describe('normalizeContent images (IMG-02, IMG-07)', () => {
+  const A = '11111111-1111-4111-8111-111111111111';
+  const B = '22222222-2222-4222-8222-222222222222';
+  const image = (assetId: string, caption = ''): ContentNode => ({
+    type: 'image',
+    attrs: { assetId, size: 'medium', caption },
+  });
+
+  it('lifts images out of nested quotes to just after the top-level block, in order', () => {
+    const doc: ContentDoc = {
+      type: 'doc',
+      content: [
+        para('Intro'),
+        {
+          type: 'blockquote',
+          content: [para('a'), image(A), { type: 'blockquote', content: [image(B), para('b')] }],
+        },
+        para('End'),
+      ],
+    };
+    const result = normalizeContent(doc);
+    expect(result.content?.map((n) => n.type)).toEqual([
+      'paragraph',
+      'blockquote',
+      'image',
+      'image',
+      'paragraph',
+    ]);
+    expect(result.content?.[2]?.attrs?.assetId).toBe(A);
+    expect(result.content?.[3]?.attrs?.assetId).toBe(B);
+    expect(docToPlainText(result)).toBe(docToPlainText(doc));
+    expect(contentSchema.safeParse(result).success).toBe(true);
+  });
+
+  it('keeps a quote that held only an image valid', () => {
+    const doc = { type: 'doc', content: [{ type: 'blockquote', content: [image(A)] }] };
+    const result = normalizeContent(doc);
+    expect(result.content).toEqual([
+      { type: 'blockquote', content: [{ type: 'paragraph' }] },
+      image(A),
+    ]);
+    expect(contentSchema.safeParse(result).success).toBe(true);
+  });
+
+  it('drops unknown attributes, fills defaults and truncates long captions', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        { type: 'image', attrs: { assetId: A, src: 'data:image/png;base64,AAAA', size: 'huge' } },
+        { type: 'image', attrs: { assetId: B, size: 'small', caption: 'x'.repeat(400) } },
+      ],
+    };
+    const result = normalizeContent(doc);
+    expect(result.content?.[0]).toEqual({
+      type: 'image',
+      attrs: { assetId: A, size: 'medium', caption: '' },
+    });
+    expect((result.content?.[1]?.attrs?.caption as string).length).toBe(300);
+    expect(contentSchema.safeParse(result).success).toBe(true);
+  });
+
+  it('does not split a surrogate pair when truncating', () => {
+    const doc = {
+      type: 'doc',
+      content: [image(A, 'x'.repeat(299) + '😀')],
+    };
+    const caption = normalizeContent(doc).content?.[0]?.attrs?.caption as string;
+    expect(caption).toBe('x'.repeat(299));
+  });
+
+  it('returns the same object when images are already clean', () => {
+    const doc: ContentDoc = { type: 'doc', content: [para('a'), image(A, 'hi'), para('b')] };
+    expect(normalizeContent(doc)).toBe(doc);
+  });
+
+  it('leaves an invalid asset id as a validation error', () => {
+    const doc = normalizeContent({ type: 'doc', content: [image('not-a-uuid')] });
+    expect(contentSchema.safeParse(doc).success).toBe(false);
+  });
+});

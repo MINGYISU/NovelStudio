@@ -1,8 +1,9 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Book } from '../shared/schemas/book.ts';
+import type { ContentNode } from '../shared/schemas/content.ts';
 import type { ColdBackupDoc, ColdSection } from '../shared/schemas/cold-backup.ts';
 import type { ExportResult } from '../shared/schemas/cold-backup-settings.ts';
 import { COLD_BACKUP_README } from '../shared/cold-backup.ts';
@@ -179,16 +180,37 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
   const goneChild = await harness.createNode(book.id, 'scene', gone.id, 'Cut scene');
   const nested = await harness.createNode(book.id, 'scene', ch1.id, 'Trashed earlier');
 
-  const save = async (id: string, texts: string[]) => {
+  const uploadImage = async (fileName: string) => {
+    const form = multipartBody([{ name: 'file', filename: fileName, data: TINY_PNG }]);
+    const res = await harness.app.inject({
+      method: 'POST',
+      url: `/api/books/${book.id}/assets`,
+      ...form,
+    });
+    return res.json<{ id: string }>().id;
+  };
+  const illustration = await uploadImage('illustration.png');
+  const banner = await uploadImage('banner.png');
+  const imageNode = (assetId: string, caption: string) => ({
+    type: 'image' as const,
+    attrs: { assetId, size: 'small', caption },
+  });
+
+  const save = async (id: string, texts: string[], image?: ContentNode) => {
     const rev = (await harness.api('GET', `/api/nodes/${id}`)).json().node.rev as number;
-    const res = await harness.saveContent(id, paragraphs(...texts), rev);
+    const doc = paragraphs(...texts);
+    const res = await harness.saveContent(
+      id,
+      image ? { ...doc, content: [...(doc.content ?? []), image] } : doc,
+      rev,
+    );
     expect(res.statusCode).toBe(200);
   };
   await save(ch1.id, ['The rain had stopped.', '她没有抬头。']);
   await save(ch1.id, ['The rain had stopped.', '她没有抬头。', 'A third paragraph.']);
-  await save(scene.id, ['Drip.']);
+  await save(scene.id, ['Drip.'], imageNode(illustration, 'A lantern in the rain'));
   await save(prologue.id, ['Before everything.']);
-  await save(gone.id, ['Deleted words.']);
+  await save(gone.id, ['Deleted words.'], imageNode(banner, ''));
   await save(goneChild.id, ['Deleted scene words.']);
   await save(nested.id, ['Trashed first.']);
   const threads = await addForeshadows(harness, book.id, {
@@ -198,6 +220,13 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
     gone: gone.id,
     nested: nested.id,
   });
+  for (const [node, assetId] of [
+    [ch1.id, banner],
+    [goneChild.id, illustration],
+  ] as const) {
+    const res = await harness.api('PATCH', `/api/nodes/${node}`, { headerAssetId: assetId });
+    expect(res.statusCode).toBe(200);
+  }
   await harness.api('DELETE', `/api/nodes/${nested.id}`);
   await harness.api('DELETE', `/api/nodes/${gone.id}`);
 
@@ -217,6 +246,8 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
   const pin = harness.store.db.prepare('UPDATE assets SET created_at = ? WHERE id = ?');
   pin.run('2026-01-01T00:00:00.000Z', asset.id);
   pin.run('2026-01-02T00:00:00.000Z', background.id);
+  pin.run('2026-01-03T00:00:00.000Z', illustration);
+  pin.run('2026-01-04T00:00:00.000Z', banner);
   const patched = await harness.api('PATCH', `/api/books/${book.id}`, {
     coverAssetId: asset.id,
     author: 'Made Up',
@@ -257,6 +288,8 @@ async function buildRichBook(harness = h): Promise<{ book: Book; ids: Record<str
       nested: nested.id,
       asset: asset.id,
       background: background.id,
+      illustration,
+      banner,
     },
   };
 }
@@ -395,9 +428,9 @@ describe('export (COLD-02..04, EXP-02)', () => {
     expect(cut.children.map((c) => c.title)).toEqual(['Cut scene']);
     expect(doc.trash.find((t) => t.title === 'Trashed earlier')!.originalParentId).toBe(ids.ch1);
 
-    expect(doc.assets).toHaveLength(2);
+    expect(doc.assets).toHaveLength(4);
     expect(Buffer.from(doc.assets[0]!.dataBase64, 'base64').equals(TINY_PNG)).toBe(true);
-    expect(doc.stats).toMatchObject({ sections: 5, trashedSections: 3, assets: 2, snapshots: 0 });
+    expect(doc.stats).toMatchObject({ sections: 5, trashedSections: 3, assets: 4, snapshots: 0 });
   });
 
   it('reproduces the manuscript with the jq recipe of COLD_BACKUP_FORMAT §7', async () => {
@@ -1726,5 +1759,195 @@ describe('API', () => {
         .statusCode,
     ).toBe(400);
     expect((await h.api('POST', '/api/import/cold-backup', {})).statusCode).toBe(400);
+  });
+});
+
+describe('images and header images (COLD-09, IMG-14, IMG-23)', () => {
+  const imageIds = (node: unknown): string[] =>
+    ((node as { content?: ContentNode[] } | null)?.content ?? [])
+      .filter((n) => n.type === 'image')
+      .map((n) => n.attrs?.assetId as string);
+
+  async function exported(withSnapshots = false) {
+    const rich = await buildRichBook();
+    const result = service().exportBook(rich.book.id, {
+      dir: backupDir,
+      includeSnapshots: withSnapshots,
+    });
+    return { ...rich, result, doc: readDoc(result.file) };
+  }
+  const find = (doc: ColdBackupDoc, title: string): ColdSection => {
+    let found: ColdSection | undefined;
+    const visit = (s: ColdSection) => {
+      if (s.title === title) found = s;
+      s.children.forEach(visit);
+    };
+    [...doc.manuscript, ...doc.trash].forEach(visit);
+    return found!;
+  };
+
+  it('exports image nodes unchanged and the header image of live and trashed sections', async () => {
+    const { doc, ids } = await exported();
+    expect(imageIds(find(doc, 'Rain').content)).toEqual([ids.illustration]);
+    expect(imageIds(find(doc, 'Cut chapter').content)).toEqual([ids.banner]);
+    expect(find(doc, 'Reunion').headerAssetId).toBe(ids.banner);
+    expect(find(doc, 'Cut scene').headerAssetId).toBe(ids.illustration);
+    expect(find(doc, 'Rain').headerAssetId).toBeNull();
+    expect(doc.assets.map((a) => a.id)).toEqual(
+      expect.arrayContaining([ids.illustration, ids.banner]),
+    );
+  });
+
+  it('keeps image text out of plainText and word counts', async () => {
+    const { doc } = await exported();
+    expect(find(doc, 'Rain').plainText).toBe('Drip.');
+    expect(find(doc, 'Rain').wordCount).toBe(1);
+  });
+
+  it('remaps image nodes, snapshot images and header images on an id collision', async () => {
+    const { book, ids } = await exported();
+    const scene = find(readDoc(service().exportBook(book.id, { dir: backupDir }).file), 'Rain');
+    h.store.db
+      .prepare(
+        `INSERT INTO snapshots (id, node_id, content, word_count, reason, created_at)
+         VALUES (?, ?, ?, 1, 'interval', '2026-01-01T00:00:00.000Z')`,
+      )
+      .run(
+        crypto.randomUUID(),
+        scene.id,
+        JSON.stringify({
+          type: 'doc',
+          content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'Old.' }] },
+            {
+              type: 'image',
+              attrs: { assetId: ids.illustration, size: 'full', caption: 'Old picture' },
+            },
+          ],
+        }),
+      );
+    const file = service(h, () => new Date(T0 + 1000)).exportBook(book.id, {
+      dir: backupDir,
+      includeSnapshots: true,
+    }).file;
+    const result = restoreColdBackup(h.store.db, h.store.paths, fs.readFileSync(file));
+    expect(result.remapped).toBe(true);
+    expect(result.warnings).toEqual([]);
+
+    const copy = readDoc(
+      service(h, () => new Date(T0 + 2000)).exportBook(result.book.id, {
+        dir: backupDir,
+        includeSnapshots: true,
+      }).file,
+    );
+    const newIds = new Set(copy.assets.map((a) => a.id));
+    expect(newIds.has(ids.illustration!)).toBe(false);
+    const copyScene = find(copy, 'Rain');
+    expect(newIds.has(imageIds(copyScene.content)[0]!)).toBe(true);
+    expect(newIds.has(find(copy, 'Reunion').headerAssetId!)).toBe(true);
+    expect(newIds.has(find(copy, 'Cut scene').headerAssetId!)).toBe(true);
+    expect(newIds.has(imageIds(find(copy, 'Cut chapter').content)[0]!)).toBe(true);
+    const snapshot = copy.snapshots!.find((s) => s.nodeId === copyScene.id)!;
+    expect(imageIds(snapshot.content)).toEqual(imageIds(copyScene.content));
+  });
+
+  it('keeps an image node whose file is not in the backup and warns once per section', async () => {
+    const { doc, ids } = await exported();
+    doc.assets = doc.assets.filter((a) => a.id !== ids.illustration);
+    const rain = find(doc, 'Rain');
+    rain.content = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Drip.' }] },
+        { type: 'image', attrs: { assetId: ids.illustration, size: 'small', caption: '' } },
+        { type: 'image', attrs: { assetId: MISSING, size: 'full', caption: '' } },
+      ],
+    };
+    const result = restoreColdBackup(h.store.db, h.store.paths, Buffer.from(JSON.stringify(doc)));
+    const restored = readDoc(
+      service(h, () => new Date(T0 + 1000)).exportBook(result.book.id, { dir: backupDir }).file,
+    );
+    expect(imageIds(find(restored, 'Rain').content)).toHaveLength(2);
+    const sectionWarnings = result.warnings.filter((w) => w.includes('"Rain"'));
+    expect(sectionWarnings).toEqual([expect.stringContaining('2 image(s)')]);
+    expect(find(restored, 'Cut scene').headerAssetId).toBeNull();
+    expect(result.warnings.some((w) => w.includes('"Cut scene"') && w.includes('header'))).toBe(
+      true,
+    );
+  });
+
+  it('reads a file without headerAssetId as no header image', async () => {
+    const { doc } = await exported();
+    const legacy = JSON.parse(JSON.stringify(doc)) as ColdBackupDoc;
+    const strip = (s: Record<string, unknown>) => {
+      delete s.headerAssetId;
+      (s.children as Record<string, unknown>[]).forEach(strip);
+    };
+    [...legacy.manuscript, ...legacy.trash].forEach((s) => strip(s as never));
+    const result = restoreColdBackup(
+      h.store.db,
+      h.store.paths,
+      Buffer.from(JSON.stringify(legacy)),
+    );
+    expect(result.warnings).toEqual([]);
+    const row = h.store.db
+      .prepare('SELECT COUNT(*) AS n FROM nodes WHERE book_id = ? AND header_asset_id IS NOT NULL')
+      .get(result.book.id) as { n: number };
+    expect(row.n).toBe(0);
+  });
+
+  it('fails with COLD_BACKUP_TOO_LARGE before writing anything when the images pass the ceiling', async () => {
+    const { book } = await buildRichBook();
+    const before = listTree(h.tmp);
+    const small = new ColdBackupService({
+      db: h.store.db,
+      paths: h.store.paths,
+      homedir: h.home,
+      now: () => new Date(T0),
+      maxImageBytes: 100,
+    });
+    expect(() => small.exportBook(book.id, { dir: backupDir })).toThrowError(
+      expect.objectContaining({
+        code: 'COLD_BACKUP_TOO_LARGE',
+        message: expect.stringContaining('The Lantern Road'),
+      }),
+    );
+    expect(listTree(h.tmp)).toEqual(before);
+    expect(fs.readdirSync(backupDir)).toEqual([]);
+  });
+
+  it('turns a RangeError while serializing into COLD_BACKUP_TOO_LARGE and writes nothing', async () => {
+    const { book } = await buildRichBook();
+    const original = JSON.stringify;
+    const spy = vi.spyOn(JSON, 'stringify').mockImplementation((value, replacer, space) => {
+      if (space === 2) throw new RangeError('Invalid string length');
+      return original(value, replacer as never, space);
+    });
+    try {
+      expect(() => service().exportBook(book.id, { dir: backupDir })).toThrowError(
+        expect.objectContaining({ code: 'COLD_BACKUP_TOO_LARGE' }),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    expect(fs.readdirSync(backupDir)).toEqual([]);
+  });
+
+  it('turns a RangeError while reading into INVALID_BACKUP instead of crashing', () => {
+    const original = JSON.parse;
+    const spy = vi.spyOn(JSON, 'parse').mockImplementation(() => {
+      throw new RangeError('Invalid string length');
+    });
+    try {
+      expect(() => restoreColdBackup(h.store.db, h.store.paths, Buffer.from('{}'))).toThrowError(
+        expect.objectContaining({
+          code: 'INVALID_BACKUP',
+          message: expect.stringContaining('too large'),
+        }),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    expect(original).toBe(JSON.parse);
   });
 });

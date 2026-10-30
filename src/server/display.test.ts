@@ -51,6 +51,20 @@ describe('display settings (DISP-02)', () => {
     });
   });
 
+  it('shows images by default, reads older settings as on, and stores Show images off (IMG-12)', async () => {
+    const book = await h.createBook();
+    expect((await get(book.id)).display.showImages).toBe(true);
+    h.store.db
+      .prepare('UPDATE books SET settings = ? WHERE id = ?')
+      .run(JSON.stringify({ display: { theme: 'dark' } }), book.id);
+    expect((await get(book.id)).display.showImages).toBe(true);
+
+    const res = await patch(book.id, { display: display({ showImages: false }) });
+    expect(res.statusCode).toBe(200);
+    expect((await get(book.id)).display.showImages).toBe(false);
+    expect((await patch(book.id, { display: display({ showImages: 'no' }) })).statusCode).toBe(400);
+  });
+
   it('stores sepia, paragraph spacing and a background color per book', async () => {
     const book = await h.createBook();
     const other = await h.createBook('Other');

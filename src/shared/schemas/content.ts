@@ -10,6 +10,7 @@ export const NODE_TYPES = [
   'blockquote',
   'horizontalRule',
   'hardBreak',
+  'image',
 ] as const;
 export const MARK_TYPES = [
   'bold',
@@ -28,6 +29,13 @@ export const HIGHLIGHT_COLORS = [
   { name: 'Pink', value: '#ffd1e3' },
   { name: 'Orange', value: '#ffd9b0' },
 ] as const;
+
+export const IMAGE_SIZES = ['small', 'medium', 'full'] as const;
+export type ImageSize = (typeof IMAGE_SIZES)[number];
+export const DEFAULT_IMAGE_SIZE: ImageSize = 'medium';
+export const IMAGE_CAPTION_MAX = 300;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const HEX_COLOR = /^#[0-9a-fA-F]{3,8}$/;
 
@@ -77,6 +85,15 @@ function checkNode(node: ContentNode, depth: number, ctx: z.RefinementCtx): void
   if (node.type === 'heading') {
     const level = node.attrs?.level;
     if (level !== 1 && level !== 2) fail('Headings are level 1 or 2.');
+  }
+  if (node.type === 'image') {
+    if (depth !== 1) fail('Images are only allowed at the top level.');
+    if (node.content || node.marks) fail('Images have no children or marks.');
+    const { assetId, size, caption } = node.attrs ?? {};
+    if (typeof assetId !== 'string' || !UUID.test(assetId)) fail('Images need an asset id.');
+    if (!(IMAGE_SIZES as readonly unknown[]).includes(size)) fail('Unsupported image size.');
+    if (typeof caption !== 'string' || caption.length > IMAGE_CAPTION_MAX)
+      fail('Image captions are at most 300 characters.');
   }
   const align = node.attrs?.textAlign;
   if (

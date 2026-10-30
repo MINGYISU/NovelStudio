@@ -35,6 +35,7 @@ export interface ColdSection {
   wordCount: number;
   plainText: string;
   content: Record<string, unknown> | null;
+  headerAssetId: string | null;
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -57,6 +58,8 @@ const sectionFields = {
   wordCount: z.number().int().nonnegative(),
   plainText: z.string(),
   content: richContent,
+  /** Added in M11 without a version bump: a file without the key means no header image. */
+  headerAssetId: id.nullable().default(null),
   rev: z.number().int().nonnegative(),
   createdAt: timestamp,
   updatedAt: timestamp,

@@ -9,7 +9,11 @@ import { seedSampleBooks } from '../services/sample-book.ts';
 try {
   const store = openDataStore({ refuseIfRestorePending: true });
   const library = new LibraryService(store.db, store.paths);
-  const { created } = seedSampleBooks(store.db, library, new ManuscriptService(store.db, library));
+  const { created } = seedSampleBooks(
+    store.db,
+    library,
+    new ManuscriptService(store.db, library, store.paths),
+  );
   console.log(
     created
       ? `Seeded the sample books into ${store.paths.dataDir}`

@@ -44,6 +44,8 @@ export class ContentService {
       rev: row.rev,
       wordCount: row.wordCount,
       updatedAt: row.updatedAt,
+      headerAssetId: row.headerAssetId,
+      headerImageUrl: row.headerAssetId ? `/assets/${row.bookId}/${row.headerAssetId}` : null,
     };
   }
 

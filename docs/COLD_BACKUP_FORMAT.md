@@ -110,6 +110,7 @@ Keys not yet supported by the exporting app's milestone are still present with e
   "wordCount": 3120,
   "plainText": "The rain had stopped…\n\nShe did not look up.",
   "content": { "type": "doc", "content": [ ] },
+  "headerAssetId": null,
   "rev": 42,
   "createdAt": "…",
   "updatedAt": "…",
@@ -121,6 +122,8 @@ Keys not yet supported by the exporting app's milestone are still present with e
 - `displayTitle` is computed at export time from the settings; it is informational and ignored on restore.
 - `plainText` is the readable text; `content` is the rich text as ProseMirror/Tiptap JSON and is authoritative on restore. If `content` is missing or invalid on restore, the section is rebuilt from `plainText` (paragraph per blank-line block) and a warning is reported.
 
+- `headerAssetId` (M11) is `null` or the `id` of one entry in `assets`: the section's header image, shown above its title. It is not part of `content`. It was added without a version bump (§8): a file without the key means `null`. `TrashedSection` has it too.
+- **Images in the text** are `image` nodes at the top level of `content`: `{ "type": "image", "attrs": { "assetId": "…", "size": "small" | "medium" | "full", "caption": "" } }`. `assetId` is the `id` of an entry in `assets`; nothing else about the picture is stored. Images are not part of `plainText` or `wordCount`. An image whose asset is not in the file is allowed; it shows as missing in the app.
 - A section whose stored formatted text cannot be read is exported with `"content": null` and a note in `warnings`; `plainText` is still there.
 
 ### 4.3 `TrashedSection`
@@ -197,10 +200,10 @@ To recover an image by hand: copy `dataBase64` into a file and run `base64 -D -i
 1. Verify the `.sha256` sidecar if present; on mismatch, warn and ask before continuing.
 2. Require `format == "novelstudio.cold-backup"`. If `formatVersion` is older, run upgraders in order; if newer than the app supports, refuse.
 3. Validate with the Zod schema (`src/shared/schemas/cold-backup.ts`).
-4. If `book.id` (or any other ID) already exists in the target database, regenerate **all** IDs and rewrite every reference: section nesting, `book.coverAssetId`, `book.settings.display.backgroundImageAssetId`, codex `categoryId` and `imageAssetId`, map node and codex links, foreshadow thread and occurrence ids, occurrence `nodeId`, `foreshadowAnchor` marks inside `content`, snapshot `nodeId`.
+4. If `book.id` (or any other ID) already exists in the target database, regenerate **all** IDs and rewrite every reference: section nesting, `book.coverAssetId`, `book.settings.display.backgroundImageAssetId`, codex `categoryId` and `imageAssetId`, map node and codex links, foreshadow thread and occurrence ids, occurrence `nodeId`, `foreshadowAnchor` marks inside `content`, snapshot `nodeId`, `image.attrs.assetId` inside the `content` of sections **and** snapshots, and each section's `headerAssetId`.
 5. Positions come from array order; `displayTitle`, `wordCount`, `plainText`, and `stats` are recomputed, not trusted.
 6. Write assets (checksum verified), insert everything in one transaction, check tree invariants. Any failure rolls everything back.
-7. Restore is defensive because the file is untrusted: images are re-checked by their bytes (only PNG, JPEG, WebP and GIF; anything else is skipped), image file names are sanitized, and `content` that does not match the editor's allowed formatting is rebuilt from `plainText`. Images keep the order they have in the file. Everything skipped or repaired is reported as a warning. Codex field keys and labels that break the app's rules are repaired (and over-long values shortened), an entry whose category is missing is skipped, and an entry image that is unavailable is removed from the entry, each with a warning. Map nodes, edges and links that cannot be read are left out and an unknown map template becomes `blank`, each with a warning; a map link whose target is not in the file is kept (and warned about) instead of being dropped. Foreshadow threads and occurrences are restored with new ids on a collision (occurrence `nodeId` follows the section remap); an unknown thread status becomes `planned`, an invalid color is reset to the default, over-long text is shortened, and an occurrence whose section is not in the file is kept with `nodeId: null`, each with a warning. Data this app version cannot store is skipped with a warning, never silently.
+7. Restore is defensive because the file is untrusted: images are re-checked by their bytes (only PNG, JPEG, WebP and GIF; anything else is skipped), image file names are sanitized, and `content` that does not match the editor's allowed formatting is rebuilt from `plainText`. Images keep the order they have in the file. Everything skipped or repaired is reported as a warning. Codex field keys and labels that break the app's rules are repaired (and over-long values shortened), an entry whose category is missing is skipped, and an entry image that is unavailable is removed from the entry, each with a warning. Map nodes, edges and links that cannot be read are left out and an unknown map template becomes `blank`, each with a warning; a map link whose target is not in the file is kept (and warned about) instead of being dropped. Foreshadow threads and occurrences are restored with new ids on a collision (occurrence `nodeId` follows the section remap); an unknown thread status becomes `planned`, an invalid color is reset to the default, over-long text is shortened, and an occurrence whose section is not in the file is kept with `nodeId: null`, each with a warning. An `image` node whose asset is not in the file is kept (it shows as missing in the app), with one warning per section; a `headerAssetId` whose asset is not in the file becomes `null`, with a warning. Data this app version cannot store is skipped with a warning, never silently.
 8. The restored book is always a **new** book. Existing books are never modified. Title gets the suffix ` (restored YYYY-MM-DD)` if a book with the same title exists.
 
 ---
@@ -215,6 +218,7 @@ NovelStudio cold backup. This file is a complete, self-contained copy of one boo
 - 'trash' holds deleted-but-recoverable sections; 'codex' holds characters and worldbuilding;
   'maps' holds story diagrams; 'foreshadows' holds setup/payoff threads.
 - Images are in 'assets' as base64 ('dataBase64').
+  Sections refer to images by 'assetId' ('image' nodes in 'content') and 'headerAssetId'.
 - Restore with NovelStudio: Library > New > Import, or `npm run restore:cold -- <this file>`.
 - Format specification: docs/COLD_BACKUP_FORMAT.md in the NovelStudio repository.
 ```
@@ -237,6 +241,19 @@ jq -r '.codex as $c
   | ($c.categories[] | select(.name == "Characters") | .id) as $cid
   | $c.entries[] | select(.categoryId == $cid)
   | "\n# " + .title + "\n" + ([.fields[] | "- " + .label + ": " + .value] | join("\n"))' \
+  "2026-10-20_184909Z__my-novel.novelstudio.json"
+```
+
+List the images of every section (header image first, then the images in the text, with their captions):
+
+```sh
+jq -r '[.manuscript[], .trash[]][] | recurse(.children[])
+  | . as $s
+  | (if .headerAssetId then [$s.displayTitle + " [header] " + .headerAssetId] else [] end)
+    + [(.content.content // [])[] | select(.type == "image")
+       | $s.displayTitle + " [" + .attrs.size + "] " + .attrs.assetId
+         + (if .attrs.caption != "" then " — " + .attrs.caption else "" end)]
+  | .[]' \
   "2026-10-20_184909Z__my-novel.novelstudio.json"
 ```
 

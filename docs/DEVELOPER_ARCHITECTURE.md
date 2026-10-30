@@ -83,7 +83,7 @@ Everything a writer sees as "order" is **derived** from that tree:
 - foreshadow warnings: [foreshadow.ts](../src/shared/foreshadow.ts), computed in the browser from the cached tree;
 - map link labels: resolved by ID from the same cached tree ([map-links.ts](../src/shared/map-links.ts)).
 
-So a move only rewrites `parent_id`/`position` of the affected siblings, and every view updates on its own. References (map links, foreshadow occurrences, anchor marks in text, Codex images) always point at IDs, never titles or numbers. That is also why a cold restore has to **remap** IDs: references are everywhere, some in SQL columns and some inside JSON.
+So a move only rewrites `parent_id`/`position` of the affected siblings, and every view updates on its own. References (map links, foreshadow occurrences, anchor marks and `image` nodes in text, header and Codex images) always point at IDs, never titles or numbers. That is also why a cold restore has to **remap** IDs: references are everywhere, some in SQL columns and some inside JSON.
 
 Trash is a marker, not a deletion: trashing sets `deleted_at` on the subtree **root** only; descendants are hidden because an ancestor is trashed. There is no permanent delete for sections (books have trash and a typed-confirmation purge).
 
@@ -233,7 +233,7 @@ flowchart TD
     end
 ```
 
-The ID remap covers parents, cover/background/entry images, Codex categories, map links, occurrence section and thread IDs, snapshot section IDs, and anchor marks inside section and snapshot content. Node and edge IDs inside a map are local to that map and are kept.
+The ID remap covers parents, cover/background/entry images, Codex categories, map links, occurrence section and thread IDs, snapshot section IDs, section header images, and anchor marks and `image` nodes inside section and snapshot content. Node and edge IDs inside a map are local to that map and are kept.
 
 ---
 
@@ -253,7 +253,7 @@ The ID remap covers parents, cover/background/entry images, Codex categories, ma
 
 **Change tree rules or numbering:** edit [tree.ts](../src/shared/tree.ts) / [numbering.ts](../src/shared/numbering.ts) only; both client and server pick it up. Keep `tree.property.test.ts` (1,000 random moves) and the index adapter tests passing.
 
-**Change editor formatting or paste:** the allow-list is [schemas/content.ts](../src/shared/schemas/content.ts); paste cleaning is [paste.ts](../src/client/features/editor/paste.ts). Check that the server validation, snapshot restore, find & replace, cold restore and text export still accept and render the result.
+**Change editor formatting or paste:** the allow-list is [schemas/content.ts](../src/shared/schemas/content.ts); paste cleaning is [paste.ts](../src/client/features/editor/paste.ts), and images (always top-level, only an asset id stored) live in [image-extension.ts](../src/client/features/editor/image-extension.ts); an image's file is protected from deletion by `isAssetInUse` in [repos/codex.ts](../src/server/repos/codex.ts). Check that the server validation, snapshot restore, find & replace, cold restore and text export still accept and render the result.
 
 **Change startup or backups:** keep the data-directory guard, the backup before migrations, server-only application of staged restores, and atomic writes. These have tests in `bootstrap.test.ts`, `hot-backup-restore.test.ts` and `scripts/cli.test.ts`.
 

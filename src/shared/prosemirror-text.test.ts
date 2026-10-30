@@ -26,6 +26,21 @@ describe('docToPlainText', () => {
     expect(docToPlainText(doc)).toBe('Title\n\nBefore.\n\n* * *\n\nQuoted.\n\nMore.');
   });
 
+  it('skips images, so plain text and find are unchanged by them', () => {
+    const image = {
+      type: 'image' as const,
+      attrs: { assetId: '11111111-1111-4111-8111-111111111111', size: 'full', caption: 'needle' },
+    };
+    const plain: ContentDoc = { type: 'doc', content: [p('One.'), p('Two needle.')] };
+    const withImages: ContentDoc = {
+      type: 'doc',
+      content: [image, p('One.'), image, p('Two needle.')],
+    };
+    expect(docToPlainText(withImages)).toBe(docToPlainText(plain));
+    expect(findInDoc(withImages, 'needle', false).count).toBe(1);
+    expect(replaceInDoc(withImages, 'needle', 'x', false).count).toBe(1);
+  });
+
   it('renders hard breaks as newlines and drops empty paragraphs', () => {
     const doc: ContentDoc = {
       type: 'doc',

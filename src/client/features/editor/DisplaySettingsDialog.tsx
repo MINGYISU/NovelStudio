@@ -99,6 +99,14 @@ export function DisplaySettingsDialog({
         <Field label={t('editor.display.paragraphSpacing')}>
           {number('paragraphSpacing', 0.1)}
         </Field>
+        <label className={uiStyles.inline}>
+          <input
+            type="checkbox"
+            checked={draft.showImages}
+            onChange={(e) => setDraft({ ...draft, showImages: e.target.checked })}
+          />
+          {t('editor.display.showImages')}
+        </label>
         <Field label={t('editor.display.backgroundColor')}>
           <span className={uiStyles.inline}>
             <input

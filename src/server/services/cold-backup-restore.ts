@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { repairFields } from '../../shared/codex.ts';
 import { CODEX_SUMMARY_MAX, CODEX_TITLE_MAX } from '../../shared/schemas/codex.ts';
+import { collectImageAssetIds, remapImageAssetIds } from '../../shared/content-images.ts';
 import { remapAnchorIds } from '../../shared/foreshadow-anchors.ts';
 import { remapMapLinks } from '../../shared/map-links.ts';
 import { docToPlainText } from '../../shared/prosemirror-text.ts';
@@ -77,8 +78,12 @@ export function parseColdBackup(bytes: Buffer): ColdBackupDoc {
   let json: unknown;
   try {
     json = JSON.parse(bytes.toString('utf8'));
-  } catch {
-    throw invalid('The file is not valid JSON.');
+  } catch (err) {
+    throw invalid(
+      err instanceof RangeError
+        ? 'The file is too large to read in one piece (too many or too large images). It cannot be restored with this app.'
+        : 'The file is not valid JSON.',
+    );
   }
   const header = json as { format?: unknown; formatVersion?: unknown } | null;
   if (typeof header !== 'object' || header === null || header.format !== COLD_BACKUP_FORMAT) {
@@ -240,6 +245,35 @@ export function restoreColdBackup(
   const mapped = (id: string): string => ids.get(id) as string;
   const bookId = mapped(doc.book.id);
 
+  // Spaced 1 ms apart so the restored images keep the order of the file (assets sort by created_at).
+  const assets = doc.assets.flatMap((asset, index) => {
+    const data = Buffer.from(asset.dataBase64, 'base64');
+    const mime = sniffImage(data);
+    if (!mime) {
+      warnings.push(`Image "${asset.fileName}" is not a supported image type and was skipped.`);
+      return [];
+    }
+    const sha256 = crypto.createHash('sha256').update(data).digest('hex');
+    if (sha256 !== asset.sha256) {
+      warnings.push(`Image "${asset.fileName}" does not match its checksum; restored anyway.`);
+    }
+    return [
+      {
+        data,
+        row: {
+          id: mapped(asset.id),
+          bookId,
+          fileName: cleanFileName(asset.fileName),
+          mime,
+          bytes: data.length,
+          sha256,
+          createdAt: new Date(now.getTime() + index).toISOString(),
+        },
+      },
+    ];
+  });
+  const assetIdSet = new Set(assets.map((a) => a.row.id));
+
   const nodes: FullNodeRow[] = [];
   const rebuild = (
     section: ColdSection,
@@ -255,6 +289,17 @@ export function restoreColdBackup(
       );
     }
     content = remapAnchorIds(content, (id) => ids.get(id));
+    // An image whose file is not in the backup is kept: it shows as missing (IMG-07).
+    let missingImages = 0;
+    for (const assetId of collectImageAssetIds(content)) {
+      if (!assetIdSet.has(ids.get(assetId) ?? assetId)) missingImages += 1;
+    }
+    if (missingImages > 0) {
+      warnings.push(
+        `Section "${section.title || section.displayTitle}": ${missingImages} image(s) are not in this backup and show as missing.`,
+      );
+    }
+    content = remapImageAssetIds(content, (id) => ids.get(id));
     const plainText = docToPlainText(content);
     return { content: JSON.stringify(content), plainText, wordCount: countWords(plainText) };
   };
@@ -265,6 +310,16 @@ export function restoreColdBackup(
     deletedAt: string | null,
   ): void => {
     const text = rebuild(section);
+    let headerAssetId: string | null = null;
+    if (section.headerAssetId !== null) {
+      const mappedHeader = ids.get(section.headerAssetId);
+      if (mappedHeader && assetIdSet.has(mappedHeader)) headerAssetId = mappedHeader;
+      else {
+        warnings.push(
+          `Section "${section.title || section.displayTitle}": its header image is not in this backup and was removed.`,
+        );
+      }
+    }
     nodes.push({
       id: mapped(section.id),
       bookId,
@@ -282,6 +337,7 @@ export function restoreColdBackup(
       createdAt: section.createdAt,
       updatedAt: section.updatedAt,
       deletedAt,
+      headerAssetId,
     });
     section.children.forEach((child, i) => addSection(child, mapped(section.id), i, null));
   };
@@ -311,34 +367,6 @@ export function restoreColdBackup(
   });
   const nodeIdSet = new Set(nodes.map((n) => n.id));
 
-  // Spaced 1 ms apart so the restored images keep the order of the file (assets sort by created_at).
-  const assets = doc.assets.flatMap((asset, index) => {
-    const data = Buffer.from(asset.dataBase64, 'base64');
-    const mime = sniffImage(data);
-    if (!mime) {
-      warnings.push(`Image "${asset.fileName}" is not a supported image type and was skipped.`);
-      return [];
-    }
-    const sha256 = crypto.createHash('sha256').update(data).digest('hex');
-    if (sha256 !== asset.sha256) {
-      warnings.push(`Image "${asset.fileName}" does not match its checksum; restored anyway.`);
-    }
-    return [
-      {
-        data,
-        row: {
-          id: mapped(asset.id),
-          bookId,
-          fileName: cleanFileName(asset.fileName),
-          mime,
-          bytes: data.length,
-          sha256,
-          createdAt: new Date(now.getTime() + index).toISOString(),
-        },
-      },
-    ];
-  });
-  const assetIdSet = new Set(assets.map((a) => a.row.id));
   let coverAssetId: string | null = null;
   if (doc.book.coverAssetId !== null) {
     const mappedCover = ids.get(doc.book.coverAssetId);
@@ -357,7 +385,12 @@ export function restoreColdBackup(
       {
         id: mapped(s.id),
         nodeId: mapped(s.nodeId),
-        content: JSON.stringify(remapAnchorIds(parsed.data, (id) => ids.get(id))),
+        content: JSON.stringify(
+          remapImageAssetIds(
+            remapAnchorIds(parsed.data, (id) => ids.get(id)),
+            (id) => ids.get(id),
+          ),
+        ),
         wordCount: countWords(docToPlainText(parsed.data)),
         reason: s.reason,
         createdAt: s.createdAt,

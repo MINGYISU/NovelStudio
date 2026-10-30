@@ -161,3 +161,11 @@ const UNTITLED: Record<Locale, string> = { en: '(untitled)', 'zh-CN': '（无标
 export function untitledLabel(locale: Locale): string {
   return UNTITLED[locale];
 }
+
+/** The line an image becomes in a text export (IMG-11): `[Image: caption]`, or `[Image]` without one. */
+export function imagePlaceholder(caption: string, locale: Locale): string {
+  const label = locale === 'zh-CN' ? '插图' : 'Image';
+  const colon = locale === 'zh-CN' ? '：' : ': ';
+  const text = caption.replace(/\s+/g, ' ').trim();
+  return text === '' ? `[${label}]` : `[${label}${colon}${text}]`;
+}

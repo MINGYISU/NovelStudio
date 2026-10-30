@@ -1,4 +1,6 @@
 import { docToPlainText } from './prosemirror-text.ts';
+import { DEFAULT_LOCALE, type Locale } from './schemas/locale.ts';
+import { imagePlaceholder } from './seed-text.ts';
 import type { ContentDoc, ContentMark, ContentNode } from './schemas/content.ts';
 
 export type ExportFormat = 'md' | 'txt';
@@ -43,12 +45,24 @@ function inlineMarkdown(node: ContentNode): string {
   return `${lead}${open}${escapeMarkdown(core)}${close}${trail}`;
 }
 
-function blocksMarkdown(node: ContentNode, headingBase: number, quote: boolean): string[] {
+function captionOf(node: ContentNode): string {
+  const caption = node.attrs?.caption;
+  return typeof caption === 'string' ? caption : '';
+}
+
+function blocksMarkdown(
+  node: ContentNode,
+  headingBase: number,
+  quote: boolean,
+  lang: Locale,
+): string[] {
   switch (node.type) {
     case 'doc':
-      return (node.content ?? []).flatMap((c) => blocksMarkdown(c, headingBase, quote));
+      return (node.content ?? []).flatMap((c) => blocksMarkdown(c, headingBase, quote, lang));
     case 'blockquote':
-      return (node.content ?? []).flatMap((c) => blocksMarkdown(c, headingBase, true));
+      return (node.content ?? []).flatMap((c) => blocksMarkdown(c, headingBase, true, lang));
+    case 'image':
+      return [imagePlaceholder(escapeMarkdown(captionOf(node)), lang)];
     case 'horizontalRule':
       return [quote ? '> ***' : '***'];
     case 'heading': {
@@ -65,18 +79,38 @@ function blocksMarkdown(node: ContentNode, headingBase: number, quote: boolean):
   }
 }
 
-function sectionMarkdown(section: ExportSection): string {
+function sectionMarkdown(section: ExportSection, lang: Locale): string {
   const level = Math.min(MAX_HEADING, 2 + section.depth);
   const parts = [`${'#'.repeat(level)} ${escapeMarkdown(section.displayTitle)}`];
-  if (section.doc) parts.push(...blocksMarkdown(section.doc, level, false));
+  if (section.doc) parts.push(...blocksMarkdown(section.doc, level, false, lang));
   else if (section.plainText.trim() !== '') {
     parts.push(...section.plainText.split(/\n{2,}/).map(escapeMarkdown));
   }
   return parts.join('\n\n');
 }
 
-function sectionText(section: ExportSection): string {
-  const body = section.doc ? docToPlainText(section.doc) : section.plainText;
+/** Plain text of a document with each image as its own placeholder line; images are top-level only. */
+function docToExportText(doc: ContentDoc, lang: Locale): string {
+  const blocks: string[] = [];
+  let run: ContentNode[] = [];
+  const flush = (): void => {
+    if (run.length === 0) return;
+    const text = docToPlainText({ type: 'doc', content: run });
+    if (text !== '') blocks.push(text);
+    run = [];
+  };
+  for (const node of doc.content ?? []) {
+    if (node.type === 'image') {
+      flush();
+      blocks.push(imagePlaceholder(captionOf(node), lang));
+    } else run.push(node);
+  }
+  flush();
+  return blocks.join('\n\n');
+}
+
+function sectionText(section: ExportSection, lang: Locale): string {
+  const body = section.doc ? docToExportText(section.doc, lang) : section.plainText;
   return body.trim() === '' ? section.displayTitle : `${section.displayTitle}\n\n${body}`;
 }
 
@@ -85,6 +119,7 @@ export function renderManuscript(
   book: ExportBook,
   sections: readonly ExportSection[],
   format: ExportFormat,
+  lang: Locale = DEFAULT_LOCALE,
 ): string {
   const head =
     format === 'md'
@@ -93,6 +128,8 @@ export function renderManuscript(
           ...(book.author ? [`*${escapeMarkdown(book.author)}*`] : []),
         ]
       : [book.title, ...(book.author ? [`by ${book.author}`] : [])];
-  const body = sections.map(format === 'md' ? sectionMarkdown : sectionText);
+  const body = sections.map((s) =>
+    format === 'md' ? sectionMarkdown(s, lang) : sectionText(s, lang),
+  );
   return [head.join('\n\n'), ...body].join('\n\n\n').trimEnd() + '\n';
 }

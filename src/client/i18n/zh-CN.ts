@@ -3,6 +3,7 @@ import { zh as codex } from './messages/codex.ts';
 import { zh as common } from './messages/common.ts';
 import { zh as editor } from './messages/editor.ts';
 import { zh as foreshadow } from './messages/foreshadow.ts';
+import { zh as images } from './messages/images.ts';
 import { zh as library } from './messages/library.ts';
 import { zh as maps } from './messages/maps.ts';
 import { zh as settings } from './messages/settings.ts';
@@ -18,4 +19,5 @@ export const zhCN: Record<MessageKey, string> = {
   ...codex,
   ...maps,
   ...foreshadow,
+  ...images,
 };

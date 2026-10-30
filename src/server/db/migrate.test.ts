@@ -135,6 +135,33 @@ describe('migrate', () => {
     db.close();
   });
 
+  it('005 adds a nullable header image to nodes of a version-4 database without touching rows', () => {
+    const db = openDatabase(path.join(tmp, 'novelstudio.db'));
+    migrate(db, { migrations: loadMigrations().slice(0, 4) });
+    db.prepare(
+      "INSERT INTO books (id, title, created_at, updated_at) VALUES ('b1', 'Keep me', 'x', 'x')",
+    ).run();
+    db.prepare(
+      `INSERT INTO nodes (id, book_id, kind, title, position, created_at, updated_at)
+       VALUES ('n1', 'b1', 'chapter', 'Old', 0, 'x', 'x')`,
+    ).run();
+
+    expect(migrate(db)).toEqual({ from: 4, to: loadMigrations().length });
+    expect(db.prepare('SELECT title, header_asset_id FROM nodes').get()).toEqual({
+      title: 'Old',
+      header_asset_id: null,
+    });
+    db.prepare(
+      `INSERT INTO assets (id, book_id, file_name, mime, bytes, sha256, created_at)
+       VALUES ('a1', 'b1', 'x.png', 'image/png', 1, 'h', 'x')`,
+    ).run();
+    db.prepare("UPDATE nodes SET header_asset_id = 'a1'").run();
+    expect(() => db.prepare("UPDATE nodes SET header_asset_id = 'nope'").run()).toThrow();
+    db.prepare("DELETE FROM books WHERE id = 'b1'").run();
+    expect(db.prepare('SELECT COUNT(*) AS n FROM nodes').get()).toEqual({ n: 0 });
+    db.close();
+  });
+
   it('does not take a pre-migration backup for a brand new database', () => {
     const db = openDatabase(path.join(tmp, 'novelstudio.db'));
     let called = 0;

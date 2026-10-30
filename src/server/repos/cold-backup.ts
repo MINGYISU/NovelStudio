@@ -29,6 +29,7 @@ export interface FullNodeRow {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  headerAssetId: string | null;
 }
 
 export function getBookExportRow(db: Db, id: string): BookExportRow | null {
@@ -67,7 +68,7 @@ export function listFullNodes(db: Db, bookId: string): FullNodeRow[] {
   const rows = db
     .prepare(
       `SELECT id, book_id, parent_id, kind, title, position, numbered, status, synopsis, content,
-              plain_text, word_count, rev, created_at, updated_at, deleted_at
+              plain_text, word_count, rev, created_at, updated_at, deleted_at, header_asset_id
          FROM nodes WHERE book_id = ?`,
     )
     .all(bookId) as {
@@ -87,6 +88,7 @@ export function listFullNodes(db: Db, bookId: string): FullNodeRow[] {
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
+    header_asset_id: string | null;
   }[];
   return rows.map((r) => ({
     id: r.id,
@@ -105,6 +107,7 @@ export function listFullNodes(db: Db, bookId: string): FullNodeRow[] {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     deletedAt: r.deleted_at,
+    headerAssetId: r.header_asset_id,
   }));
 }
 
@@ -172,8 +175,9 @@ export function insertBookRow(db: Db, book: BookExportRow): void {
 export function insertFullNodeRow(db: Db, node: FullNodeRow): void {
   db.prepare(
     `INSERT INTO nodes (id, book_id, parent_id, kind, title, position, numbered, status, synopsis,
-                        content, plain_text, word_count, rev, created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        content, plain_text, word_count, rev, created_at, updated_at, deleted_at,
+                        header_asset_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     node.id,
     node.bookId,
@@ -191,5 +195,6 @@ export function insertFullNodeRow(db: Db, node: FullNodeRow): void {
     node.createdAt,
     node.updatedAt,
     node.deletedAt,
+    node.headerAssetId,
   );
 }

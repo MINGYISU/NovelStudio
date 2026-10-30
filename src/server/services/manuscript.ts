@@ -12,18 +12,24 @@ import {
   type TreeChange,
 } from '../../shared/tree.ts';
 import type { TreeNode } from '../../shared/types.ts';
+import type { DataPaths } from '../config.ts';
 import type { Db } from '../db/connection.ts';
 import { ApiError } from '../errors.ts';
+import { deleteAsset, getAsset, type AssetRow } from '../repos/assets.ts';
 import { getBookSettingsJson, parseStructure } from '../repos/books.ts';
+import { isAssetInUse } from '../repos/codex.ts';
 import {
   copyNodeRow,
+  getHeaderAssetId,
   getNode,
   insertNodeRow,
   listNodes,
+  setHeaderAssetId,
   touchBook,
   updateNodeFields,
   writeStructure,
 } from '../repos/nodes.ts';
+import { removeAssetFile } from './assets.ts';
 import type { LibraryService } from './library.ts';
 
 const RULE_STATUS: Record<TreeRuleError['code'], number> = {
@@ -44,6 +50,7 @@ export class ManuscriptService {
   constructor(
     private readonly db: Db,
     private readonly library: LibraryService,
+    private readonly paths: DataPaths,
   ) {}
 
   tree(bookId: string): TreeNode[] {
@@ -85,14 +92,41 @@ export class ManuscriptService {
   }
 
   update(id: string, patch: PatchNodeBody): TreeNode {
-    return this.write(() => {
+    const replaced = this.write(() => {
       const node = this.requireNode(id);
       this.library.requireLiveBook(node.bookId);
       const now = new Date().toISOString();
-      updateNodeFields(this.db, id, patch, now);
+      const { headerAssetId, ...fields } = patch;
+      let oldHeader: AssetRow | null = null;
+      if (headerAssetId !== undefined) {
+        const current = getHeaderAssetId(this.db, id);
+        if (headerAssetId !== null) {
+          const asset = getAsset(this.db, headerAssetId);
+          if (!asset || asset.bookId !== node.bookId) {
+            throw new ApiError(
+              400,
+              'INVALID_IMAGE',
+              'The image must be uploaded to this book first.',
+            );
+          }
+        }
+        if (headerAssetId !== current) {
+          setHeaderAssetId(this.db, id, headerAssetId, now);
+          oldHeader = current ? getAsset(this.db, current) : null;
+        }
+      }
+      updateNodeFields(this.db, id, fields, now);
       touchBook(this.db, node.bookId, now);
-      return this.requireNode(id);
+      // A replaced or removed header image is deleted only when nothing else uses it (IMG-22).
+      let gone: AssetRow | null = null;
+      if (oldHeader && !isAssetInUse(this.db, oldHeader.id)) {
+        deleteAsset(this.db, oldHeader.id);
+        gone = oldHeader;
+      }
+      return { node: this.requireNode(id), gone };
     });
+    if (replaced.gone) removeAssetFile(this.paths.assetsDir, replaced.gone);
+    return replaced.node;
   }
 
   /** Copies a section with its live subtree right after the original; trashed descendants stay behind. */

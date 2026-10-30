@@ -18,7 +18,7 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 | M8 | Polish, import/export | WS-03, ED-09, DISP-02, HOT-02, IMP-02/03, EXP-01, COLD-11 | ☑ |
 | M9 | Review fixes | TREE-08, ED-02/04/05/10/12, HOT-02, WS-01/02, CDX-01, MOVE-11, MAP-08, EXP-01, COLD-02, IMP-02 | ☑ |
 | M10 | Interface language (English / 简体中文) | I18N-01..10 | ☑ |
-| M11 | Images: illustrations and section header images | IMG-01..14, IMG-20..23, COLD-09 | ☐ |
+| M11 | Images: illustrations and section header images | IMG-01..14, IMG-20..23, COLD-09 | ☑ |
 
 **Finish M9 before writing real chapters.** The post-M8 review found ways typed text could be lost (see M9 group A). After M9, make sure a cold backup folder is set and one export has succeeded.
 
@@ -648,10 +648,10 @@ Work in group order. Several commits (`M11: …`) are fine; the milestone is acc
 
 ### Done when
 
-- [ ] Every item in groups A–D is implemented (IMG-10 and IMG-13 may be deferred if agreed with the user).
-- [ ] `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:e2e` all pass; results reported with counts.
-- [ ] Docs updated as listed.
-- [ ] PRD §13 scenarios 17–19 pass.
+- [x] Every item in groups A–D is implemented (IMG-10 and IMG-13 may be deferred if agreed with the user).
+- [x] `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:e2e` all pass; results reported with counts.
+- [x] Docs updated as listed.
+- [x] PRD §13 scenarios 17–19 pass.
 - [ ] Manual checklist, run against `./.data-dev` only:
   - [ ] Insert three AI-style images in a chapter at different widths: the text never wraps beside them, in light, dark and sepia themes and in focus mode.
   - [ ] Drag an image to another place in the section: it always lands between paragraphs.

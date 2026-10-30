@@ -65,6 +65,6 @@ export function exportManuscript(
   return {
     fileName: `${slugifyTitle(book.title)}.${format}`,
     contentType: format === 'md' ? 'text/markdown; charset=utf-8' : 'text/plain; charset=utf-8',
-    body: renderManuscript({ title: book.title, author: book.author }, sections, format),
+    body: renderManuscript({ title: book.title, author: book.author }, sections, format, lang),
   };
 }

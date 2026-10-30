@@ -13,6 +13,7 @@ import {
   Heading2,
   Highlighter,
   History,
+  ImagePlus,
   Italic,
   Minus,
   Quote,
@@ -78,6 +79,7 @@ interface ToolbarProps {
   onFind: () => void;
   onSnapshots: () => void;
   onDisplay: () => void;
+  onInsertImage: () => void;
   /** FS-08: mark the selection as a setup, hint or payoff. */
   onMarkAnchor: (role: OccurrenceRole) => void;
   showAnchors: boolean;
@@ -91,6 +93,7 @@ export function Toolbar({
   onFind,
   onSnapshots,
   onDisplay,
+  onInsertImage,
   onMarkAnchor,
   showAnchors,
   onToggleAnchors,
@@ -230,6 +233,12 @@ export function Toolbar({
         icon={Minus}
         disabled={!editable}
         onClick={() => run().setHorizontalRule().run()}
+      />
+      <Tool
+        label={t('images.toolbar.insert')}
+        icon={ImagePlus}
+        disabled={!editable}
+        onClick={onInsertImage}
       />
       <span className={styles.separator} />
       <Tool

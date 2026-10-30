@@ -32,16 +32,18 @@ interface SidebarProps {
 function useElementSize<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [element, setElement] = useState<T | null>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    setElement(el);
     const observer = new ResizeObserver(([entry]) => {
       if (entry) setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
     });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  return { ref, ...size };
+  return { ref, element, ...size };
 }
 
 /** Sidebar tree (TREE-05..07, MOVE-01..11). Mount it with `key={bookId}`. */
@@ -58,7 +60,7 @@ export function Sidebar({ bookId, nodes, structure, selectedId, warnings }: Side
   const [trashOpen, setTrashOpen] = useState(false);
   const treeRef = useRef<TreeApi<TreeItem> | null>(null);
   const [initialOpen] = useState(() => initialOpenState(bookId, nodes));
-  const { ref: boxRef, width, height } = useElementSize<HTMLDivElement>();
+  const { ref: boxRef, element: boxElement, width, height } = useElementSize<HTMLDivElement>();
   const pendingEditId = useWorkspaceStore((s) => s.pendingEditId);
 
   useEffect(() => {
@@ -153,6 +155,8 @@ export function Sidebar({ bookId, nodes, structure, selectedId, warnings }: Side
             {width > 0 && height > 0 ? (
               <Tree<TreeItem>
                 ref={treeRef}
+                // Drag and drop is scoped to the tree: a window-wide backend would swallow drops in the editor.
+                dndRootElement={boxElement}
                 data={items}
                 idAccessor="id"
                 childrenAccessor="children"

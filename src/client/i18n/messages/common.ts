@@ -71,6 +71,8 @@ export const en = {
   'errors.COLD_BACKUP_LOCATION_UNAVAILABLE': 'The cold backup folder is not available.',
   'errors.COLD_BACKUP_NOT_CONFIGURED':
     'Set a cold backup folder in Settings first, or choose a folder to export to.',
+  'errors.COLD_BACKUP_TOO_LARGE':
+    'This book’s images are too large for a single cold backup file. Nothing was written.',
   'errors.CONFIRM_TITLE_MISMATCH': 'Type the exact book title to delete it permanently.',
   'errors.CONTENT_INVALID': 'The stored text of this section is unreadable.',
   'errors.EXPORT_FAILED': 'The export failed.',
@@ -182,6 +184,7 @@ export const zh: Record<keyof typeof en, string> = {
   'errors.COLD_BACKUP_LOCATION_INVALID': '不能使用这个冷备份文件夹。',
   'errors.COLD_BACKUP_LOCATION_UNAVAILABLE': '冷备份文件夹当前不可用。',
   'errors.COLD_BACKUP_NOT_CONFIGURED': '请先在“设置”中设置冷备份文件夹，或选择一个导出文件夹。',
+  'errors.COLD_BACKUP_TOO_LARGE': '此作品的图片太大，无法放进单个冷备份文件，未写入任何内容。',
   'errors.CONFIRM_TITLE_MISMATCH': '请输入完整的作品标题，才能永久删除。',
   'errors.CONTENT_INVALID': '此章节保存的文字无法读取。',
   'errors.EXPORT_FAILED': '导出失败。',

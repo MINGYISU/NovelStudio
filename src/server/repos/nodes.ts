@@ -84,9 +84,10 @@ export function copyNodeRow(
 ): void {
   db.prepare(
     `INSERT INTO nodes (id, book_id, parent_id, kind, title, position, numbered, status, synopsis,
-                        content, plain_text, word_count, rev, created_at, updated_at, deleted_at)
+                        content, plain_text, word_count, rev, created_at, updated_at, deleted_at,
+                        header_asset_id)
      SELECT ?, book_id, ?, kind, ?, ?, numbered, status, synopsis,
-            content, plain_text, word_count, 0, ?, ?, NULL
+            content, plain_text, word_count, 0, ?, ?, NULL, header_asset_id
        FROM nodes WHERE id = ?`,
   ).run(copy.id, copy.parentId, copy.title, copy.position, now, now, sourceId);
   const row = db.prepare('SELECT content FROM nodes WHERE id = ?').get(copy.id) as
@@ -107,6 +108,20 @@ export function writeStructure(db: Db, nodes: readonly TreeNode[]): void {
     'UPDATE nodes SET parent_id = ?, position = ?, deleted_at = ? WHERE id = ?',
   );
   for (const n of nodes) stmt.run(n.parentId, n.position, n.deletedAt, n.id);
+}
+
+export function getHeaderAssetId(db: Db, id: string): string | null {
+  const row = db.prepare('SELECT header_asset_id FROM nodes WHERE id = ?').get(id) as
+    { header_asset_id: string | null } | undefined;
+  return row?.header_asset_id ?? null;
+}
+
+export function setHeaderAssetId(db: Db, id: string, assetId: string | null, now: string): void {
+  db.prepare('UPDATE nodes SET header_asset_id = ?, updated_at = ? WHERE id = ?').run(
+    assetId,
+    now,
+    id,
+  );
 }
 
 export interface NodeFieldsUpdate {
@@ -163,6 +178,7 @@ export interface NodeContentRow {
   wordCount: number;
   rev: number;
   updatedAt: string;
+  headerAssetId: string | null;
 }
 
 interface RawContentRow {
@@ -174,6 +190,7 @@ interface RawContentRow {
   word_count: number;
   rev: number;
   updated_at: string;
+  header_asset_id: string | null;
 }
 
 function toContentRow(row: RawContentRow): NodeContentRow {
@@ -186,10 +203,12 @@ function toContentRow(row: RawContentRow): NodeContentRow {
     wordCount: row.word_count,
     rev: row.rev,
     updatedAt: row.updated_at,
+    headerAssetId: row.header_asset_id,
   };
 }
 
-const CONTENT_COLUMNS = 'id, book_id, deleted_at, content, plain_text, word_count, rev, updated_at';
+const CONTENT_COLUMNS =
+  'id, book_id, deleted_at, content, plain_text, word_count, rev, updated_at, header_asset_id';
 
 export function getNodeContentRow(db: Db, id: string): NodeContentRow | null {
   const row = db.prepare(`SELECT ${CONTENT_COLUMNS} FROM nodes WHERE id = ?`).get(id) as

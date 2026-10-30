@@ -18,9 +18,13 @@ import type { SectionSaver } from './autosave.ts';
 import { DisplaySettingsDialog } from './DisplaySettingsDialog.tsx';
 import { AnchorColors, anchorColorsKey } from './anchor-extension.ts';
 import { createExtensions } from './extensions.ts';
+import { SectionHeader } from './HeaderImage.tsx';
+import { ImageLightbox } from './ImageLightbox.tsx';
+import { ImagePickerDialog } from './ImagePickerDialog.tsx';
+import { ImageHost } from './image-extension.ts';
 import { FindBar } from './FindBar.tsx';
 import { copyText } from './clipboard.ts';
-import { cleanPastedHtml } from './paste.ts';
+import { cleanPastedHtmlReport } from './paste.ts';
 import { saverRegistry, useSaverState } from './save-registry.ts';
 import { hasUnsavedWork } from './unsaved-work.ts';
 import { SnapshotDialog } from './SnapshotDialog.tsx';
@@ -162,7 +166,18 @@ function SectionEditor({
   const t = useT();
   const client = useQueryClient();
   const [anchorColors] = useState(() => new AnchorColors());
-  const [extensions] = useState(() => createExtensions(anchorColors));
+  const [imageHost] = useState(() => new ImageHost(bookId));
+  const [extensions] = useState(() => createExtensions(anchorColors, imageHost));
+  const [picker, setPicker] = useState<{
+    mode: 'insert' | 'replace';
+    onPick: (asset: { id: string }) => void;
+  } | null>(null);
+  const [zoomed, setZoomed] = useState<{ url: string; caption: string } | null>(null);
+  useEffect(
+    () =>
+      imageHost.connect({ pick: (mode, onPick) => setPicker({ mode, onPick }), zoom: setZoomed }),
+    [imageHost],
+  );
   const threads = useThreads(bookId);
   const showAnchors = useWorkspaceStore((s) => s.showAnchors);
   const setShowAnchors = useWorkspaceStore((s) => s.setShowAnchors);
@@ -184,7 +199,16 @@ function SectionEditor({
     content: opened.content,
     editorProps: {
       attributes: { 'aria-label': t('editor.sectionText'), 'data-testid': 'editor' },
-      transformPastedHTML: cleanPastedHtml,
+      transformPastedHTML: (html) => {
+        const { html: clean, removedImages } = cleanPastedHtmlReport(html);
+        // Pasted web pages and documents never bring their images along (IMG-09).
+        if (removedImages) {
+          useWorkspaceStore
+            .getState()
+            .notify({ tone: 'info', message: t('images.notice.foreign') });
+        }
+        return clean;
+      },
     },
     onUpdate: ({ editor: e }) => saver.update(normalizeContent(e.getJSON() as ContentDoc)),
   });
@@ -261,6 +285,12 @@ function SectionEditor({
           void saver.flush().then(() => setDialog('snapshots'));
         }}
         onDisplay={() => setDialog('display')}
+        onInsertImage={() =>
+          setPicker({
+            mode: 'insert',
+            onPick: (asset) => editor.chain().focus().insertImage({ assetId: asset.id }).run(),
+          })
+        }
         onMarkAnchor={(role) => {
           const { from, to, empty } = editor.state.selection;
           if (empty) return;
@@ -306,8 +336,14 @@ function SectionEditor({
       ) : null}
       <div className={styles.scroller}>
         <div className={styles.page}>
-          <h2 className={styles.title}>{displayTitle}</h2>
-          <div className={styles.prose} data-anchors={showAnchors ? 'on' : 'off'}>
+          <SectionHeader bookId={bookId} nodeId={nodeId} showImages={display.showImages}>
+            <h2 className={styles.title}>{displayTitle}</h2>
+          </SectionHeader>
+          <div
+            className={styles.prose}
+            data-anchors={showAnchors ? 'on' : 'off'}
+            data-images={display.showImages ? 'on' : 'off'}
+          >
             <EditorContent editor={editor} />
           </div>
         </div>
@@ -353,6 +389,20 @@ function SectionEditor({
             setMarking(null);
           }}
         />
+      ) : null}
+      {picker ? (
+        <ImagePickerDialog
+          bookId={bookId}
+          mode={picker.mode}
+          onClose={() => setPicker(null)}
+          onPick={(asset) => {
+            setPicker(null);
+            picker.onPick(asset);
+          }}
+        />
+      ) : null}
+      {zoomed ? (
+        <ImageLightbox url={zoomed.url} caption={zoomed.caption} onClose={() => setZoomed(null)} />
       ) : null}
       {dialog === 'display' ? (
         <DisplaySettingsDialog bookId={bookId} display={display} onClose={() => setDialog(null)} />

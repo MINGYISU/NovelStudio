@@ -30,7 +30,7 @@ afterEach(() => {
 describe('seedSampleBooks', () => {
   it('creates a valid ~200 section book and does nothing the second time', () => {
     const library = new LibraryService(store.db, store.paths);
-    const manuscript = new ManuscriptService(store.db, library);
+    const manuscript = new ManuscriptService(store.db, library, store.paths);
     expect(seedSampleBooks(store.db, library, manuscript).created).toBe(true);
     expect(seedSampleBooks(store.db, library, manuscript).created).toBe(false);
 

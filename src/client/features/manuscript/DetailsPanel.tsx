@@ -11,6 +11,7 @@ import { apiErrorMessage, formatWords, useT } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import type { ForeshadowWarning } from '../../../shared/foreshadow.ts';
 import type { Thread } from '../../../shared/schemas/foreshadow.ts';
+import { HeaderImageSection } from '../editor/HeaderImage.tsx';
 import { CharactersInSection } from '../codex/CharactersInSection.tsx';
 import { SectionThreads } from '../foreshadow/SectionThreads.tsx';
 import styles from './manuscript.module.css';
@@ -37,6 +38,7 @@ export function DetailsPanel({ bookId, node, displayTitle, threads, warnings }: 
             node={node}
             displayTitle={displayTitle ?? node.title}
           />
+          <HeaderImageSection key={`header:${node.id}`} bookId={bookId} nodeId={node.id} />
           <SectionThreads bookId={bookId} nodeId={node.id} threads={threads} warnings={warnings} />
           <CharactersInSection key={node.id} bookId={bookId} nodeId={node.id} />
         </>

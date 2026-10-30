@@ -48,6 +48,8 @@ export const patchNodeBodySchema = z
     status: nodeStatusSchema.optional(),
     synopsis: synopsis.optional(),
     numbered: z.boolean().optional(),
+    /** An image of the same book, or `null` to remove the header image (IMG-21). */
+    headerAssetId: z.uuid().nullable().optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'Nothing to update.' });
 export type PatchNodeBody = z.infer<typeof patchNodeBodySchema>;
@@ -66,6 +68,8 @@ export const nodeContentSchema = z.object({
   rev: z.number().int().nonnegative(),
   wordCount: z.number().int().nonnegative(),
   updatedAt: z.string(),
+  headerAssetId: z.string().nullable(),
+  headerImageUrl: z.string().nullable(),
 });
 export type NodeContent = z.infer<typeof nodeContentSchema>;
 export const nodeContentResponseSchema = z.object({ node: nodeContentSchema });

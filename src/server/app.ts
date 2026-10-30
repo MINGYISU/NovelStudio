@@ -98,7 +98,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const library = new LibraryService(options.db, options.paths);
     registerBookRoutes(app, options.db, library);
     registerAssetRoutes(app, options.db, options.paths, library);
-    registerNodeRoutes(app, new ManuscriptService(options.db, library));
+    registerNodeRoutes(app, new ManuscriptService(options.db, library, options.paths));
     registerCodexRoutes(app, new CodexService(options.db, options.paths, library));
     registerMapRoutes(app, new MapService(options.db, library));
     registerForeshadowRoutes(app, new ForeshadowService(options.db, library));

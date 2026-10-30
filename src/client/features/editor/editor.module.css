@@ -357,3 +357,321 @@
 .unsavedWarning p {
   margin: 0 0 0.5rem;
 }
+
+/* Images (IMG-02, IMG-03): a figure of its own, centered; never wrapped, never inline. */
+.image {
+  position: relative;
+  margin: 1em 0;
+  text-indent: 0;
+}
+
+.imageFigure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+}
+
+.imageMedia {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.imagePicture {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 2px;
+}
+
+.image[data-selected='true'] .imageMedia {
+  outline: 2px solid var(--ed-accent);
+  outline-offset: 2px;
+}
+
+.imageMissing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  border: 1px dashed var(--ed-border);
+  background: var(--ed-surface);
+  color: var(--ed-muted);
+  font-size: 0.85rem;
+}
+
+.imageCaption {
+  max-width: 100%;
+  margin-top: 0.4em;
+  color: var(--ed-muted);
+  font-size: 0.8em;
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* "Show images" off (IMG-12): one line with the caption instead of the picture. */
+.imageHidden {
+  display: none;
+  width: 100%;
+  padding: 0.2em 0;
+  color: var(--ed-muted);
+  font-size: 0.85em;
+  text-align: center;
+}
+
+.prose[data-images='off'] .imageFigure {
+  display: none;
+}
+
+.prose[data-images='off'] .imageHidden {
+  display: block;
+}
+
+.imageBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--ed-border);
+  border-radius: var(--radius);
+  background: var(--ed-surface);
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+.imageBarGroup {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+
+.imageBarButton {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ed-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.imageBarButton:hover {
+  background: var(--ed-border);
+}
+
+.imageBarButton[aria-pressed='true'] {
+  background: var(--ed-accent);
+  color: var(--color-accent-contrast);
+}
+
+.imageCaptionInput {
+  min-width: 12rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--ed-border);
+  border-radius: var(--radius);
+  background: var(--ed-bg);
+  color: var(--ed-text);
+  font: inherit;
+}
+
+.lightboxOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(0 0 0 / 80%);
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  cursor: zoom-out;
+}
+
+.lightboxImage {
+  max-width: 100%;
+  max-height: 85vh;
+  object-fit: contain;
+}
+
+.lightboxCaption {
+  margin: 0;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Section header image (IMG-20): the whole picture, centered, at most 40% of the window high. */
+.titleArea {
+  position: relative;
+}
+
+.headerImage {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.headerImage img {
+  display: block;
+  max-width: 100%;
+  max-height: 40vh;
+  object-fit: contain;
+}
+
+.headerMissing,
+.headerHidden {
+  margin-bottom: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px dashed var(--ed-border);
+  color: var(--ed-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.headerHidden {
+  border-style: none;
+}
+
+.headerActions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.titleArea:hover .headerActions,
+.titleArea:focus-within .headerActions {
+  opacity: 1;
+}
+
+.headerActions button {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+/* Picker dialog (IMG-08). */
+.pickerHeading {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.9rem;
+}
+
+.pickerHelp {
+  display: block;
+  margin: 0.3rem 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.pickerWarn {
+  margin: 0.3rem 0;
+  color: var(--color-error);
+  font-size: 0.85rem;
+}
+
+.pickerCheck {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+}
+
+.pickerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: 0.5rem;
+  max-height: 16rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.pickerThumb {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.pickerThumb:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.pickerThumb img {
+  width: 100%;
+  height: 5.5rem;
+  object-fit: contain;
+}
+
+/* Header image in the details panel; it is outside the editor, so it uses the app colors. */
+.detailsHeader {
+  margin-bottom: 1rem;
+}
+
+.detailsHeaderHeading {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+}
+
+.detailsHeaderPreview {
+  display: block;
+  max-width: 100%;
+  max-height: 7rem;
+  margin-bottom: 0.4rem;
+  object-fit: contain;
+}
+
+.detailsHeaderNone {
+  margin: 0 0 0.4rem;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.detailsHeaderButtons {
+  display: flex;
+  gap: 0.3rem;
+}

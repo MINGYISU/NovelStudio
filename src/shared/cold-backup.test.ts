@@ -85,6 +85,7 @@ describe('computeStats', () => {
       wordCount,
       plainText: '',
       content: null,
+      headerAssetId: null,
       rev: 0,
       createdAt: 'x',
       updatedAt: 'x',

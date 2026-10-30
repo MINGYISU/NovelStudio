@@ -57,3 +57,18 @@ export function getAsset(db: Db, id: string): AssetRow | null {
 export function deleteAsset(db: Db, id: string): void {
   db.prepare('DELETE FROM assets WHERE id = ?').run(id);
 }
+
+/** The book's images, newest first (id breaks ties so the order is stable). */
+export function listBookAssets(db: Db, bookId: string): AssetRow[] {
+  const rows = db
+    .prepare('SELECT * FROM assets WHERE book_id = ? ORDER BY created_at DESC, id DESC')
+    .all(bookId) as RawAsset[];
+  return rows.map(toAsset);
+}
+
+export function totalAssetBytes(db: Db, bookId: string): number {
+  const row = db
+    .prepare('SELECT COALESCE(SUM(bytes), 0) AS total FROM assets WHERE book_id = ?')
+    .get(bookId) as { total: number };
+  return row.total;
+}

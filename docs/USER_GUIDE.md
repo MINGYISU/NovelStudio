@@ -15,6 +15,7 @@ This guide uses a made-up novel, **The Lantern Road**. The screenshots show the 
 - [Find your way around](#find-your-way-around)
 - [Organize and rearrange chapters](#organize-and-rearrange-chapters)
 - [Make writing comfortable](#make-writing-comfortable)
+- [Add pictures](#add-pictures)
 - [Find words and make revisions](#find-words-and-make-revisions)
 - [Keep character and world notes](#keep-character-and-world-notes)
 - [Plan with story maps](#plan-with-story-maps)
@@ -178,7 +179,7 @@ The bottom of the editor shows word counts for the section and book. Select a pa
 
 1. Click **Display settings** in the editor toolbar.
 2. Choose a font, text size, line spacing, and editor width.
-3. Choose **Light**, **Dark**, or **Sepia**. You can also set paragraph spacing, a background color, or a background picture.
+3. Choose **Light**, **Dark**, or **Sepia**. You can also set paragraph spacing, a background color, or a background picture, and turn **Show images** off to hide pictures while you draft (see [Add pictures](#add-pictures)).
 4. Click **Save**.
 
 ![Display settings for font, spacing, theme, and background.](images/user-guide/04-display-settings.jpg)
@@ -196,6 +197,49 @@ Only the interface changes. Titles, text, Codex names, and map contents stay exa
 Choose **Book menu → Focus mode**, or press **Command+Shift+F**. The chapter list and side panels disappear so you can concentrate on writing. The save status remains visible.
 
 Click **Exit focus mode** to bring the panels back. You can also use **Command+Shift+F** again.
+
+## Add pictures
+
+NovelStudio can place a picture between paragraphs and give each section a header image. An image is always a line of its own, centered. It never sits inside a sentence, floats beside text, or sits inside a quote.
+
+### Put a picture in the text
+
+1. Click in the text where the picture belongs. If the cursor is in the middle of a paragraph, the paragraph is split there and the picture goes between the two halves.
+2. Click **Insert image** in the toolbar.
+3. Choose **Upload an image**, or click one of the pictures already in this book. The dialog shows the total size of the book’s pictures.
+
+You can also paste a picture (for example after **Copy image** in a browser, or a screenshot) or drop an image file onto the text. While it uploads, a short notice appears. PNG, JPEG, WebP, and GIF files up to 20 MB are accepted.
+
+Click a picture to select it. A small bar appears under it:
+
+- **Small**, **Medium**, or **Full** sets the width: about a third, two thirds, or all of the text column. A picture is never enlarged beyond its own size.
+- **Caption** adds a short line of text under the picture, up to 300 characters.
+- **Replace** swaps the picture and keeps its width and caption.
+- **Remove** takes it out of the text. The file stays in the book, so **Command+Z** and [snapshots](#bring-back-an-earlier-version-of-a-chapter) still bring it back.
+
+Press **Delete** or **Backspace** on a selected picture to remove it. Drag a picture to move it; it always lands between paragraphs. Double-click a picture to see it full size; press **Esc** or click to close it.
+
+Captions and pictures do not count as words and are not searched by find and replace.
+
+### Large pictures are shrunk
+
+To keep the book light, NovelStudio shrinks a picture whose long side is over 2,400 pixels or whose file is over 1.5 MB, and saves it as WebP. Animated GIFs, pictures that are already small, and pictures that cannot be made smaller are kept as they are. Tick **Keep original** in the insert dialog to skip this; the choice is remembered, and it also applies to pasted and dropped pictures.
+
+### Pictures from web pages and other books
+
+When you paste a web page or a document, its pictures are **not** copied, and NovelStudio tells you so. Paste or drop the picture file itself instead. A picture copied from one NovelStudio chapter pastes fine into another chapter of the same book. Pasted into a different book, the file is copied into that book.
+
+If a picture’s file is ever missing, its place shows **Image missing**; the reference is kept.
+
+### Give a section a header image
+
+Any volume, part, chapter, or scene can have one header image, shown above its title. Point at the title area and click **Add header image**, or use the **Header image** buttons in the right panel. Choose **Replace** or **Remove** later in the same places. The whole picture is always visible, and it is never taller than about 40% of the window.
+
+A header image is not part of the text: it does not change word counts, find and replace, or snapshots. Duplicating a section copies it, and moving or trashing a section keeps it.
+
+### Hide pictures while you draft
+
+Open **Display settings** and turn off **Show images**. Each picture, and each header image, shrinks to a thin line (with the caption, if there is one). Nothing in the text changes. Turn it back on any time.
 
 ## Find words and make revisions
 
@@ -362,13 +406,15 @@ Files must be no larger than 25 MB. Word documents (`.docx`), PDFs, and EPUB fil
 
 **Plain text** is useful when you need the words without formatting. **Markdown** retains supported formatting as text notation and is useful in apps that read Markdown.
 
-Both exports follow the current reading order and include section headings. Trashed sections are left out. Planning notes, maps, and character cards are not included in a manuscript export. For those, make a **cold backup** as described below.
+Both exports follow the current reading order and include section headings. Each picture becomes a line such as `[Image: caption]`, or `[Image]` without a caption; header images are left out. Trashed sections are left out. Planning notes, maps, and character cards are not included in a manuscript export. For those, make a **cold backup** as described below.
 
 If an export warns that some text has not saved, choose **Cancel**, preserve the unsaved text, and resolve the save problem first. **Export anyway** may leave your latest changes out of the file.
 
 ## Keep a separate backup
 
 Autosave keeps your working copy up to date. A **cold backup** is a separate file containing a whole book, including its manuscript, trashed sections, character notes, maps, clues, and pictures. You can use it to bring the book back later.
+
+Because a cold backup is one file, a book’s pictures can total about 300 MB at most. A book over that limit is not backed up and says how large its pictures are; the insert-image dialog already warns once the pictures pass 200 MB. Remove pictures you no longer need from the text, or keep them smaller.
 
 ### Choose a backup folder
 

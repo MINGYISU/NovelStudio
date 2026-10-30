@@ -135,6 +135,10 @@ export class SnapshotService {
         rev: current.rev + 1,
         wordCount: countWords(plainText),
         updatedAt: now.toISOString(),
+        headerAssetId: current.headerAssetId,
+        headerImageUrl: current.headerAssetId
+          ? `/assets/${current.bookId}/${current.headerAssetId}`
+          : null,
       };
     })();
     this.markSeen(node.id);

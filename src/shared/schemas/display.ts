@@ -36,6 +36,7 @@ export const displaySettingsSchema = z.object({
     .default(null),
   backgroundImageAssetId: z.uuid().nullable().default(null),
   backgroundImageOpacity: z.number().min(0.05).max(1).default(0.3),
+  showImages: z.boolean().default(true),
 });
 export type DisplaySettings = z.infer<typeof displaySettingsSchema>;
 

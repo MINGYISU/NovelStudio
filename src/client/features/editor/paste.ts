@@ -50,13 +50,27 @@ function cleanStyle(el: HTMLElement): void {
   if (keep.length > 0) el.setAttribute('style', keep.join('; '));
 }
 
+/** Our own image on the clipboard (IMG-10); every attribute but these is dropped. */
+const IMAGE_ATTRIBUTES = ['data-ns-image', 'data-asset-id', 'data-book-id', 'data-size'];
+
 /**
  * Pasted HTML is untrusted and usually carries fonts, sizes and colors (ED-04). Everything except
  * bold/italic/underline/strike/alignment, palette highlight colors on `<mark>` and foreshadow
  * anchors is removed before the editor's schema filters the rest. Nested quotes are flattened.
  */
 export function cleanPastedHtml(html: string): string {
+  return cleanPastedHtmlReport(html).html;
+}
+
+/**
+ * As `cleanPastedHtml`, and says whether foreign images were left out (IMG-09): every `<img>` and
+ * `<picture>` goes, nothing is ever fetched; only our own `figure[data-ns-image]` is kept.
+ */
+export function cleanPastedHtmlReport(html: string): { html: string; removedImages: boolean } {
   const doc = new DOMParser().parseFromString(html, 'text/html');
+  const foreignImages = doc.querySelectorAll('img, picture');
+  const removedImages = foreignImages.length > 0;
+  foreignImages.forEach((el) => el.remove());
   doc
     .querySelectorAll('script, style, meta, link, title, head, iframe, object, embed')
     .forEach((el) => el.remove());
@@ -76,9 +90,13 @@ export function cleanPastedHtml(html: string): string {
     for (const attr of Array.from(el.attributes)) {
       // Cut-and-paste inside the app must keep an anchor with its text (FS-08).
       const keepAnchor = attr.name === ANCHOR_ATTRIBUTE && isOccurrenceId(attr.value);
-      if (attr.name !== 'style' && !keepAnchor) el.removeAttribute(attr.name);
+      const keepImage =
+        el.tagName === 'FIGURE' &&
+        el.hasAttribute('data-ns-image') &&
+        IMAGE_ATTRIBUTES.includes(attr.name);
+      if (attr.name !== 'style' && !keepAnchor && !keepImage) el.removeAttribute(attr.name);
     }
     if (highlight !== null) el.setAttribute('data-color', highlight);
   });
-  return doc.body.innerHTML;
+  return { html: doc.body.innerHTML, removedImages };
 }

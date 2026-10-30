@@ -81,6 +81,19 @@ export const assetSchema = z.object({
 });
 export type Asset = z.infer<typeof assetSchema>;
 
+/** One image of a book as listed in the image picker (IMG-08). */
+export const bookAssetSchema = assetSchema.omit({ bookId: true }).extend({ createdAt: z.string() });
+export type BookAsset = z.infer<typeof bookAssetSchema>;
+export const assetListResponseSchema = z.object({
+  assets: z.array(bookAssetSchema),
+  totalBytes: z.number().int().nonnegative(),
+});
+export type AssetListResponse = z.infer<typeof assetListResponseSchema>;
+
+/** Copies an image of another book into this one (IMG-10). */
+export const copyAssetBodySchema = z.object({ sourceBookId: z.uuid(), assetId: z.uuid() });
+export type CopyAssetBody = z.infer<typeof copyAssetBodySchema>;
+
 export const errorResponseSchema = z.object({
   error: z.object({ code: z.string(), message: z.string() }),
 });
