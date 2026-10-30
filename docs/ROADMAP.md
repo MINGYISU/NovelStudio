@@ -17,6 +17,8 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 | M7b | In-text foreshadow anchors | FS-08 | ☑ |
 | M8 | Polish, import/export | WS-03, ED-09, DISP-02, HOT-02, IMP-02/03, EXP-01, COLD-11 | ☑ |
 | M9 | Review fixes | TREE-08, ED-02/04/05/10/12, HOT-02, WS-01/02, CDX-01, MOVE-11, MAP-08, EXP-01, COLD-02, IMP-02 | ☑ |
+| M10 | Interface language (English / 简体中文) | I18N-01..10 | ☐ |
+| M11 | Images: illustrations and section header images | IMG-01..14, IMG-20..23, COLD-09 | ☐ |
 
 **Finish M9 before writing real chapters.** The post-M8 review found ways typed text could be lost (see M9 group A). After M9, make sure a cold backup folder is set and one export has succeeded.
 
@@ -342,6 +344,322 @@ Work in group order: **A** first (data safety), then **B**, then **C**. Splittin
 
 ---
 
+## M10 — Interface language (English / 简体中文)
+
+Make every piece of interface text switchable between English and Simplified Chinese (PRD §12.1). M10 changes **no stored data** and adds **no dependency**. It goes before M11, so the image interface is written in both languages from the start.
+
+**Not in scope:** other languages; translating the user guide, CLI output, server logs or the cold backup `_readme`; translating or rewriting anything already stored in a book; right-to-left layout.
+
+Work in group order. Several commits (`M10: …`) are fine; the milestone is accepted as a whole.
+
+### Group A — Infrastructure
+
+**A1. Locale type and dictionaries.**
+- `src/shared/schemas/locale.ts`: `localeSchema = z.enum(['en', 'zh-CN'])`, type `Locale`, `DEFAULT_LOCALE = 'en'`.
+- `src/client/i18n/`:
+  - `en.ts` is the source of truth: a flat `as const` object of message keys (`'library.newBook'`, `'editor.status.saving'`, …).
+  - `zh-CN.ts` is typed `Record<MessageKey, string>`, so a missing or extra key is a compile error.
+  - Placeholders use `{name}` (e.g. `'trash.restoredTo': 'Restored to {parent}'`).
+  - Plurals use `Intl.PluralRules`: keys ending `.one` / `.other`. Chinese fills both the same way.
+- `index.ts` exports:
+  - `t(key, params?)` and a `useT()` hook that re-renders on a locale change;
+  - `formatNumber`, `formatDate`, `formatDateTime`, `formatWords(count)`, all using the current locale;
+  - `apiErrorMessage(error)` (A4).
+- No i18n library. Keep `t` small and tested.
+
+**A2. Locale store and switch (I18N-02, I18N-08).**
+- A Zustand store `stores/locale.ts`, persisted in `localStorage` under `novelstudio:locale`.
+- First start: `navigator.language` beginning with `zh` → `zh-CN`, anything else → `en`. An unreadable stored value counts as unset.
+- On change, set `document.documentElement.lang` and `document.title`.
+- Settings page: a **Language · 语言** section (label always in both languages), with options `English` / `简体中文`, each in its own language.
+- Switching must not remount the editor or touch savers. Test this (C2).
+
+**A3. Lint guard (I18N-09).**
+- In `eslint.config.js`, for `src/client/**/*.tsx`, use the core rule `no-restricted-syntax` to forbid:
+  - `JSXText` containing a Latin letter or CJK character;
+  - string literals in the JSX attributes `title`, `placeholder`, `aria-label`, `alt` and `label`.
+- Exceptions (the product name `NovelStudio`, keyboard key names) need an `eslint-disable-next-line` comment with a reason.
+- Strings built in `.ts` files and shown in the UI (notices, `confirm()` text, toasts) must also go through `t`; review them by hand, since lint cannot see them.
+
+**A4. Error messages (I18N-04).**
+- Add `src/shared/error-codes.ts`, listing every API error `code` the server can return. Use it on the server where practical.
+- The client has an `errors.<CODE>` key for every code.
+- `apiErrorMessage` translates by code. For an unknown code it falls back to the server's message.
+- Messages that carry server-side details (e.g. a cold backup path, a validation detail) show the translated sentence plus the detail.
+
+### Group B — Translate everything
+
+**B1. Client text (I18N-01, I18N-03, I18N-07).** Move every string in `src/client/**` to the dictionaries. That covers pages, features, components, dialogs, notices, tooltips, aria labels and the save status. Replace bare `toLocaleString()` and `Intl.*(undefined, …)` with the locale-aware helpers. Names that belong to the app are translated at display time:
+- section kinds in menus, section statuses;
+- map template names and descriptions;
+- foreshadow roles, statuses and warning texts (translate from the warning `kind` and its parameters; `shared/foreshadow.ts` keeps its English `message` as the fallback);
+- highlight color names, theme names, `(untitled)`.
+
+**B2. Text the app creates (I18N-06).**
+- `src/shared/seed-text.ts` (pure data, both locales) holds:
+  - default Codex categories and field **labels**, with field **keys** unchanged;
+  - map template titles and node titles;
+  - the default map title;
+  - the copy suffix (`(copy)` / `（副本）`);
+  - the *Front matter* title of a text import (`前言`);
+  - the restored-book title suffix (` (restored YYYY-MM-DD)` / `（恢复于 YYYY-MM-DD）`).
+- These endpoints take an optional `locale` (body field or multipart field; default `en`, invalid → `400 VALIDATION_ERROR`), and the client always sends the current one:
+  - `POST /books` (Codex defaults, plus the numbering preset: `zh-CN` → the Chinese preset of NUM-04);
+  - `POST /books/:id/codex/seed`;
+  - `POST /import/text` commit (Codex defaults and the *Front matter* title; the preset stays the user's choice);
+  - `POST /books/:id/maps`;
+  - `POST /nodes/:id/duplicate`;
+  - `POST /maps/:id/duplicate`;
+  - `POST /import/cold-backup` (title suffix).
+- `GET /books/:id/export` takes `lang` for `(untitled)`.
+- The CLI scripts and `seed:dev` keep English.
+- The "characters in this section" detection (CDX-07) already keys on the `aliases` field. Confirm that a Chinese-default book (category `人物`) is detected, and add a test.
+
+**B3. Glossary.** Use these terms everywhere so the Chinese interface is consistent. Ask before changing one.
+
+| English | 简体中文 | English | 简体中文 |
+|---|---|---|---|
+| Library | 书库 | Codex | 设定集 |
+| Book | 作品 | Category / Entry / Field | 分类 / 条目 / 字段 |
+| Manuscript | 正文 | Story map | 故事图 |
+| Section | 章节 | Node / Edge | 节点 / 连线 |
+| Volume / Part / Chapter / Scene | 卷 / 部 / 章 / 场景 | Timeline / Plot tree / Character arc | 时间线 / 情节树 / 人物弧光 |
+| Synopsis | 梗概 | Foreshadowing / Thread | 伏笔 / 伏笔线 |
+| Status: idea / draft / revising / done | 构思 / 草稿 / 修改中 / 完成 | Setup / Hint / Payoff | 埋设 / 暗示 / 回收 |
+| Trash / Restore | 回收站 / 恢复 | planned / planted / paid off / abandoned | 计划中 / 已埋设 / 已回收 / 已放弃 |
+| Snapshot | 快照 | Anchor | 锚点 |
+| Hot backup / Cold backup | 热备份 / 冷备份 | Focus mode | 专注模式 |
+| Saving… / Saved / Error | 正在保存… / 已保存 / 保存失败 | Find & replace | 查找和替换 |
+| Word count / words | 字数 / 字 | Display settings | 显示设置 |
+| Cover | 封面 | Import / Export | 导入 / 导出 |
+| Image / Caption (M11) | 插图 / 图注 | Header image (M11) | 题图 |
+
+Default Codex categories in Chinese: 人物, 地点, 时代与年表, 文化与习俗, 组织与势力, 生物与种族, 规则与概念, 其他.
+- Character fields: 姓名, 别名, 身份, 年龄, 外貌, 背景, 性格, 目标与动机, 人物关系, 人物弧光, 备注.
+- Other categories' fields: 描述, 备注.
+
+### Group C — Tests
+
+- **C1. Unit:**
+  - `t` with placeholders, plurals and fallback;
+  - every `en` key has a non-empty `zh-CN` value with the same set of `{placeholders}`;
+  - `formatWords` in both locales;
+  - first-start detection from `navigator.language`;
+  - every code in `error-codes.ts` has both translations;
+  - `seed-text.ts` has the same Codex field keys in both locales.
+- **C2. E2E:**
+  - Switch to 简体中文 in Settings. Library, workspace (all four views), the Settings page and a dialog show Chinese labels, `<html lang="zh-CN">`, no reload happens, and the choice survives a reload.
+  - Type in a section, switch the language immediately, reload: the text is all there.
+  - Create a book in Chinese: its Codex starts with `人物`, and a new chapter shows as `第一章`. Switch back to English: the same book still shows `人物` and `第一章`.
+- **C3. API:**
+  - `POST /books` with `locale: 'zh-CN'` creates Chinese categories and the Chinese preset;
+  - without `locale`, the result is the same as today;
+  - an invalid `locale` → `400`;
+  - map and section duplicate suffixes in both locales;
+  - export `lang=zh-CN` writes `（无标题）` for untitled sections.
+- Existing tests keep passing. E2E tests that select by English text should run in English, either by setting the locale in a fixture or by relying on the English default.
+
+### Docs to update in the same change
+
+- **ARCHITECTURE.md:**
+  - §2: an "Interface language" row (no library; typed dictionaries + `Intl`);
+  - §3: `src/client/i18n/`, `shared/seed-text.ts`, `shared/error-codes.ts`;
+  - §6: the `locale` / `lang` parameters;
+  - a short "Interface language" subsection: the store, `lang` attribute, lint guard and the rule that stored data is never translated.
+- **AGENTS.md** (Technical rules): "All interface text goes through `t()` with both `en` and `zh-CN` entries; never hardcode UI text; follow the glossary in ROADMAP M10."
+- **README.md** and **USER_GUIDE.md**: one short paragraph on switching language.
+
+### Done when
+
+- [ ] Every item A1–A4, B1–B3, C1–C3 is implemented.
+- [ ] `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:e2e` all pass; results reported with counts.
+- [ ] Docs updated as listed.
+- [ ] Manual checklist, run against `./.data-dev` only:
+  - [ ] Click through every view and dialog in 简体中文: no English left except the product name, user data and fixed formats.
+  - [ ] Read the Chinese text for tone and terminology (the user reviews the wording).
+  - [ ] Trigger a few errors (export to a missing folder, upload an SVG): the messages are in Chinese.
+  - [ ] Dates in the library, snapshots and hot backup list use Chinese formatting.
+
+---
+
+## M11 — Images: illustrations and section header images
+
+Images between paragraphs and a header image per section (PRD §5.2, §5.3). The single most important rule is **an image is always a line of its own**. Do not add text wrapping, inline images, alignment options or free resizing, even if Tiptap makes them easy. All new interface text goes through `t()` in both languages (M10).
+
+**Not in scope:** image editing; images inside quotes, headings, Codex fields or map nodes; images from URLs; a gallery view; image notes (e.g. the AI prompt); orphan cleanup; EPUB/DOCX; changing cover, Codex or background uploads; a multi-file cold backup format.
+
+Work in group order. Several commits (`M11: …`) are fine; the milestone is accepted as a whole.
+
+### Group A — Images in the text
+
+**A1. Content model.**
+- `src/shared/schemas/content.ts` adds the node type `image`, with the attributes `assetId` (UUID, required), `size` (`small` | `medium` | `full`, default `medium`) and `caption` (string, at most 300 characters, default `''`).
+- It has no `content`, `marks` or `text`, and it is only valid as a direct child of `doc`.
+- No `src`, base64 or any other attribute is ever stored; content holds only the asset id.
+- `normalizeContent` (shared, runs everywhere content is normalized today):
+  - moves an `image` found inside a blockquote (or deeper) to just after the top-level block that contained it, in order;
+  - drops unknown image attributes;
+  - fills missing `size`/`caption` with the defaults;
+  - truncates a caption over 300 characters.
+- An image whose `assetId` is not a UUID cannot come from the editor, so it stays a validation error.
+- An image whose asset does not exist **is valid** (IMG-07). Saves never check that an asset exists.
+
+**A2. Editor node (IMG-01..05, IMG-13).**
+- A custom Tiptap node in `features/editor/image-extension.ts`, rendered with `ReactNodeViewRenderer` from `@tiptap/react` (already a dependency; do **not** add `@tiptap/extension-image`).
+- Atom, draggable, selectable, top level only. The document's content expression must allow it at the top level and the blockquote's must not.
+- Rendering:
+  - `<figure>` with the image, centered, its width set by `size` (Small ≈ 33%, Medium ≈ 66%, Full = 100% of the text column; `max-width` = natural width);
+  - `<figcaption>` when the caption is set;
+  - `loading="lazy"`, `decoding="async"`, and `alt` set to the caption;
+  - URL `/assets/<bookId>/<assetId>`;
+  - a failed load shows an **Image missing** placeholder of the same width, and the node stays.
+- Selected image: a small bar with S / M / Full, **Caption** (inline input, `maxLength` 300), **Replace** (same dialog as insert; keeps size and caption) and **Remove**. Double-click opens a full-size overlay (Radix dialog; `Esc` closes).
+- Toolbar **Image** button: opens the insert dialog (A4). Insertion happens at the cursor. Inside a paragraph, the paragraph is split, so the image never shares a line. If the cursor is in a quote, the image goes after the quote.
+- Clipboard HTML of an image is `<figure data-ns-image data-asset-id data-book-id data-size>…`. `parseHTML` accepts **only** that form.
+
+**A3. Pasting and dropping (IMG-01, IMG-09, IMG-10).**
+- `handlePaste` / `handleDrop`: `image/*` files are optimized (A5), uploaded with `POST /books/:id/assets`, and inserted at the cursor or drop point once the upload succeeds.
+- Mapping the position: map the insert position through the transactions that happen during the upload, and insert at the mapped position.
+- No placeholder node is ever stored. While uploading, show the notice "Uploading image…".
+- If the upload fails, show the translated error (e.g. `415`, `413`) and insert nothing.
+- `paste.ts` removes every foreign `<img>`/`<picture>` (anything that is not our own `figure[data-ns-image]`). If it removed any, show the IMG-09 notice. Nothing is ever fetched.
+- *Should, IMG-10:* if a pasted image's `data-book-id` is another book, call a new `POST /books/:id/assets/copy` `{ sourceBookId, assetId }` → `201 { asset }`. The server copies the file into this book (same checks as an upload), and the client then sets the new `assetId`. If the copy fails, remove that image from the pasted content and show a notice.
+
+**A4. Book images and the insert dialog (IMG-06, IMG-08, IMG-14).**
+- New `GET /books/:id/assets` → `{ assets: [{ id, fileName, mime, bytes, url, createdAt }], totalBytes }` (newest first; readable for a trashed book).
+- One `ImagePickerDialog`, used for insert, replace and header images, with:
+  - an **Upload** area with the **Keep original** checkbox, remembered in `localStorage` (`novelstudio:keepOriginalImages`);
+  - a thumbnail grid of the book's images;
+  - the book's total image size, with a warning above 200 MB.
+
+**A5. Optimization (IMG-06).**
+- Pure decision helpers go in `src/shared/image-sizing.ts`: `needsOptimizing({ width, height, bytes, mime, animated })` and `targetSize(width, height, maxEdge = 2400)`. Both are unit-tested.
+- The browser part goes in `features/editor/image-optimize.ts`:
+  - decode with `createImageBitmap` (EXIF orientation applied);
+  - draw to a canvas at the target size;
+  - encode with `toBlob('image/webp', 0.85)`.
+- Upload the original unchanged in any of these cases:
+  - the image is a GIF;
+  - the browser does not return WebP;
+  - the result is not smaller than the original;
+  - anything throws.
+- The file name keeps its base name with the new extension.
+
+**A6. Plain text, counts, export (IMG-11).**
+- `docToPlainText` skips `image` nodes, so `plain_text`, `word_count`, find, find & replace and foreshadow anchors are unchanged.
+- `manuscript-export.ts` writes `[Image: <caption>]` / `[Image]` as its own block. The text is localized through the `lang` parameter from M10 (`[插图：<图注>]` / `[插图]`), and escaped in Markdown.
+
+**A7. Show images (IMG-12).**
+- Add `showImages` (boolean, default `true`) to `settings.display`, with a checkbox in Display settings. Older settings without the key read as `true`.
+- When off, images and the header image render as a one-line placeholder with the caption.
+- It is part of the book settings, so it is already in the cold backup.
+
+### Group B — Section header images (IMG-20..23)
+
+**B1. Data.**
+- Migration `005_section_header_image.sql`: `ALTER TABLE nodes ADD COLUMN header_asset_id TEXT REFERENCES assets(id);`. It is a new file; never edit an earlier migration.
+- `GET /nodes/:id` returns `headerAssetId` and `headerImageUrl`. The tree endpoint does not need it.
+- `PATCH /nodes/:id` accepts `headerAssetId`: an asset of the same book, or `null`. Anything else is `400 INVALID_IMAGE`; a trashed book is `409 BOOK_TRASHED`.
+- Duplicate copies `header_asset_id`. Trash and restore leave it as it is.
+
+**B2. UI.**
+- The header image renders above the title `h2` in `EditorPanel`, inside the text column:
+  - the whole image is visible (`object-fit: contain`), centered;
+  - `max-height: 40vh`;
+  - a missing file shows a slim **Image missing** bar.
+- Hovering the title area shows a quiet **Add header image** button, or **Replace / Remove** when one is set.
+- The details panel has the same controls and a small preview.
+- Header images go through the picker (A4) and the optimization (A5).
+
+### Group C — Asset safety and backups
+
+**C1. Never delete an image that is still used (IMG-07, IMG-22).**
+- Extend `isAssetInUse` (`repos/`) so it also returns true when the asset is:
+  - a node's `header_asset_id`;
+  - referenced by the `content` of any node of the book, **trashed ones included**;
+  - referenced by the `content` of any snapshot of those nodes.
+- A narrowing `instr(content, ?)` search followed by a JSON check is fine at this scale. Keep the SQL in `repos/`.
+- Removing an image from the text deletes nothing.
+- Replacing or removing a header image deletes the old file only if `isAssetInUse` is false, which is the existing cover rule.
+
+**C2. Cold backup (COLD-09).**
+- Export:
+  - `Section` and `TrashedSection` gain `headerAssetId` (`string | null`; a missing key on restore means `null`);
+  - `content` carries `image` nodes unchanged;
+  - `formatVersion` stays `1`, per the versioning rules (an optional key with a default).
+- Restore:
+  - remap `image.attrs.assetId` in section **and** snapshot content, and `headerAssetId`, through the same ID map as the cover (alongside the `foreshadowAnchor` remap);
+  - an image node whose asset is not in the file is **kept** (it shows as missing) with one warning per section;
+  - a missing header asset becomes `null`, with a warning.
+- Size guard (IMG-14):
+  - before serializing, if the book's image bytes exceed `COLD_BACKUP_MAX_IMAGE_BYTES` (300 MB; a constant that tests can lower), fail with `COLD_BACKUP_TOO_LARGE`, write nothing, and name the book and its image total;
+  - also turn a `RangeError` from `JSON.stringify`/`JSON.parse` into this error (restore: `INVALID_BACKUP` with a clear message) instead of a crash;
+  - auto daily cold backup reports the failure like any other.
+- Update the `_readme` text (COLD_BACKUP_FORMAT §6) with: "Sections refer to images by 'assetId' ('image' nodes in 'content') and 'headerAssetId'." Update its test.
+
+### Group D — Tests
+
+- **Unit:**
+  - the schema accepts a top-level image and rejects one inside a paragraph;
+  - `normalizeContent` lifts an image out of nested quotes (order kept), drops unknown attributes, truncates long captions, and the output passes `contentSchema`;
+  - `docToPlainText`/word count are identical with and without images;
+  - export placeholder lines in both languages;
+  - `needsOptimizing`/`targetSize` tables;
+  - picker size formatting.
+- **API:**
+  - `PUT /nodes/:id/content` with an image of a non-existent asset → `200`;
+  - an image inside a quote → `200` and stored lifted out;
+  - `GET /books/:id/assets` → the list and the total;
+  - `PATCH` `headerAssetId`: valid, another book's asset → `400`, `null` → removed;
+  - replacing a header deletes the old file only when it is unused: keep it when the asset is in some section's text, a trashed section's text or a snapshot;
+  - duplicate copies the header;
+  - asset copy between books (if IMG-10 is done);
+  - `COLD_BACKUP_TOO_LARGE` with a lowered limit writes nothing.
+- **Cold backup:**
+  - the round trip with images in text, snapshots and headers is identical;
+  - restore with an ID collision remaps every `assetId` and `headerAssetId`;
+  - a missing asset keeps the node and warns.
+- **E2E** (images generated in the test as small made-up PNGs; no real pictures in fixtures):
+  - insert via the toolbar mid-paragraph: two paragraphs with the image between; set Small, add a caption, reload → unchanged;
+  - paste an image file → inserted on its own line;
+  - paste HTML with an `<img src="https://…">`: no request leaves the page (Playwright request listener), the image is left out, and the notice is shown;
+  - set a header image → above the title; reload → still there;
+  - remove an image, undo → it is back; remove it, restore the previous snapshot → it shows (the file was not deleted);
+  - Show images off → placeholders.
+- **Manual:**
+  - a 4,000 px PNG becomes a ≤ 2,400 px WebP;
+  - **Keep original** uploads the PNG unchanged.
+
+### Docs to update in the same change
+
+- **ARCHITECTURE.md:**
+  - §2 Editor row: the custom node `image` (no new dependency);
+  - §5: `header_asset_id`;
+  - §6: `GET /books/:id/assets`, `POST /books/:id/assets/copy`, the `PATCH /nodes/:id` and `GET /nodes/:id` additions;
+  - §8: an "Images" paragraph (model, normalization, paste and drop, optimization, missing images, show images);
+  - §10.2: the restore remap and size guard;
+  - §13: pasted images are never fetched.
+- **COLD_BACKUP_FORMAT.md:**
+  - §4.2: `headerAssetId` and the `image` node;
+  - §5 rule 4: the new references;
+  - §6: the `_readme` line;
+  - §7: optionally, a `jq` recipe that lists images per section.
+- **USER_GUIDE.md:** inserting images, header images, Keep original, Show images.
+
+### Done when
+
+- [ ] Every item in groups A–D is implemented (IMG-10 and IMG-13 may be deferred if agreed with the user).
+- [ ] `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:e2e` all pass; results reported with counts.
+- [ ] Docs updated as listed.
+- [ ] PRD §13 scenarios 17–19 pass.
+- [ ] Manual checklist, run against `./.data-dev` only:
+  - [ ] Insert three AI-style images in a chapter at different widths: the text never wraps beside them, in light, dark and sepia themes and in focus mode.
+  - [ ] Drag an image to another place in the section: it always lands between paragraphs.
+  - [ ] Switching to a chapter with several large images stays smooth (lazy loading).
+  - [ ] Export the book to Markdown: image lines are in place; cold backup export and `verify:cold` succeed.
+
+---
+
 ## Later (not scheduled)
 
-Multi-select drag · swimlane timeline view · codex field types & relationship graph · DOCX/EPUB · writing goals · Electron wrapper · per-heading toggles in the import preview · cleanup of orphaned image uploads (a cover uploaded but never attached, e.g. when saving the book fails).
+Multi-select drag · swimlane timeline view · codex field types & relationship graph · DOCX/EPUB (with images) · writing goals · Electron wrapper · per-heading toggles in the import preview · cleanup of orphaned image uploads (a cover uploaded but never attached, e.g. when saving the book fails; images removed from the text, once no snapshot uses them) · a cold backup format for books with more than ~300 MB of images · image notes (e.g. the prompt that generated an illustration) · a gallery view of a book's images · a Chinese user guide · more interface languages.

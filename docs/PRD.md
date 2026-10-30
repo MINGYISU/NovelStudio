@@ -23,6 +23,8 @@ NovelStudio is a personal writing app for long-form fiction. It combines:
 4. A **foreshadowing tracker** that links setups to payoffs and warns when reordering breaks them.
 5. A **Codex**: character cards and worldbuilding entries with customizable fields.
 6. Layered local data protection, ending in a human-readable **cold backup** JSON file.
+7. **Illustrations**: images placed between paragraphs and a header image per section, always on a line of their own (§5.2, §5.3).
+8. An interface in **English or Simplified Chinese**, switchable at any time (§12.1).
 
 ### Principles
 
@@ -137,7 +139,7 @@ Defaults:
 | ID | Pri | Requirement |
 |---|---|---|
 | ED-01 | Must | Selecting a section opens its content in the rich-text editor. Empty sections show an empty editor with a placeholder. |
-| ED-02 | Must | Formatting (stored in content): bold, italic, underline, strikethrough, highlight (several colors), headings (2 levels), blockquote, text alignment, scene break (horizontal rule). Nothing else. |
+| ED-02 | Must | Formatting (stored in content): bold, italic, underline, strikethrough, highlight (several colors), headings (2 levels), blockquote, text alignment, scene break (horizontal rule). Nothing else. Images are separate block elements with their own rules (§5.2). |
 | ED-03 | Must | Undo/redo (`Cmd+Z` / `Cmd+Shift+Z`) within the open section. History resets when switching sections. |
 | ED-04 | Must | Cut/copy/paste. Pasting from Word or web pages keeps only formatting allowed by ED-02; fonts, sizes and colors are stripped. `Cmd+Shift+V` pastes plain text. |
 | ED-05 | Must | Autosave ~1 s after typing stops, and immediately on section switch, view switch, tab hide, and page unload. Save status shown in the top bar (§3). |
@@ -158,6 +160,36 @@ Font family, font size, line height, paragraph spacing, first-line indent (e.g. 
 | DISP-01 | Must | Font family, size, line height, first-line indent, editor width, light/dark theme. |
 | DISP-02 | Should | Background color/image, sepia theme, paragraph spacing. |
 | DISP-03 | Must | Only system fonts and fonts bundled with the app are offered. No network font loading. |
+
+### 5.2 Images in the text (illustrations)
+
+Pictures of scenes and characters (for example AI-generated ones) can sit between paragraphs. NovelStudio is a writing tool, not a page-layout tool, so images follow one strict rule: **an image is always a line of its own.** Text never flows around an image, appears beside it, or shares its line, so an image can never break the layout of the text around it.
+
+| ID | Pri | Requirement |
+|---|---|---|
+| IMG-01 | Must | Insert an image at the cursor with the toolbar's **Image** button (upload a file, or pick one already in the book, IMG-08), by pasting an image file (e.g. *Copy image* in a browser, a screenshot), or by dropping an image file onto the text. If the cursor is inside a paragraph, the paragraph is split there and the image goes between the two halves. |
+| IMG-02 | Must | **Block-only layout.** An image always sits on its own line, horizontally centered. There is no text wrapping, floating, inline image, free resizing by dragging, cropping or rotation. Images live only at the top level of the text, never inside a quote, heading or paragraph; an image that ends up inside a quote (e.g. by pasting) is moved to just after it. |
+| IMG-03 | Must | Three width presets: **Small** (about ⅓ of the text column), **Medium** (about ⅔, the default) and **Full** (the text column). An image is never enlarged beyond its own pixel size. |
+| IMG-04 | Should | Optional **caption** (plain text, at most 300 characters) shown centered under the image in smaller, muted text. Captions do not count as words and are not searched by find or find & replace (documented limitation). |
+| IMG-05 | Must | Clicking an image selects it and shows a small bar: width presets, **Caption**, **Replace**, **Remove**. `Delete`/`Backspace` removes a selected image and undo brings it back. An image can be dragged to another place in the same section; it always lands between paragraphs. |
+| IMG-06 | Must | **Optimized on insert.** Before upload, the browser shrinks an image whose long edge is over 2,400 px or whose file is over 1.5 MB to at most 2,400 px on the long edge and re-encodes it as WebP. Animated GIFs, images already within both limits, and images the browser cannot make smaller are uploaded unchanged. A **Keep original** checkbox in the insert dialog skips this; the choice is remembered and also applies to pasted and dropped images. Applies to images in the text and header images (§5.3), not to covers, Codex images or the background picture. |
+| IMG-07 | Must | **Images are never lost silently.** Removing an image from the text does not delete its file: it stays in the book's images, so undo and snapshot restore (ED-10) still show it. An image used by any section text (live or trashed), any snapshot, a header image, the cover, a Codex entry or the background picture is never deleted automatically. If an image file is missing, its place in the text shows an **Image missing** placeholder and the reference is kept. A section must never become unsaveable because of an image (missing file, image inside a quote, long caption). |
+| IMG-08 | Must | **Book images.** The insert dialog and the header image picker list every image of the book (including the cover and Codex images) as thumbnails, so one image can be reused without uploading it again. The dialog shows the total size of the book's images. |
+| IMG-09 | Must | **Pasted documents.** Images inside pasted HTML (web pages, Word) are never fetched (no network) and are left out; a notice says to paste or drop the image file itself. An image copied inside NovelStudio and pasted in the same book keeps working. |
+| IMG-10 | Should | Copying an image from one book's text and pasting it into another book copies the image file into that book, so it is not shown as missing. If the copy fails, the image is left out with a notice. |
+| IMG-11 | Must | **Text, counts and exports.** Images do not count as words and are not part of a section's plain text. The Markdown/TXT export (EXP-01) writes each image as a line `[Image: <caption>]`, or `[Image]` without a caption, in the export's language (§12.1). The full image is only in the cold backup. |
+| IMG-12 | Should | Display setting **Show images** (DISP, per book, on by default). When off, each image and header image collapses to a thin one-line placeholder showing its caption, for distraction-free drafting. Nothing in the text changes. |
+| IMG-13 | Should | Double-clicking an image opens it full size over the page; `Esc` or a click closes it. |
+| IMG-14 | Must | **Cold backup size guard.** Every image is in the cold backup (COLD-03, COLD-09). A cold backup is a single JSON file, so a book's images have a size ceiling (about 300 MB of image files). An export that would exceed it fails before writing anything, with `COLD_BACKUP_TOO_LARGE` and a message giving the book's image total. The insert dialog warns when the book's images pass 200 MB. |
+
+### 5.3 Section header images
+
+| ID | Pri | Requirement |
+|---|---|---|
+| IMG-20 | Must | Any section (volume, part, chapter or scene) can have one **header image**, shown above its title at the top of the editor: the width of the text column, centered, the whole image visible (never cropped), its height capped at about 40% of the window. |
+| IMG-21 | Must | Set, replace and remove the header image from the details panel, and from a small button shown when hovering over the title area. The picker offers upload (optimized as in IMG-06) or an existing book image (IMG-08). |
+| IMG-22 | Must | The header image is not part of the text: it does not affect word count, find & replace or snapshots. Duplicating a section copies its header image; trash and restore keep it. A replaced or removed header image is deleted only when nothing else uses it (IMG-07). |
+| IMG-23 | Must | Header images are in the cold backup and restored with their section (COLD-09). The Markdown/TXT export leaves them out. |
 
 ---
 
@@ -290,7 +322,22 @@ A cold backup is a **plain JSON file** containing everything needed to rebuild o
 - **Reliability**: no data loss in normal navigation; failed saves always surfaced; no invalid tree states in the database (checked by an invariant function in tests).
 - **Usability**: desktop layouts from 1280 px wide; keyboard shortcuts for common actions; consistent save behavior everywhere.
 - **Security**: server binds to `127.0.0.1` only; rejects requests whose `Host`/`Origin` is not the app's own; all request bodies validated; imported files and pasted HTML treated as untrusted; SVG uploads rejected; image uploads limited to 20 MB.
-- **Language**: UI in English for v1; content fully supports CJK text.
+- **Language**: the interface is in English or Simplified Chinese (§12.1); content fully supports CJK text.
+
+### 12.1 Interface language
+
+| ID | Pri | Requirement |
+|---|---|---|
+| I18N-01 | Must | The whole interface is available in **English** (`en`) and **Simplified Chinese** (`zh-CN`). Every text the app shows comes from the language files, including menus, buttons, dialogs, tooltips, placeholders, empty states, notices, confirmations, error messages, save status, word count labels, `aria-label`s, `title` attributes and the browser tab title. |
+| I18N-02 | Must | Switch in **Settings → Language · 语言** (label always shown in both languages). Each language is listed by its own name (`English`, `简体中文`). The switch applies immediately, without reload, and never touches unsaved text. The choice is remembered on this computer. On first start the app follows the browser's language: `zh*` → 简体中文, anything else → English. |
+| I18N-03 | Must | Numbers, dates and times are formatted for the chosen language. Word count labels read naturally (`1,234 words` / `1,234 字`); the counting rule itself (ED-06) does not change. |
+| I18N-04 | Must | Server errors are shown in the chosen language: the client translates each error `code`. A code without a translation falls back to the server's English message. |
+| I18N-05 | Must | **Switching never changes stored data.** Section titles, text, Codex category and field names, map contents, numbering labels and formats stay exactly as they are. |
+| I18N-06 | Must | **Text the app creates for you** uses the language active at that moment: a new book's default Codex categories and field labels (field keys stay the same in both languages), its numbering preset (Chinese → `第{n:cn}章` etc., NUM-04), map template titles and node titles, the "copy" suffix of duplicated sections and maps, the *Front matter* section of a text import, and the title suffix of a restored book. TXT/Markdown import keeps offering the preset that fits the file. The CLI scripts and the sample book (`seed:dev`) stay English. |
+| I18N-07 | Must | Names that belong to the app, not the book, are translated when shown: section kinds in menus, statuses, map template names, foreshadow roles, statuses and warnings, highlight color names, themes, `(untitled)`. The Markdown/TXT export uses the current interface language for `(untitled)` and image placeholders (IMG-11). |
+| I18N-08 | Must | The page's `lang` attribute follows the interface language (`en` / `zh-CN`), so Chinese interface text uses Simplified Chinese glyph forms. |
+| I18N-09 | Must | Completeness is enforced: a missing or extra key in the Chinese file is a type error; a test fails on empty translations or placeholders that differ between languages; lint rejects literal text in components. |
+| I18N-10 | Should | Fixed English stays English: the cold backup `_readme` and its JSON keys, CLI output, server logs, and the `beforeunload` prompt (the browser controls that text). The user guide stays English for now. |
 
 ---
 
@@ -311,12 +358,16 @@ A cold backup is a **plain JSON file** containing everything needed to rebuild o
 13. Set a cold backup folder, export a book, delete the database file, run `npm run restore:cold` on the backup → the book is fully restored, including images, maps, foreshadows and Codex.
 14. Unplug or rename the cold backup folder and export → clear error, nothing written elsewhere.
 15. Import a TXT with `第一章` … `第五章` headings → preview shows five chapters; confirm creates them.
+16. Switch to 简体中文 while text is still saving → the whole interface is in Chinese at once, nothing typed is lost; create a book → its Codex starts with 人物, 地点 … and chapters number as `第一章`; switch back to English → that book's data is unchanged.
+17. Put the cursor in the middle of a paragraph and paste an image file → the paragraph splits and the image sits on its own line between the halves; set it to *Small*, add a caption, reload → unchanged.
+18. Give a chapter a header image → it shows above the chapter title; move the chapter → the image moves with it.
+19. Cold backup a book with images in the text and header images, restore it into an empty data directory → every image is back in place; remove an image from the text and restore the previous snapshot → the image shows again.
 
 ---
 
 ## 14. Out of scope for v1
 
-Accounts, cloud sync, collaboration, mobile apps, AI writing features, publishing integrations, typesetting/print layout, DOCX/EPUB, signed or notarized macOS app bundles.
+Accounts, cloud sync, collaboration, mobile apps, AI writing features (including generating images inside the app), publishing integrations, typesetting/print layout, DOCX/EPUB, signed or notarized macOS app bundles, image editing (crop, rotate, filters), text wrapping around images, fetching images from the web, interface languages other than English and Simplified Chinese.
 
 ## 15. Decisions log
 
@@ -336,3 +387,11 @@ Accounts, cloud sync, collaboration, mobile apps, AI writing features, publishin
 | Background picture (DISP-02) | An image asset of the book, referenced from the display settings | Reuses the asset pipeline (type sniffing, cold backup, restore remap); no new table. |
 | Installable app | PWA manifest only, no service worker | Chrome/Edge can install from the manifest; a service worker would add a cache that could serve stale code. |
 | Launcher | `NovelStudio.command` keeps the server in its Terminal window; Ctrl+C stops it | Simple and visible; a background service and stop command are for the later deployment stage. |
+| Interface language (M10) | English and Simplified Chinese, with typed dictionaries in the client and the browser's `Intl`. No i18n library. The choice is UI state in `localStorage` (like fold state), not book data | Two languages do not justify a dependency. The compiler catches missing keys. The language is a preference of this computer, not part of a book, so it is not in the cold backup. |
+| Text the app creates (M10) | Created in the interface language of that moment and never rewritten later. Field keys are language-neutral | Switching language must never touch the user's data. Codex logic (e.g. "characters in this section") keys on field keys, not on names. |
+| Images in the text (M11) | A top-level block node `image` with `assetId`, `size` (`small`/`medium`/`full`) and `caption`. Always its own line, centered. No inline images, wrapping or free resizing | Keeps the editor a writing tool. Layout can never break, and the content model stays simple to validate, normalize and restore. |
+| Images and plain text (M11) | Images are not in `plain_text` and do not count as words. Exports write a `[Image: caption]` line | Word counts, search and find & replace stay exactly as before. |
+| Deleting image files (M11) | Removing an image from the text never deletes its file. The automatic deletion that already exists (replacing a cover, Codex image, background or header image) also checks every section's text, trashed sections and snapshots | Undo and snapshot restore must still find the image. Orphan cleanup stays a *Later* item. |
+| Image optimization (M11) | In the browser before upload (long edge ≤ 2,400 px, WebP), on by default, with **Keep original** | AI images are often 2–5 MB PNGs. Optimizing keeps books and cold backups small without a new dependency. |
+| Cold backup size (M11) | Stays one JSON file (format v1). Exports over the ceiling (~300 MB of images per book) fail cleanly with `COLD_BACKUP_TOO_LARGE` | Node strings are limited to ~512 MB, and the backup is built and verified as one string. A multi-file format is a *Later* item, if ever needed. |
+| Header images (M11) | A nullable `nodes.header_asset_id` (any section kind), shown above the title. Not part of `content` | The title is not part of the text, so the image belongs to the section, not its content. One rule for every kind. |
