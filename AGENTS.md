@@ -41,6 +41,7 @@ If these documents conflict with each other or with a request, stop and ask. Do 
 - Server binds to `127.0.0.1` only. No telemetry, analytics, update checks, CDN fonts/scripts, or other network calls at runtime.
 - Treat imported files, pasted HTML, and uploaded images as untrusted (ARCHITECTURE §13).
 - Keep UI minimal and calm; follow existing components and CSS variables. No new visual frameworks.
+- All interface text goes through `t()` with both `en` and `zh-CN` entries; never hardcode UI text; follow the glossary in ROADMAP M10.
 - Comments only where the code needs clarification.
 
 ## When unsure

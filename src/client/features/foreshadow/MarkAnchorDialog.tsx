@@ -2,12 +2,12 @@ import { useState, type FormEvent } from 'react';
 import {
   OCCURRENCE_TEXT_MAX,
   ROLE_GLYPHS,
-  ROLE_LABELS,
   THREAD_TITLE_MAX,
   type OccurrenceRole,
 } from '../../../shared/schemas/foreshadow.ts';
 import { useAddOccurrence, useCreateThread, useThreads } from '../../api/foreshadows.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 
 const NEW_THREAD = '';
 
@@ -31,6 +31,7 @@ export function MarkAnchorDialog({
   onMarked,
   onClose,
 }: MarkAnchorDialogProps) {
+  const t = useT();
   const threads = useThreads(bookId);
   const createThread = useCreateThread(bookId);
   const addOccurrence = useAddOccurrence(bookId);
@@ -58,10 +59,10 @@ export function MarkAnchorDialog({
         },
       });
       const occurrence = thread.occurrences.at(-1);
-      if (!occurrence) throw new Error('The occurrence was not created.');
+      if (!occurrence) throw new Error(t('foreshadow.markAnchor.notCreated'));
       onMarked(occurrence.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not mark the text.');
+      setError(e instanceof Error ? apiErrorMessage(e) : t('foreshadow.markAnchor.failed'));
       setBusy(false);
     }
   };
@@ -70,26 +71,29 @@ export function MarkAnchorDialog({
     <Dialog
       open
       onOpenChange={(open) => !open && !busy && onClose()}
-      title={`Mark as ${ROLE_LABELS[role].toLowerCase()}`}
-      description={`${ROLE_GLYPHS[role]} The selected text becomes this thread's ${ROLE_LABELS[role].toLowerCase()}.`}
+      title={t('foreshadow.markAnchor.title', { role: t(`foreshadow.roleLower.${role}`) })}
+      description={t('foreshadow.markAnchor.description', {
+        glyph: ROLE_GLYPHS[role],
+        role: t(`foreshadow.roleLower.${role}`),
+      })}
     >
       <form onSubmit={(e) => void submit(e)}>
-        <Field label="Thread">
+        <Field label={t('foreshadow.markAnchor.thread')}>
           <select
             className={uiStyles.input}
             value={selected}
             onChange={(e) => setChoice(e.target.value)}
           >
-            {existing.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title}
+            {existing.map((thread) => (
+              <option key={thread.id} value={thread.id}>
+                {thread.title}
               </option>
             ))}
-            <option value={NEW_THREAD}>New thread…</option>
+            <option value={NEW_THREAD}>{t('foreshadow.markAnchor.newThreadOption')}</option>
           </select>
         </Field>
         {creating ? (
-          <Field label="New thread title">
+          <Field label={t('foreshadow.markAnchor.newThreadTitle')}>
             <input
               className={uiStyles.input}
               value={title}
@@ -103,10 +107,10 @@ export function MarkAnchorDialog({
         <FormError message={error} />
         <div className={uiStyles.actions}>
           <Button onClick={onClose} disabled={busy}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" variant="primary" disabled={busy || threads.isPending}>
-            Mark text
+            {t('foreshadow.markAnchor.submit')}
           </Button>
         </div>
       </form>

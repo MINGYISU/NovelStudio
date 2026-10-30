@@ -52,6 +52,7 @@ export function registerImportTextRoutes(app: FastifyInstance, db: Db): void {
         detect: parsed.detect === '1',
         title: parsed.title,
         preset: parsed.preset,
+        locale: parsed.locale,
       };
       if (parsed.mode === 'preview') return previewTextImport(input);
       return reply.code(201).send(commitTextImport(db, input));

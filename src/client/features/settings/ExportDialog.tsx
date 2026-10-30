@@ -6,7 +6,9 @@ import {
   useExportAll,
   useExportBook,
 } from '../../api/cold-backup.ts';
+import { ApiRequestError } from '../../api/http.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, formatWords, useT } from '../../i18n/index.ts';
 import type {
   ExportAllResponse,
   ExportResult,
@@ -17,13 +19,16 @@ import styles from './settings.module.css';
 export type ExportScope = { kind: 'book'; bookId: string; title: string } | { kind: 'all' };
 
 function ResultLine({ result }: { result: ExportResult }) {
+  const t = useT();
   return (
     <li>
       <strong>{result.title}</strong>
       <div className={styles.path}>{result.file}</div>
       <div className={styles.hint}>
-        Verified · {result.stats.sections.toLocaleString()} sections ·{' '}
-        {result.stats.words.toLocaleString()} words
+        {t('settings.export.verified', {
+          sections: t('settings.sectionCount', { count: result.stats.sections }),
+          words: formatWords(result.stats.words),
+        })}
       </div>
       {result.warnings.map((w) => (
         <div key={w} className={styles.warning}>
@@ -36,6 +41,7 @@ function ResultLine({ result }: { result: ExportResult }) {
 
 /** Export this book / all books as cold backups (COLD-02). A one-off folder can replace the saved one. */
 export function ExportDialog({ scope, onClose }: { scope: ExportScope; onClose: () => void }) {
+  const t = useT();
   const settings = useColdBackupSettings();
   const exportBook = useExportBook();
   const exportAll = useExportAll();
@@ -68,7 +74,7 @@ export function ExportDialog({ scope, onClose }: { scope: ExportScope; onClose: 
       const picked = await chooseFolder();
       if (picked) setDir(picked);
     } catch (err) {
-      setPickerError((err as Error).message);
+      setPickerError(apiErrorMessage(err));
     }
   };
 
@@ -78,32 +84,37 @@ export function ExportDialog({ scope, onClose }: { scope: ExportScope; onClose: 
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title={scope.kind === 'book' ? `Export “${scope.title}”` : 'Export all books'}
-      description="Writes a plain JSON cold backup (with a .sha256 file) that can be read without NovelStudio, then verifies it."
+      title={
+        scope.kind === 'book'
+          ? t('settings.export.titleBook', { title: scope.title })
+          : t('settings.export.titleAll')
+      }
+      description={t('settings.export.description')}
     >
       <form onSubmit={submit}>
         <fieldset className={styles.choice}>
           <label>
-            <input type="radio" checked={!useOneOff} onChange={() => setUseOneOff(false)} /> Saved
-            location: <span className={styles.path}>{saved?.dir ?? 'not set'}</span>
+            <input type="radio" checked={!useOneOff} onChange={() => setUseOneOff(false)} />{' '}
+            {t('settings.export.savedLocation')}{' '}
+            <span className={styles.path}>{saved?.dir ?? t('settings.export.notSet')}</span>
           </label>
           <label>
-            <input type="radio" checked={useOneOff} onChange={() => setUseOneOff(true)} /> Another
-            folder, just this once
+            <input type="radio" checked={useOneOff} onChange={() => setUseOneOff(true)} />{' '}
+            {t('settings.export.otherFolder')}
           </label>
         </fieldset>
         {useOneOff ? (
-          <Field label="Folder (absolute path)">
+          <Field label={t('settings.export.folderLabel')}>
             <div className={styles.row}>
               <input
                 className={uiStyles.input}
                 value={dir}
                 onChange={(e) => setDir(e.target.value)}
-                placeholder="/Volumes/Backup/NovelStudio"
-                aria-label="Folder (absolute path)"
+                placeholder={t('settings.export.folderPlaceholder')}
+                aria-label={t('settings.export.folderLabel')}
               />
               {settings.data?.pickerSupported ? (
-                <Button onClick={() => void pick()}>Choose…</Button>
+                <Button onClick={() => void pick()}>{t('settings.export.choose')}</Button>
               ) : null}
             </div>
           </Field>
@@ -111,8 +122,9 @@ export function ExportDialog({ scope, onClose }: { scope: ExportScope; onClose: 
         <FormError message={pickerError} />
         {noLocation ? (
           <p className={styles.hint}>
-            No folder is saved yet. Set one in <Link to="/settings">Settings</Link> or use another
-            folder.
+            {t('settings.export.noFolderBefore')}{' '}
+            <Link to="/settings">{t('settings.export.settingsLink')}</Link>{' '}
+            {t('settings.export.noFolderAfter')}
           </p>
         ) : null}
         <label className={styles.check}>
@@ -121,36 +133,42 @@ export function ExportDialog({ scope, onClose }: { scope: ExportScope; onClose: 
             checked={includeSnapshots}
             onChange={(e) => setSnapshots(e.target.checked)}
           />{' '}
-          Include snapshots (larger files)
+          {t('settings.export.includeSnapshots')}
         </label>
-        <FormError message={error ? `${error.message}` : null} />
+        <FormError message={error ? apiErrorMessage(error) : null} />
         {exportBook.data ? (
-          <ul className={styles.results} aria-label="Export result">
+          <ul className={styles.results} aria-label={t('settings.export.resultAria')}>
             <ResultLine result={exportBook.data} />
           </ul>
         ) : null}
         {allResults ? (
-          <ul className={styles.results} aria-label="Export results">
+          <ul className={styles.results} aria-label={t('settings.export.resultsAria')}>
             {allResults.map((r) =>
               r.ok ? (
                 <ResultLine key={r.bookId} result={r.result} />
               ) : (
                 <li key={r.bookId}>
                   <strong>{r.title}</strong>
-                  <div className={styles.warning}>Failed: {r.error.message}</div>
+                  <div className={styles.warning}>
+                    {t('settings.export.failed', {
+                      message: apiErrorMessage(
+                        new ApiRequestError(0, r.error.code, r.error.message),
+                      ),
+                    })}
+                  </div>
                 </li>
               ),
             )}
           </ul>
         ) : null}
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>{done ? 'Close' : 'Cancel'}</Button>
+          <Button onClick={onClose}>{done ? t('common.close') : t('common.cancel')}</Button>
           <Button
             type="submit"
             variant="primary"
             disabled={running || noLocation || (useOneOff && dir.trim() === '')}
           >
-            {running ? 'Exporting…' : 'Export'}
+            {running ? t('settings.export.exporting') : t('common.export')}
           </Button>
         </div>
       </form>

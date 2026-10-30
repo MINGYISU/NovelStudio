@@ -1,4 +1,5 @@
 import type { ContentDoc } from '../../../shared/schemas/content.ts';
+import { t } from '../../i18n/index.ts';
 
 export type SaveState = 'saved' | 'dirty' | 'saving' | 'error' | 'stale';
 
@@ -241,7 +242,7 @@ export class SaverRegistry {
     for (const saver of this.savers.values()) {
       if (saver.state === 'stale') return { kind: 'stale' };
       if (saver.state === 'error') {
-        error = saver.error ?? 'The text could not be saved.';
+        error = saver.error ?? t('editor.status.fallbackError');
         if (saver.rejected) retrying = false;
       }
       if (saver.state === 'saving' || saver.state === 'dirty') saving = true;

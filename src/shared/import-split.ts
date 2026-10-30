@@ -48,6 +48,8 @@ export interface SplitOptions {
   detect: boolean;
   /** Title of the single section when nothing is split. */
   fallbackTitle?: string;
+  /** Title of the section for text before the first heading (default: English `FRONT_MATTER_TITLE`). */
+  frontMatterTitle?: string;
 }
 
 export class ImportError extends Error {
@@ -241,7 +243,7 @@ export function splitImport(input: string, options: SplitOptions): ImportPlan {
     sections.push(
       draft(
         'chapter',
-        FRONT_MATTER_TITLE,
+        options.frontMatterTitle ?? FRONT_MATTER_TITLE,
         null,
         true,
         lines.slice(0, firstHeading),

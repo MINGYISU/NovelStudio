@@ -2,10 +2,12 @@ import { useState, type FormEvent } from 'react';
 import { usePurgeBook } from '../../api/books.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
 import type { Book } from '../../../shared/schemas/book.ts';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 import styles from './library.module.css';
 
 /** Permanent deletion needs the exact title typed in (LIB-06). */
 export function PurgeDialog({ book, onClose }: { book: Book; onClose: () => void }) {
+  const t = useT();
   const [typed, setTyped] = useState('');
   const purge = usePurgeBook();
 
@@ -16,13 +18,14 @@ export function PurgeDialog({ book, onClose }: { book: Book; onClose: () => void
   };
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()} title="Delete permanently">
+    <Dialog open onOpenChange={(open) => !open && onClose()} title={t('library.purge.title')}>
       <form onSubmit={submit}>
         <p>
-          This deletes <span className={styles.confirmTitle}>{book.title}</span>, all of its
-          sections and its images. It cannot be undone.
+          {t('library.purge.warningBefore')}
+          <span className={styles.confirmTitle}>{book.title}</span>
+          {t('library.purge.warningAfter')}
         </p>
-        <Field label="Type the exact title to confirm">
+        <Field label={t('library.purge.confirmField')}>
           <input
             className={uiStyles.input}
             value={typed}
@@ -31,11 +34,11 @@ export function PurgeDialog({ book, onClose }: { book: Book; onClose: () => void
             autoFocus
           />
         </Field>
-        <FormError message={purge.error?.message ?? null} />
+        <FormError message={purge.error ? apiErrorMessage(purge.error) : null} />
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" variant="danger" disabled={typed !== book.title || purge.isPending}>
-            Delete permanently
+            {t('library.purge.submit')}
           </Button>
         </div>
       </form>

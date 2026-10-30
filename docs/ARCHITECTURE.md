@@ -51,6 +51,7 @@ Why a server instead of browser-only storage: browser storage (IndexedDB/localSt
 | Editor | **Tiptap** (free extensions only): StarterKit, Underline, Highlight (multicolor), TextAlign, CharacterCount, Placeholder | Custom mark `foreshadowAnchor` in M7b. No Tiptap Pro / paid extensions. |
 | Story maps | **@xyflow/react** (React Flow) + **@dagrejs/dagre** for auto-layout | |
 | Validation | **Zod** in `src/shared/schemas` | Same schemas on client and server. |
+| Interface language (M10) | Typed dictionaries in `src/client/i18n/` + the browser's `Intl` | No i18n library: two languages do not need one, and the compiler catches missing keys. §16. |
 | Server | **Fastify** + `@fastify/static` + `@fastify/multipart` | |
 | Database | SQLite via **better-sqlite3** | WAL mode, foreign keys on. `node:sqlite` is still a release candidate (stability 1.2) — revisit later; all DB access goes through `src/server/db/` so the driver is swappable. |
 | IDs | `crypto.randomUUID()` | No ID library. |
@@ -79,7 +80,7 @@ NovelStudio/
 ├─ src/
 │  ├─ shared/                 PURE TypeScript: no DOM, no Node APIs, fully unit-tested
 │  │  ├─ types.ts
-│  │  ├─ schemas/             Zod schemas (API bodies, settings, cold backup format)
+│  │  ├─ schemas/             Zod schemas (API bodies, settings, cold backup format, `locale.ts`)
 │  │  ├─ tree.ts              buildTree, validateMove, applyMove, invariants
 │  │  ├─ numbering.ts         computeDisplayTitles, number formatters (roman, cn, …)
 │  │  ├─ wordcount.ts         CJK-aware counting
@@ -87,6 +88,8 @@ NovelStudio/
 │  │  ├─ content-normalize.ts normalizeContent: blockquotes never nest (§8)
 │  │  ├─ foreshadow.ts        analyzeForeshadows → warnings
 │  │  ├─ import-split.ts      TXT/Markdown chapter detection
+│  │  ├─ seed-text.ts         text the app creates for the user, in both languages (§16)
+│  │  ├─ error-codes.ts       every API error `code` (§16)
 │  │  └─ manuscript-export.ts Markdown / plain text rendering of the manuscript
 │  ├─ server/
 │  │  ├─ index.ts             start server (bind 127.0.0.1)
@@ -120,6 +123,7 @@ NovelStudio/
 │     ├─ main.tsx, App.tsx, routes.tsx
 │     ├─ api/                 typed fetch wrappers + TanStack Query hooks
 │     ├─ stores/              Zustand stores
+│     ├─ i18n/                en.ts (keys), zh-CN.ts, messages/<area>.ts, t() and formatters (§16)
 │     ├─ components/          shared UI (Button, Dialog, Toast, SaveStatus…)
 │     ├─ pages/
 │     │  ├─ library/
@@ -362,6 +366,8 @@ All under `/api`, JSON in/out, bodies validated with Zod. Errors: `{ "error": { 
 | `GET /books/:id/export?format=md\|txt` | Manuscript export download (EXP-01): `text/markdown` or `text/plain` as an `attachment` with a safe, encoded file name; reading order, display titles, trashed sections and their subtrees left out; readable for a trashed book; changes nothing. |
 | `GET /hot-backups` · `POST /hot-backups/:name/restore` · `DELETE /hot-backups/pending-restore` | Hot backups (HOT-02). `GET` → `{ backups: [{ name, bytes, createdAt }] (newest first), pending, failed }`. `restore` accepts only a name of the form `novelstudio-YYYYMMDD-HHmmss.db` that exists in `backups/`, validates the file (SQLite integrity check, a `books` table, schema not newer than this app: otherwise `409 BACKUP_UNUSABLE`), stages it and writes a pending marker → `{ pending }`; nothing is replaced while the server runs (§10.1). `DELETE …/pending-restore` withdraws a pending restore or dismisses the notice about a failed one. |
 
+**Language parameters (M10, §16).** The endpoints that create text for the user take the interface language of that moment, always sent by the client: an optional `locale` (`en` | `zh-CN`, default `en`, anything else is `400 VALIDATION_ERROR`) in the JSON body of `POST /books` (default Codex categories; `zh-CN` also sets the Chinese numbering preset), `POST /books/:id/codex/seed`, `POST /books/:id/maps` (default title and template node titles), `POST /nodes/:id/duplicate` and `POST /maps/:id/duplicate` (copy suffix; the duplicate endpoints accept an empty body); as a multipart field of `POST /import/text` (both modes: the *Front matter* title and the Codex defaults; the numbering preset stays the user's choice) and `POST /import/cold-backup` (the suffix of a restored book's title). `GET /books/:id/export` takes `lang` (`en` | `zh-CN`, default `en`) for the `(untitled)` placeholder. Error responses stay English; the client translates by `error.code`.
+
 Client routes: `/` (library), `/trash`, `/settings`, `/book/:bookId/manuscript/:nodeId?`, `/book/:bookId/maps/:mapId?`, `/book/:bookId/foreshadow`, `/book/:bookId/codex/:entryId?`, `/book/:bookId/settings`.
 
 ---
@@ -585,3 +591,19 @@ Round-trip equality means: export book A → restore into an empty data dir → 
 
 - **`NovelStudio.command`** (executable, repo root): `cd`s to its own folder, checks `GET /api/health` on `PORT` (default 4317); if the production server answers (`"status":"ok"` **and** `"mode":"production"`) it only opens the browser. If anything else answers on the port (a development server, or another program), it prints "Port 4317 is used by a NovelStudio development server (or another program). Stop it, or set PORT." and waits for Return, without opening the browser or starting a second server (M9). Otherwise it finds `node` (adding the usual Homebrew/Volta/nvm locations to `PATH`, since a window opened from Finder has a minimal one), refuses to run without `node_modules`, runs `npm run build` when `dist/server/index.js` is missing or any file under `src`, `index.html` or `public` is newer, then starts `npm start` **in the foreground** of the Terminal window (Ctrl+C stops it) while a background loop opens the browser as soon as the health check passes. `PORT` and `NOVEL_DATA_DIR` from the environment are passed through, which is how it is tested against a temp data directory. It never writes anywhere itself.
 - **PWA**: `public/manifest.webmanifest` (name, `start_url` `/`, `display: standalone`, theme colors, two PNG icons 192/512 in `public/icons/`) is linked from `index.html`; Vite copies `public/` to the root of `dist/client`, so Fastify serves `/manifest.webmanifest` and `/icons/*`. There is deliberately **no service worker**: the app already runs locally, desktop Chrome/Edge offer *Install app* from the manifest alone, and a worker would add a cache that could serve stale code. Installing only creates a window and Dock icon; the server must be running.
+
+---
+
+## 16. Interface language (M10)
+
+English and Simplified Chinese, switchable at any time (PRD §12.1). No i18n library and no stored data involved.
+
+- **Dictionaries.** `src/client/i18n/en.ts` is the source of truth: a flat `as const` object of message keys (`'library.newBook'`, `'editor.status.saving'`, …), composed from one file per area in `messages/` (each holds its `en` and `zh` side by side). `zh-CN.ts` is typed `Record<MessageKey, string>`, so a missing or extra key is a compile error. Placeholders are `{name}`; plurals are `.one` / `.other` key pairs chosen with `Intl.PluralRules` when the call has a numeric `count` (which is also grouped by locale). A key missing from a language falls back to English.
+- **API of `i18n/index.ts`.** `t(key, params?)` for code outside React (it reads the current language), `useT()` for components (re-renders on a language change), `formatNumber`, `formatDate`, `formatDateTime`, `formatWords`, and `apiErrorMessage(error)`. Bare `toLocaleString()` and `Intl.*(undefined, …)` are not used for interface text.
+- **Locale store.** `stores/locale.ts` (Zustand) persists the choice in `localStorage` under `novelstudio:locale`. On first start `navigator.language` starting with `zh` gives `zh-CN`, anything else `en`; an unreadable stored value counts as unset. A change sets `document.documentElement.lang` and `document.title`. The switch lives in **Settings → Language · 语言**. Switching re-renders text only: nothing is keyed on the language, so the editor and its savers are never remounted.
+- **Lint guard.** `eslint.config.js` forbids, for `src/client/**/*.tsx`, JSX text containing a Latin letter or CJK character, and string/template literals in the JSX attributes `title`, `placeholder`, `aria-label`, `alt` and `label`. Exceptions (the product name, key names) need an `eslint-disable-next-line` comment with a reason. Text built in `.ts` files (notices, `confirm()` text) is reviewed by hand.
+- **Errors.** `shared/error-codes.ts` lists every `code` the server can return (`ApiError` is typed with it; a test scans the server source for codes it does not list). The client has an `errors.<CODE>` message for each, plus `NETWORK` and `UNKNOWN` raised by the client itself. Codes whose server message carries details (a validation path, a backup problem) show the translated sentence followed by the server's text. An unknown code shows the server's message.
+- **Text the app creates** (`shared/seed-text.ts`, pure data): default Codex categories and field labels (field **keys** never change; the "characters in this section" detection keys on the `aliases` field), map template titles and node titles, the default map title, the copy suffix, the *Front matter* title and the restored-book suffix. It is created in the language of that moment (§6) and never rewritten when the language changes.
+- **Names that belong to the app, not to the book** (section kinds, statuses, template names, foreshadow roles, statuses and warnings, themes, `(untitled)`) are translated when shown. A foreshadow warning is built on the client from its `kind` and `threadTitle`; the English `message` is only the fallback. `computeDisplayTitles` and `map-links` take the `(untitled)` / `(missing)` texts as parameters with English defaults.
+- **Stays English** (I18N-10): the cold backup `_readme` and JSON keys, CLI output, server logs, the `beforeunload` prompt, restore warnings sent by the server, and the user guide.
+- **Rule.** Stored data is never translated or rewritten by a language change: titles, text, Codex names and labels, map contents and numbering formats stay exactly as saved.

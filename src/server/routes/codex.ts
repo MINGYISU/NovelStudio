@@ -7,6 +7,7 @@ import {
   patchCategoryBodySchema,
   patchEntryBodySchema,
 } from '../../shared/schemas/codex.ts';
+import { localeBodySchema } from '../../shared/schemas/locale.ts';
 import { parseOrThrow } from '../errors.ts';
 import type { CodexService } from '../services/codex.ts';
 
@@ -21,7 +22,8 @@ export function registerCodexRoutes(app: FastifyInstance, codex: CodexService): 
   // Idempotent: only a book without categories gets the defaults.
   app.post('/api/books/:id/codex/seed', async (request) => {
     const { id } = parseOrThrow(idParams, request.params);
-    return { categories: codex.seedDefaults(id) };
+    const { locale } = parseOrThrow(localeBodySchema, request.body ?? {});
+    return { categories: codex.seedDefaults(id, locale) };
   });
 
   app.post('/api/books/:id/codex/categories', async (request, reply) => {

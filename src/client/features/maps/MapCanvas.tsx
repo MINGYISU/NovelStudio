@@ -21,7 +21,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowRight, Plus, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { layoutMap, NODE_HEIGHT, NODE_WIDTH } from '../../../shared/map-layout.ts';
-import { resolveMapLink, type LinkTarget } from '../../../shared/map-links.ts';
+import { resolveMapLink, type LinkTarget, type LinkTexts } from '../../../shared/map-links.ts';
 import {
   DEFAULT_NODE_COLOR,
   EMPTY_VIEWPORT,
@@ -33,6 +33,7 @@ import {
   type StoryMap,
 } from '../../../shared/schemas/map.ts';
 import { cacheMapData, putMapData } from '../../api/maps.ts';
+import { apiErrorMessage, t as translateNow, useT, type MessageKey } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import { MapCanvasContext, type MapCanvasContextValue } from './map-context.ts';
 import { MapSaver, trackMapSaver, type MapSaveState } from './map-saver.ts';
@@ -85,12 +86,12 @@ function toMapData(
   };
 }
 
-const STATUS_TEXT: Record<MapSaveState, string> = {
-  saved: 'Saved',
-  dirty: 'Unsaved changes…',
-  saving: 'Saving…',
-  error: 'Not saved',
-};
+const STATUS_KEY = {
+  saved: 'maps.canvas.status.saved',
+  dirty: 'maps.canvas.status.dirty',
+  saving: 'maps.canvas.status.saving',
+  error: 'maps.canvas.status.error',
+} as const satisfies Record<MapSaveState, MessageKey>;
 
 export interface MapCanvasProps {
   bookId: string;
@@ -119,6 +120,7 @@ function MapCanvasInner({
   entryOptions,
   onOpenLink,
 }: MapCanvasProps) {
+  const t = useT();
   const client = useQueryClient();
   const { screenToFlowPosition, fitView, deleteElements, getViewport } = useReactFlow();
   const readOnly = map.damaged;
@@ -126,7 +128,7 @@ function MapCanvasInner({
   const [edges, setEdges] = useState<Edge[]>(() => toFlowEdges(map.data));
   const [direction, setDirection] = useState<MapDirection>(map.data.layoutDirection);
   const [saveState, setSaveState] = useState<MapSaveState>('saved');
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveFailure, setSaveFailure] = useState<{ cause: unknown } | null>(null);
   const [deleted, setDeleted] = useState<{ nodes: StoryFlowNode[]; edges: Edge[] } | null>(null);
   const [focusTitleId, setFocusTitleId] = useState<string | null>(null);
   const [changes, setChanges] = useState(0);
@@ -140,7 +142,7 @@ function MapCanvasInner({
         transport: { save: (id, data, options) => putMapData(id, data, options) },
         onChange: (s) => {
           setSaveState(s.state);
-          setSaveError(s.error);
+          setSaveFailure(s.state === 'error' ? { cause: s.cause } : null);
         },
       }),
   );
@@ -158,7 +160,10 @@ function MapCanvasInner({
         if (saver.state === 'error') {
           useWorkspaceStore.getState().notify({
             tone: 'error',
-            message: `The map "${map.title}" could not be saved: ${saver.error ?? 'unknown error'}`,
+            message: translateNow('maps.canvas.saveFailed', {
+              title: map.title,
+              error: apiErrorMessage(saver.cause),
+            }),
           });
         }
       });
@@ -207,7 +212,7 @@ function MapCanvasInner({
 
   const addNodeAt = (position: { x: number; y: number }, data: Partial<StoryNodeData> = {}) => {
     if (nodes.length >= MAP_MAX_NODES) {
-      notifyError(`A map can hold up to ${MAP_MAX_NODES} nodes.`);
+      notifyError(t('maps.canvas.maxNodes', { max: MAP_MAX_NODES }));
       return null;
     }
     const id = crypto.randomUUID();
@@ -217,7 +222,7 @@ function MapCanvasInner({
       position,
       selected: true,
       data: {
-        title: 'New node',
+        title: t('maps.canvas.newNodeTitle'),
         description: '',
         color: DEFAULT_NODE_COLOR,
         storyTime: '',
@@ -248,7 +253,7 @@ function MapCanvasInner({
       return false;
     }
     if (edges.length >= MAP_MAX_EDGES) {
-      notifyError(`A map can hold up to ${MAP_MAX_EDGES} edges.`);
+      notifyError(t('maps.canvas.maxEdges', { max: MAP_MAX_EDGES }));
       return false;
     }
     setEdges((current) =>
@@ -343,17 +348,60 @@ function MapCanvasInner({
   useEffect(() => {
     addChildRef.current = addChild;
   });
+  const linkTexts = useMemo<LinkTexts>(
+    () => ({
+      untitled: t('common.untitled'),
+      missing: t('maps.link.missing'),
+      inTrash: (title) => t('maps.link.inTrash', { title }),
+    }),
+    [t],
+  );
+  const flowLabels = useMemo(
+    () => ({
+      'node.a11yDescription.default': t('maps.flow.nodeDescription'),
+      'node.a11yDescription.keyboardDisabled': t('maps.flow.nodeDescriptionMovable'),
+      'node.a11yDescription.ariaLiveMessage': ({
+        direction,
+        x,
+        y,
+      }: {
+        direction: string;
+        x: number;
+        y: number;
+      }) => {
+        const key = (
+          {
+            up: 'maps.flow.up',
+            down: 'maps.flow.down',
+            left: 'maps.flow.left',
+            right: 'maps.flow.right',
+          } as Record<string, MessageKey | undefined>
+        )[direction];
+        return t('maps.flow.nodeMoved', { direction: key ? t(key) : direction, x, y });
+      },
+      'edge.a11yDescription.default': t('maps.flow.edgeDescription'),
+      'controls.ariaLabel': t('maps.flow.controls'),
+      'controls.zoomIn.ariaLabel': t('maps.flow.zoomIn'),
+      'controls.zoomOut.ariaLabel': t('maps.flow.zoomOut'),
+      'controls.fitView.ariaLabel': t('maps.flow.fitView'),
+      'controls.interactive.ariaLabel': t('maps.flow.interactive'),
+      'minimap.ariaLabel': t('maps.flow.minimap'),
+      'handle.ariaLabel': t('maps.flow.handle'),
+    }),
+    [t],
+  );
   const context = useMemo<MapCanvasContextValue>(
     () => ({
       direction,
       readOnly,
-      resolveLink: (link) => resolveMapLink(link, sectionTargets, entryTitles),
+      resolveLink: (link) => resolveMapLink(link, sectionTargets, entryTitles, linkTexts),
       openLink: onOpenLink,
       addChild: (parentId) => addChildRef.current(parentId),
     }),
-    [direction, readOnly, sectionTargets, entryTitles, onOpenLink],
+    [direction, readOnly, sectionTargets, entryTitles, linkTexts, onOpenLink],
   );
 
+  const saveError = saveFailure ? apiErrorMessage(saveFailure.cause) : null;
   const selectedNodes = nodes.filter((n) => n.selected);
   const selectedEdges = edges.filter((e) => e.selected);
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : undefined;
@@ -373,10 +421,11 @@ function MapCanvasInner({
         <div className={styles.canvas} ref={wrapper} data-testid="map-canvas">
           {readOnly ? (
             <p className={styles.banner} role="alert">
-              Part of this map could not be read, so it is shown read-only and will not be changed.
+              {t('maps.canvas.readOnly')}
             </p>
           ) : null}
           <ReactFlow
+            ariaLabelConfig={flowLabels}
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
@@ -414,29 +463,29 @@ function MapCanvasInner({
               {readOnly ? null : (
                 <>
                   <button type="button" className={styles.toolButton} onClick={addNode}>
-                    <Plus size={14} /> Add node
+                    <Plus size={14} /> {t('maps.canvas.addNode')}
                   </button>
                   <button
                     type="button"
                     className={`${styles.toolButton} ${direction === 'TB' ? styles.toolOn : ''}`}
                     onClick={() => arrange('TB')}
-                    aria-label="Auto-layout top to bottom"
-                    title="Auto-layout, top to bottom"
+                    aria-label={t('maps.canvas.layoutDown')}
+                    title={t('maps.canvas.layoutDownTitle')}
                   >
-                    <ArrowDown size={14} /> Auto-layout
+                    <ArrowDown size={14} /> {t('maps.canvas.layout')}
                   </button>
                   <button
                     type="button"
                     className={`${styles.toolButton} ${direction === 'LR' ? styles.toolOn : ''}`}
                     onClick={() => arrange('LR')}
-                    aria-label="Auto-layout left to right"
-                    title="Auto-layout, left to right"
+                    aria-label={t('maps.canvas.layoutRight')}
+                    title={t('maps.canvas.layoutRightTitle')}
                   >
-                    <ArrowRight size={14} /> Auto-layout
+                    <ArrowRight size={14} /> {t('maps.canvas.layout')}
                   </button>
                   {deleted ? (
                     <button type="button" className={styles.toolButton} onClick={undoDelete}>
-                      <Undo2 size={14} /> Undo delete
+                      <Undo2 size={14} /> {t('maps.canvas.undoDelete')}
                     </button>
                   ) : null}
                 </>
@@ -447,8 +496,8 @@ function MapCanvasInner({
                 data-testid="map-save-status"
                 title={saveError ?? undefined}
               >
-                {STATUS_TEXT[saveState]}
-                {saveState === 'error' && saveError ? ` — ${saveError}` : ''}
+                {t(STATUS_KEY[saveState])}
+                {saveError ? ` — ${saveError}` : ''}
               </span>
             </Panel>
           </ReactFlow>
@@ -478,10 +527,7 @@ function MapCanvasInner({
           />
         ) : (
           <aside className={styles.inspector}>
-            <p className={styles.muted}>
-              Select a node or an edge to edit it. Drag from a node&apos;s edge to another node to
-              connect them, or use the + button on a node to add a child.
-            </p>
+            <p className={styles.muted}>{t('maps.canvas.hint')}</p>
           </aside>
         )}
       </div>

@@ -7,7 +7,8 @@ import {
   type MapData,
   type StoryMap,
 } from '../../shared/schemas/map.ts';
-import { apiRequest } from './http.ts';
+import { apiErrorMessage, currentLocale } from '../i18n/index.ts';
+import { ApiRequestError, apiRequest } from './http.ts';
 
 export const mapsKey = (bookId: string) => ['maps', bookId] as const;
 
@@ -40,7 +41,10 @@ export function useCreateMap(bookId: string) {
   return useMutation({
     mutationFn: async (body: CreateMapBody): Promise<StoryMap> =>
       mapResponseSchema.parse(
-        await apiRequest(`/api/books/${bookId}/maps`, { method: 'POST', json: body }),
+        await apiRequest(`/api/books/${bookId}/maps`, {
+          method: 'POST',
+          json: { ...body, locale: currentLocale() },
+        }),
       ).map,
     onSuccess: (map) => update(client, bookId, (maps) => [...maps, map]),
   });
@@ -64,8 +68,12 @@ export function useDuplicateMap(bookId: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<StoryMap> =>
-      mapResponseSchema.parse(await apiRequest(`/api/maps/${id}/duplicate`, { method: 'POST' }))
-        .map,
+      mapResponseSchema.parse(
+        await apiRequest(`/api/maps/${id}/duplicate`, {
+          method: 'POST',
+          json: { locale: currentLocale() },
+        }),
+      ).map,
     onSuccess: (copy, id) =>
       update(client, bookId, (maps) => {
         const index = maps.findIndex((m) => m.id === id);
@@ -121,12 +129,18 @@ export async function putMapData(
       keepalive: options.keepalive && new TextEncoder().encode(body).length <= KEEPALIVE_MAX_BYTES,
     });
   } catch {
-    throw new MapSaveError('Cannot reach the NovelStudio server.', true);
+    throw new MapSaveError(apiErrorMessage(new ApiRequestError(0, 'NETWORK', '')), true);
   }
   if (res.ok) return;
   const parsed = errorResponseSchema.safeParse(await res.json().catch(() => undefined));
   throw new MapSaveError(
-    parsed.success ? parsed.data.error.message : `Save failed (${res.status}).`,
+    apiErrorMessage(
+      new ApiRequestError(
+        res.status,
+        parsed.success ? parsed.data.error.code : 'UNKNOWN',
+        parsed.success ? parsed.data.error.message : `Save failed (${res.status}).`,
+      ),
+    ),
     res.status >= 500,
   );
 }

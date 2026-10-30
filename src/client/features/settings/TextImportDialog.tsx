@@ -7,12 +7,8 @@ import {
 } from '../../../shared/schemas/import.ts';
 import { useTextImportCommit, useTextImportPreview } from '../../api/text-import.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, formatWords, useT } from '../../i18n/index.ts';
 import styles from './settings.module.css';
-
-const PRESET_LABELS: Record<(typeof IMPORT_PRESETS)[number], string> = {
-  english: 'English (Chapter 1, Chapter 2…)',
-  chinese: 'Chinese (第一章, 第二章…)',
-};
 
 function baseName(fileName: string): string {
   return fileName.replace(/\.[^.]*$/, '').trim();
@@ -20,6 +16,7 @@ function baseName(fileName: string): string {
 
 /** Import a TXT or Markdown file as a new book, with a preview of the detected sections (IMP-02/03). */
 export function TextImportDialog({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const navigate = useNavigate();
   const preview = useTextImportPreview();
   const commit = useTextImportCommit();
@@ -54,10 +51,10 @@ export function TextImportDialog({ onClose }: { onClose: () => void }) {
       open
       wide
       onOpenChange={(open) => !open && onClose()}
-      title="Import text or Markdown"
-      description="Creates a new book from a .txt or .md file. Chapters are detected from headings such as 第十二章, Chapter 12 or # Heading. Nothing is created until you confirm."
+      title={t('settings.textImport.title')}
+      description={t('settings.textImport.description')}
     >
-      <Field label="File (.txt, .md)">
+      <Field label={t('settings.textImport.fileLabel')}>
         <input
           className={uiStyles.input}
           type="file"
@@ -69,16 +66,23 @@ export function TextImportDialog({ onClose }: { onClose: () => void }) {
             setPreset(null);
             commit.reset();
           }}
-          aria-label="Text file"
+          aria-label={t('settings.textImport.fileAria')}
         />
       </Field>
       {tooLarge ? (
         <p className={styles.warning} role="alert">
-          This file is larger than {MAX_TEXT_IMPORT_LABEL}, so it cannot be imported and nothing
-          will be changed. Split it into smaller files and import them one at a time.
+          {t('settings.textImport.tooLarge', { limit: MAX_TEXT_IMPORT_LABEL })}
         </p>
       ) : null}
-      <FormError message={preview.error?.message ?? commit.error?.message ?? null} />
+      <FormError
+        message={
+          preview.error
+            ? apiErrorMessage(preview.error)
+            : commit.error
+              ? apiErrorMessage(commit.error)
+              : null
+        }
+      />
 
       {data && !result ? (
         <>
@@ -87,46 +91,48 @@ export function TextImportDialog({ onClose }: { onClose: () => void }) {
               type="checkbox"
               checked={detect}
               onChange={(e) => setDetect(e.target.checked)}
-              aria-label="Detect chapters"
+              aria-label={t('settings.textImport.detectAria')}
             />
-            Detect chapters from headings
+            {t('settings.textImport.detectLabel')}
           </label>
-          <Field label="Book title">
+          <Field label={t('settings.textImport.bookTitle')}>
             <input
               className={uiStyles.input}
               value={title}
               maxLength={200}
               onChange={(e) => setTitle(e.target.value)}
-              aria-label="Book title"
+              aria-label={t('settings.textImport.bookTitle')}
             />
           </Field>
-          <Field label="Chapter numbering style">
+          <Field label={t('settings.textImport.numberingLabel')}>
             <select
               className={uiStyles.input}
               value={chosenPreset}
               onChange={(e) => setPreset(e.target.value as (typeof IMPORT_PRESETS)[number])}
-              aria-label="Numbering style"
+              aria-label={t('settings.textImport.numberingAria')}
             >
               {IMPORT_PRESETS.map((p) => (
                 <option key={p} value={p}>
-                  {PRESET_LABELS[p]}
+                  {t(`settings.textImport.preset.${p}`)}
                 </option>
               ))}
             </select>
           </Field>
           <p className={styles.hint} role="status">
-            {data.detected
-              ? `${data.sections.length} sections detected`
-              : 'No chapter detection: the whole file becomes one section'}
-            {' · '}
-            {data.totalWords.toLocaleString()} words · {data.encoding}
+            {t('settings.textImport.summary', {
+              detected: data.detected
+                ? t('settings.textImport.detected', { count: data.sections.length })
+                : t('settings.textImport.notDetected'),
+              words: formatWords(data.totalWords),
+              encoding: data.encoding,
+            })}
           </p>
           {data.warnings.map((w) => (
             <p key={w} className={styles.warning}>
               {w}
             </p>
           ))}
-          <ol className={styles.preview} aria-label="Detected sections">
+          <ol className={styles.preview} aria-label={t('settings.textImport.previewAria')}>
             {data.sections.map((s, i) => (
               <li
                 key={i}
@@ -134,11 +140,15 @@ export function TextImportDialog({ onClose }: { onClose: () => void }) {
                 data-kind={s.kind}
               >
                 <strong>
-                  {s.kind === 'volume' ? 'Volume: ' : ''}
-                  {s.title || '(untitled)'}
+                  {s.kind === 'volume' ? t('settings.textImport.volumePrefix') : ''}
+                  {s.title || t('common.untitled')}
                 </strong>
-                {s.unnumbered ? <span className={styles.hint}> · unnumbered</span> : null}
-                <span className={styles.hint}> · {s.wordCount.toLocaleString()} words</span>
+                {s.unnumbered ? (
+                  <span className={styles.hint}>{t('settings.textImport.unnumbered')}</span>
+                ) : null}
+                <span className={styles.hint}>
+                  {t('settings.textImport.sectionWords', { words: formatWords(s.wordCount) })}
+                </span>
                 {s.excerpt ? <div className={styles.hint}>{s.excerpt}</div> : null}
               </li>
             ))}
@@ -149,8 +159,10 @@ export function TextImportDialog({ onClose }: { onClose: () => void }) {
       {result ? (
         <div role="status">
           <p className={styles.ok}>
-            Imported “{result.book.title}” with {result.sectionCount}{' '}
-            {result.sectionCount === 1 ? 'section' : 'sections'}.
+            {t('settings.textImport.result', {
+              title: result.book.title,
+              count: result.sectionCount,
+            })}
           </p>
           {result.warnings.map((w) => (
             <p key={w} className={styles.warning}>
@@ -161,10 +173,10 @@ export function TextImportDialog({ onClose }: { onClose: () => void }) {
       ) : null}
 
       <div className={uiStyles.actions}>
-        <Button onClick={onClose}>{result ? 'Close' : 'Cancel'}</Button>
+        <Button onClick={onClose}>{result ? t('common.close') : t('common.cancel')}</Button>
         {result ? (
           <Button variant="primary" onClick={() => navigate(`/book/${result.book.id}/manuscript`)}>
-            Open book
+            {t('settings.import.openBook')}
           </Button>
         ) : (
           <Button
@@ -173,10 +185,10 @@ export function TextImportDialog({ onClose }: { onClose: () => void }) {
             disabled={!data || tooLarge || commit.isPending || preview.isPending}
           >
             {commit.isPending
-              ? 'Importing…'
+              ? t('settings.import.importing')
               : data
-                ? `Import ${data.sections.length} ${data.sections.length === 1 ? 'section' : 'sections'}`
-                : 'Import'}
+                ? t('settings.textImport.importSections', { count: data.sections.length })
+                : t('common.import')}
           </Button>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router';
 import type { CodexEntry } from '../../../shared/schemas/codex.ts';
+import { useT } from '../../i18n/index.ts';
 import styles from './codex.module.css';
 
 interface EntryCardProps {
@@ -15,6 +16,7 @@ interface EntryCardProps {
 
 /** CDX-05: image, title and summary of one entry. */
 export function EntryCard({ entry, categoryName, onMove, isFirst, isLast }: EntryCardProps) {
+  const t = useT();
   return (
     <li className={styles.card}>
       <Link className={styles.cardLink} to={`/book/${entry.bookId}/codex/${entry.id}`}>
@@ -36,7 +38,7 @@ export function EntryCard({ entry, categoryName, onMove, isFirst, isLast }: Entr
           <button
             type="button"
             className={styles.iconButton}
-            aria-label={`Move ${entry.title} earlier`}
+            aria-label={t('codex.entryCard.moveEarlier', { title: entry.title })}
             disabled={isFirst}
             onClick={() => onMove(-1)}
           >
@@ -45,7 +47,7 @@ export function EntryCard({ entry, categoryName, onMove, isFirst, isLast }: Entr
           <button
             type="button"
             className={styles.iconButton}
-            aria-label={`Move ${entry.title} later`}
+            aria-label={t('codex.entryCard.moveLater', { title: entry.title })}
             disabled={isLast}
             onClick={() => onMove(1)}
           >

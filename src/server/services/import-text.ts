@@ -9,6 +9,8 @@ import type {
   ImportPreviewResponse,
   ImportTextCommitResponse,
 } from '../../shared/schemas/import.ts';
+import { DEFAULT_LOCALE, type Locale } from '../../shared/schemas/locale.ts';
+import { frontMatterTitle } from '../../shared/seed-text.ts';
 import { CHINESE_STRUCTURE, DEFAULT_STRUCTURE } from '../../shared/schemas/structure.ts';
 import { assertTreeInvariants } from '../../shared/tree.ts';
 import type { TreeNode } from '../../shared/types.ts';
@@ -27,6 +29,7 @@ export interface TextImportInput {
   detect: boolean;
   title?: string;
   preset?: 'english' | 'chinese';
+  locale?: Locale;
 }
 
 function baseName(fileName: string): string {
@@ -46,6 +49,7 @@ function plan(input: TextImportInput): { plan: ImportPlan; encoding: string; tit
       markdown: isMarkdownName(input.fileName),
       detect: input.detect,
       fallbackTitle: title,
+      frontMatterTitle: frontMatterTitle(input.locale ?? DEFAULT_LOCALE),
     });
     if (result.sections.length === 0) {
       throw new ApiError(400, 'IMPORT_EMPTY', 'The file contains no text.');
@@ -89,7 +93,7 @@ export function commitTextImport(db: Db, input: TextImportInput): ImportTextComm
 
   const bookId = db.transaction(() => {
     const created = insertBook(db, { title }, now);
-    insertDefaultCategories(db, created.id);
+    insertDefaultCategories(db, created.id, input.locale ?? DEFAULT_LOCALE);
     if (preset === 'chinese') updateBookFields(db, created.id, { structure }, now);
 
     const ids = result.sections.map(() => crypto.randomUUID());

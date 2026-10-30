@@ -10,6 +10,7 @@ import {
   type ExportBody,
   type PutColdBackupSettingsBody,
 } from '../../shared/schemas/cold-backup-settings.ts';
+import { currentLocale } from '../i18n/index.ts';
 import { apiRequest } from './http.ts';
 
 export const coldBackupKey = ['cold-backup-settings'] as const;
@@ -86,6 +87,7 @@ export function useImportColdBackup() {
       const form = new FormData();
       if (vars.ignoreChecksum) form.append('ignoreChecksum', '1');
       if (vars.checksum) form.append('checksum', vars.checksum);
+      form.append('locale', currentLocale());
       form.append('file', vars.file);
       return importResponseSchema.parse(
         await apiRequest('/api/import/cold-backup', { method: 'POST', body: form }),

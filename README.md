@@ -12,6 +12,7 @@ A personal, local-first writing app for long-form fiction. It runs on your own m
 - **Story maps**: node-and-edge diagrams for plot, timelines, and character arcs.
 - **Foreshadowing tracker**: setups, hints, and payoffs linked to chapters, with warnings when reordering breaks them.
 - **Codex**: character cards and worldbuilding entries with custom fields.
+- **English or 简体中文 interface**: switch in **Settings → Language · 语言**. The choice is remembered on this computer; your books are never changed by it.
 - **Layered data protection**: autosave, snapshots, hourly database backups, and a human-readable **cold backup** JSON file in a folder you choose.
 
 ## Documents

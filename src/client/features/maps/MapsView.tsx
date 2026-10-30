@@ -7,6 +7,7 @@ import { buildTree, type TreeBranch } from '../../../shared/tree.ts';
 import type { TreeNode } from '../../../shared/types.ts';
 import { useCodex } from '../../api/codex.ts';
 import { useMaps } from '../../api/maps.ts';
+import { useT } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import { MapCanvas } from './MapCanvas.tsx';
 import { MapList } from './MapList.tsx';
@@ -35,6 +36,7 @@ function flatten(
 
 /** The Story Maps view: map list on the left, canvas and details on the right. */
 export function MapsView({ bookId, mapId, nodes, treeFailed, structure }: MapsViewProps) {
+  const t = useT();
   const navigate = useNavigate();
   const maps = useMaps(bookId);
   const codex = useCodex(bookId);
@@ -46,8 +48,8 @@ export function MapsView({ bookId, mapId, nodes, treeFailed, structure }: MapsVi
   }, [bookId, selectedId]);
 
   const targets = useMemo(
-    () => (nodes ? sectionTargets(nodes, structure) : null),
-    [nodes, structure],
+    () => (nodes ? sectionTargets(nodes, structure, t('common.untitled')) : null),
+    [nodes, structure, t],
   );
   const entryTitles = useMemo(
     () => (codex.data ? new Map(codex.data.entries.map((e) => [e.id, e.title])) : null),
@@ -84,11 +86,11 @@ export function MapsView({ bookId, mapId, nodes, treeFailed, structure }: MapsVi
   if (maps.error || codex.error || treeFailed) {
     return (
       <p className={styles.placeholder} role="alert">
-        The maps could not be loaded.
+        {t('maps.view.loadFailed')}
       </p>
     );
   }
-  if (!maps.data) return <p className={styles.placeholder}>Loading…</p>;
+  if (!maps.data) return <p className={styles.placeholder}>{t('common.loading')}</p>;
 
   const ready = targets && entryTitles;
 
@@ -110,10 +112,10 @@ export function MapsView({ bookId, mapId, nodes, treeFailed, structure }: MapsVi
         ) : (
           <p className={styles.placeholder}>
             {selected
-              ? 'Loading…'
+              ? t('common.loading')
               : maps.data.length === 0
-                ? 'Create a map to start planning your story.'
-                : 'Select a map.'}
+                ? t('maps.view.empty')
+                : t('maps.view.select')}
           </p>
         )}
       </main>

@@ -10,6 +10,7 @@ import { buildTree, type TreeBranch } from '../../../shared/tree.ts';
 import type { TreeNode } from '../../../shared/types.ts';
 import { searchBook, useReplaceInBook } from '../../api/search.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, t as translate, useT } from '../../i18n/index.ts';
 import { saverRegistry } from '../editor/save-registry.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import styles from './search.module.css';
@@ -22,9 +23,9 @@ function readingOrder(branches: TreeBranch<TreeNode>[]): string[] {
 async function saveEverything(): Promise<string | null> {
   await saverRegistry.flushAll();
   const status = saverRegistry.status();
-  if (status.kind === 'error') return `Some text is not saved yet: ${status.message}`;
-  if (status.kind === 'stale')
-    return 'A section was changed elsewhere. Reload it before replacing.';
+  if (status.kind === 'error')
+    return translate('search.findReplace.unsaved', { message: status.message });
+  if (status.kind === 'stale') return translate('search.findReplace.stale');
   return null;
 }
 
@@ -40,6 +41,7 @@ export function FindReplaceDialog({
   structure: StructureSettings;
   onClose: () => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [replacement, setReplacement] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
@@ -52,10 +54,10 @@ export function FindReplaceDialog({
 
   const { titles, order } = useMemo(
     () => ({
-      titles: computeDisplayTitles(nodes, structure),
+      titles: computeDisplayTitles(nodes, structure, t('common.untitled')),
       order: readingOrder(buildTree(nodes)),
     }),
-    [nodes, structure],
+    [nodes, structure, t],
   );
   const sections = useMemo(() => {
     if (!found) return [];
@@ -88,7 +90,7 @@ export function FindReplaceDialog({
       setFound({ ...(await searchBook(bookId, { query, caseSensitive })), query });
       setUnchecked(new Set());
     } catch (err) {
-      setError((err as Error).message);
+      setError(apiErrorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -116,7 +118,7 @@ export function FindReplaceDialog({
       setDone({ replaced: result.replaced, sections: result.sections.length });
       setFound(null);
     } catch (err) {
-      setError((err as Error).message);
+      setError(apiErrorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -130,20 +132,21 @@ export function FindReplaceDialog({
       return next;
     });
 
-  const replaceLabel = `Replace ${chosenMatches} in ${chosen.length} ${
-    chosen.length === 1 ? 'section' : 'sections'
-  }`;
+  const replaceLabel = t('search.findReplace.replaceButton', {
+    matches: t('search.findReplace.replaceMatches', { count: chosenMatches }),
+    sections: t('search.findReplace.sections', { count: chosen.length }),
+  });
 
   return (
     <Dialog
       open
       wide
       onOpenChange={(open) => !open && onClose()}
-      title="Find and replace in book"
-      description="Matches are found inside one stretch of formatting, so a phrase that is partly bold is not matched. A snapshot of every changed section is saved first."
+      title={t('search.findReplace.title')}
+      description={t('search.findReplace.description')}
     >
       <form onSubmit={runSearch}>
-        <Field label="Find">
+        <Field label={t('search.findReplace.find')}>
           <input
             className={uiStyles.input}
             value={query}
@@ -153,16 +156,16 @@ export function FindReplaceDialog({
               setQuery(e.target.value);
               reset();
             }}
-            aria-label="Find"
+            aria-label={t('search.findReplace.find')}
           />
         </Field>
-        <Field label="Replace with">
+        <Field label={t('search.findReplace.replaceWith')}>
           <input
             className={uiStyles.input}
             value={replacement}
             maxLength={REPLACEMENT_MAX}
             onChange={(e) => setReplacement(e.target.value)}
-            aria-label="Replace with"
+            aria-label={t('search.findReplace.replaceWith')}
           />
         </Field>
         <div className={styles.options}>
@@ -175,10 +178,10 @@ export function FindReplaceDialog({
                 reset();
               }}
             />
-            Match case
+            {t('search.findReplace.matchCase')}
           </label>
           <Button type="submit" disabled={query === '' || busy}>
-            {busy && !found ? 'Searching…' : 'Find all'}
+            {busy && !found ? t('search.findReplace.searching') : t('search.findReplace.findAll')}
           </Button>
         </div>
       </form>
@@ -188,15 +191,17 @@ export function FindReplaceDialog({
       {found ? (
         found.total === 0 ? (
           <p className={styles.notice} role="status">
-            No matches for “{found.query}”.
+            {t('search.findReplace.noMatches', { query: found.query })}
           </p>
         ) : (
           <>
             <p className={styles.summary} role="status">
-              {found.total} {found.total === 1 ? 'match' : 'matches'} in {found.sections.length}{' '}
-              {found.sections.length === 1 ? 'section' : 'sections'}
+              {t('search.findReplace.summary', {
+                matches: t('search.findReplace.matches', { count: found.total }),
+                sections: t('search.findReplace.sections', { count: found.sections.length }),
+              })}
             </p>
-            <ul className={styles.list} aria-label="Matches by section">
+            <ul className={styles.list} aria-label={t('search.findReplace.resultsLabel')}>
               {sections.map((s) => (
                 <li key={s.nodeId} className={styles.item}>
                   <label className={styles.itemHead}>
@@ -204,11 +209,13 @@ export function FindReplaceDialog({
                       type="checkbox"
                       checked={!unchecked.has(s.nodeId)}
                       onChange={() => toggle(s.nodeId)}
-                      aria-label={`Replace in ${titles.get(s.nodeId) ?? 'section'}`}
+                      aria-label={t('search.findReplace.replaceIn', {
+                        title: titles.get(s.nodeId) ?? t('search.findReplace.sectionFallback'),
+                      })}
                     />
-                    <span>{titles.get(s.nodeId) ?? '(untitled)'}</span>
+                    <span>{titles.get(s.nodeId) ?? t('common.untitled')}</span>
                     <span className={styles.count}>
-                      {s.count} {s.count === 1 ? 'match' : 'matches'}
+                      {t('search.findReplace.matches', { count: s.count })}
                     </span>
                   </label>
                   {s.excerpts.map((x, i) => (
@@ -223,7 +230,7 @@ export function FindReplaceDialog({
             </ul>
             {found.skipped > 0 ? (
               <p className={styles.notice}>
-                {found.skipped} section(s) have unreadable text and were not searched.
+                {t('search.findReplace.skipped', { count: found.skipped })}
               </p>
             ) : null}
           </>
@@ -232,21 +239,22 @@ export function FindReplaceDialog({
 
       {done ? (
         <p className={styles.ok} role="status">
-          Replaced {done.replaced} {done.replaced === 1 ? 'match' : 'matches'} in {done.sections}{' '}
-          {done.sections === 1 ? 'section' : 'sections'}. Earlier versions are in each section’s
-          snapshots.
+          {t('search.findReplace.replaced', {
+            matches: t('search.findReplace.matches', { count: done.replaced }),
+            sections: t('search.findReplace.sections', { count: done.sections }),
+          })}
         </p>
       ) : null}
 
       <div className={uiStyles.actions}>
-        <Button onClick={onClose}>{done ? 'Close' : 'Cancel'}</Button>
+        <Button onClick={onClose}>{done ? t('common.close') : t('common.cancel')}</Button>
         {found && found.total > 0 ? (
           <Button
             variant="primary"
             onClick={() => void runReplace()}
             disabled={busy || chosen.length === 0}
           >
-            {busy ? 'Replacing…' : replaceLabel}
+            {busy ? t('search.findReplace.replacing') : replaceLabel}
           </Button>
         ) : null}
       </div>

@@ -185,6 +185,12 @@ The bottom of the editor shows word counts for the section and book. Select a pa
 
 These settings apply to this book’s writing space. They are not page-layout instructions for an exported manuscript.
 
+### Switch the interface language
+
+Open **Settings** from the Library and choose **English** or **简体中文** under **Language · 语言**. The change applies at once, without reloading, and does not touch your text. NovelStudio remembers the choice on this computer; the first time it opens, it follows your browser’s language.
+
+Only the interface changes. Titles, text, Codex names, and map contents stay exactly as you wrote them. Text that NovelStudio creates for you, such as the default Codex categories of a new book, uses the language that is active at that moment and is not rewritten later. This guide stays in English for now.
+
 ### Hide distractions
 
 Choose **Book menu → Focus mode**, or press **Command+Shift+F**. The chapter list and side panels disappear so you can concentrate on writing. The save status remains visible.

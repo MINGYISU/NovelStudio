@@ -2,11 +2,9 @@ import { useMemo, useState } from 'react';
 import type { StructureSettings } from '../../../shared/schemas/structure.ts';
 import type { TreeNode } from '../../../shared/types.ts';
 import { Button, Dialog, FormError, uiStyles } from '../../components/ui.tsx';
-import { formatWords } from '../../pages/library/format.ts';
+import { apiErrorMessage, formatDateTime, formatWords, useT } from '../../i18n/index.ts';
 import { trashEntries } from './build-items.ts';
 import styles from './manuscript.module.css';
-
-const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 interface TrashDialogProps {
   nodes: readonly TreeNode[];
@@ -17,6 +15,7 @@ interface TrashDialogProps {
 
 /** The book's trashed sections (TREE-08). Restoring is the only action; nothing is deleted here. */
 export function TrashDialog({ nodes, structure, onRestore, onClose }: TrashDialogProps) {
+  const t = useT();
   const entries = useMemo(() => trashEntries(nodes), [nodes]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,8 +23,8 @@ export function TrashDialog({ nodes, structure, onRestore, onClose }: TrashDialo
   const restore = (node: TreeNode) => {
     setBusy(node.id);
     setError(null);
-    onRestore(node).then(onClose, (err: Error) => {
-      setError(err.message);
+    onRestore(node).then(onClose, (err: unknown) => {
+      setError(apiErrorMessage(err));
       setBusy(null);
     });
   };
@@ -35,12 +34,12 @@ export function TrashDialog({ nodes, structure, onRestore, onClose }: TrashDialo
       open
       wide
       onOpenChange={(open) => !open && onClose()}
-      title="Trash"
-      description="A restored section goes back to the end of its original parent, or to the end of the book if that parent is gone or itself in the trash."
+      title={t('manuscript.trash.title')}
+      description={t('manuscript.trash.description')}
     >
-      {entries.length === 0 ? <p>The trash is empty.</p> : null}
+      {entries.length === 0 ? <p>{t('manuscript.trash.empty')}</p> : null}
       {entries.length > 0 ? (
-        <ul className={styles.trashList} aria-label="Trashed sections">
+        <ul className={styles.trashList} aria-label={t('manuscript.trash.list')}>
           {entries.map(({ node, sections, words }) => (
             <li key={node.id} className={styles.trashItem}>
               <div className={styles.trashText}>
@@ -48,15 +47,15 @@ export function TrashDialog({ nodes, structure, onRestore, onClose }: TrashDialo
                   <span className={styles.trashKind}>
                     {structure[node.kind].label || node.kind}
                   </span>{' '}
-                  {node.title || '(untitled)'}
+                  {node.title || t('common.untitled')}
                 </span>
                 <span className={styles.trashMeta}>
-                  Deleted {dateTime.format(new Date(node.deletedAt ?? 0))} ·{' '}
-                  {sections === 1 ? '1 section' : `${sections} sections`} · {formatWords(words)}
+                  {t('manuscript.trash.deleted', { date: formatDateTime(node.deletedAt ?? 0) })} ·{' '}
+                  {t('manuscript.trash.sections', { count: sections })} · {formatWords(words)}
                 </span>
               </div>
               <Button disabled={busy !== null} onClick={() => restore(node)}>
-                Restore
+                {t('common.restore')}
               </Button>
             </li>
           ))}
@@ -64,7 +63,7 @@ export function TrashDialog({ nodes, structure, onRestore, onClose }: TrashDialo
       ) : null}
       <FormError message={error} />
       <div className={uiStyles.actions}>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t('common.close')}</Button>
       </div>
     </Dialog>
   );

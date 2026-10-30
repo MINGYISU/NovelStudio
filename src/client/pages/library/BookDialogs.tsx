@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { useCreateBook, useUpdateBook } from '../../api/books.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
 import { AUTHOR_MAX, DESCRIPTION_MAX, TITLE_MAX, type Book } from '../../../shared/schemas/book.ts';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 import { BookCover } from './BookCover.tsx';
 import styles from './library.module.css';
 
@@ -14,6 +15,7 @@ export function CreateBookDialog({
   onClose,
   onCreated,
 }: DialogProps & { onCreated?: (book: Book) => void }) {
+  const t = useT();
   const [title, setTitle] = useState('');
   const create = useCreateBook();
 
@@ -31,9 +33,13 @@ export function CreateBookDialog({
   };
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()} title="New book">
+    <Dialog
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title={t('library.createDialog.title')}
+    >
       <form onSubmit={submit}>
-        <Field label="Title">
+        <Field label={t('library.dialog.titleField')}>
           <input
             className={uiStyles.input}
             value={title}
@@ -43,11 +49,11 @@ export function CreateBookDialog({
             required
           />
         </Field>
-        <FormError message={create.error?.message ?? null} />
+        <FormError message={create.error ? apiErrorMessage(create.error) : null} />
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={!title.trim() || create.isPending}>
-            Create
+            {t('common.create')}
           </Button>
         </div>
       </form>
@@ -59,6 +65,7 @@ const IMAGE_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 
 /** Edit metadata and cover (LIB-05). The server decides which files are valid covers. */
 export function EditBookDialog({ book, onClose }: DialogProps & { book: Book }) {
+  const t = useT();
   const [title, setTitle] = useState(book.title);
   const [author, setAuthor] = useState(book.author);
   const [description, setDescription] = useState(book.description);
@@ -83,9 +90,9 @@ export function EditBookDialog({ book, onClose }: DialogProps & { book: Book }) 
   const hasCover = cover === undefined ? book.coverUrl !== null : cover !== null;
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()} title="Edit book">
+    <Dialog open onOpenChange={(open) => !open && onClose()} title={t('library.editDialog.title')}>
       <form onSubmit={submit}>
-        <Field label="Title">
+        <Field label={t('library.dialog.titleField')}>
           <input
             className={uiStyles.input}
             value={title}
@@ -94,7 +101,7 @@ export function EditBookDialog({ book, onClose }: DialogProps & { book: Book }) 
             required
           />
         </Field>
-        <Field label="Author">
+        <Field label={t('library.dialog.author')}>
           <input
             className={uiStyles.input}
             value={author}
@@ -102,7 +109,7 @@ export function EditBookDialog({ book, onClose }: DialogProps & { book: Book }) 
             onChange={(e) => setAuthor(e.target.value)}
           />
         </Field>
-        <Field label="Description">
+        <Field label={t('library.dialog.description')}>
           <textarea
             className={uiStyles.input}
             rows={4}
@@ -124,7 +131,7 @@ export function EditBookDialog({ book, onClose }: DialogProps & { book: Book }) 
               className={styles.hiddenInput}
               type="file"
               accept={IMAGE_TYPES}
-              aria-label="Cover image file"
+              aria-label={t('library.dialog.coverFile')}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) setCover(file);
@@ -132,16 +139,18 @@ export function EditBookDialog({ book, onClose }: DialogProps & { book: Book }) 
               }}
             />
             <Button onClick={() => fileInput.current?.click()}>
-              {hasCover ? 'Replace cover…' : 'Upload cover…'}
+              {hasCover ? t('library.dialog.replaceCover') : t('library.dialog.uploadCover')}
             </Button>
-            {hasCover ? <Button onClick={() => setCover(null)}>Remove cover</Button> : null}
+            {hasCover ? (
+              <Button onClick={() => setCover(null)}>{t('library.dialog.removeCover')}</Button>
+            ) : null}
           </div>
         </div>
-        <FormError message={update.error?.message ?? null} />
+        <FormError message={update.error ? apiErrorMessage(update.error) : null} />
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={!title.trim() || update.isPending}>
-            Save
+            {t('common.save')}
           </Button>
         </div>
       </form>

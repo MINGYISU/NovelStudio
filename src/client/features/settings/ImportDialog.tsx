@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router';
 import { useImportColdBackup } from '../../api/cold-backup.ts';
 import { ApiRequestError } from '../../api/http.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 import styles from './settings.module.css';
 
 /** Import a cold backup (.novelstudio.json) as a new book (IMP-01, COLD-07). */
 export function ImportDialog({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const navigate = useNavigate();
   const importBackup = useImportColdBackup();
   const [file, setFile] = useState<File | null>(null);
@@ -28,34 +30,36 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title="Import a cold backup"
-      description="Restores a .novelstudio.json file as a new book. Existing books are never changed."
+      title={t('settings.import.title')}
+      description={t('settings.import.description')}
     >
       <form onSubmit={submit}>
-        <Field label="Backup file (.novelstudio.json)">
+        <Field label={t('settings.import.fileLabel')}>
           <input
             className={uiStyles.input}
             type="file"
             accept=".json,application/json"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            aria-label="Backup file"
+            aria-label={t('settings.import.fileAria')}
           />
         </Field>
-        <Field label="Checksum file (.sha256), optional">
+        <Field label={t('settings.import.checksumLabel')}>
           <input
             className={uiStyles.input}
             type="file"
             accept=".sha256"
             onChange={(e) => setChecksum(e.target.files?.[0] ?? null)}
-            aria-label="Checksum file"
+            aria-label={t('settings.import.checksumAria')}
           />
         </Field>
-        <FormError message={importBackup.error?.message ?? null} />
+        <FormError message={importBackup.error ? apiErrorMessage(importBackup.error) : null} />
         {result ? (
           <div role="status">
-            <p className={styles.ok}>Imported “{result.book.title}”.</p>
+            <p className={styles.ok}>
+              {t('settings.import.imported', { title: result.book.title })}
+            </p>
             {result.remapped ? (
-              <p className={styles.hint}>Some ids already existed, so new ones were created.</p>
+              <p className={styles.hint}>{t('settings.import.remapped')}</p>
             ) : null}
             {result.warnings.map((w) => (
               <p key={w} className={styles.warning}>
@@ -65,21 +69,21 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           </div>
         ) : null}
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>{result ? 'Close' : 'Cancel'}</Button>
+          <Button onClick={onClose}>{result ? t('common.close') : t('common.cancel')}</Button>
           {result ? (
             <Button
               variant="primary"
               onClick={() => navigate(`/book/${result.book.id}/manuscript`)}
             >
-              Open book
+              {t('settings.import.openBook')}
             </Button>
           ) : mismatch ? (
             <Button variant="danger" onClick={() => run(true)} disabled={importBackup.isPending}>
-              Import anyway
+              {t('settings.import.anyway')}
             </Button>
           ) : (
             <Button type="submit" variant="primary" disabled={!file || importBackup.isPending}>
-              {importBackup.isPending ? 'Importing…' : 'Import'}
+              {importBackup.isPending ? t('settings.import.importing') : t('common.import')}
             </Button>
           )}
         </div>

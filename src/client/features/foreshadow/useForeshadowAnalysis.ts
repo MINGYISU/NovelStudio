@@ -7,11 +7,12 @@ import {
 import type { Thread } from '../../../shared/schemas/foreshadow.ts';
 import type { TreeNode } from '../../../shared/types.ts';
 import { useThreads } from '../../api/foreshadows.ts';
+import { t } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
+import { warningText } from './warning-text.ts';
 
 const EMPTY: ForeshadowWarning[] = [];
 const MERGE_WINDOW_MS = 2000;
-const REVIEW_LABEL = 'Review';
 
 export interface ForeshadowAnalysis {
   threads: Thread[] | undefined;
@@ -52,22 +53,24 @@ export function useForeshadowAnalysis(
     if (!before || before.bookId !== bookId) return;
     const created = newWarnings(before.warnings, warnings).filter((w) => w.level === 'warning');
     if (created.length === 0) return;
+    const first = created[0];
     const message =
-      created.length === 1
-        ? (created[0]?.message ?? 'A new foreshadowing warning.')
-        : `${created.length} new foreshadowing warnings.`;
+      created.length === 1 && first
+        ? warningText(t, first)
+        : t('foreshadow.analysis.newWarnings', { count: created.length });
+    const reviewLabel = t('foreshadow.analysis.review');
     const { notice, notify } = useWorkspaceStore.getState();
     // The action that caused the warning (trash with Restore, say) keeps its button.
     if (
       notice?.tone === 'info' &&
       notice.action &&
-      notice.action.label !== REVIEW_LABEL &&
+      notice.action.label !== reviewLabel &&
       Date.now() - notice.at < MERGE_WINDOW_MS
     ) {
       notify({ tone: 'info', message: `${notice.message} ${message}`, action: notice.action });
       return;
     }
-    notify({ tone: 'info', message, action: { label: REVIEW_LABEL, run: () => review.current() } });
+    notify({ tone: 'info', message, action: { label: reviewLabel, run: () => review.current() } });
   }, [bookId, ready, warnings]);
 
   return { threads, warnings, failed: threadsQuery.isError };

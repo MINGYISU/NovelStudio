@@ -3,20 +3,17 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import type { ForeshadowWarning } from '../../../shared/foreshadow.ts';
 import type { LinkTarget } from '../../../shared/map-links.ts';
-import {
-  ROLE_GLYPHS,
-  ROLE_LABELS,
-  STATUS_LABELS,
-  type Occurrence,
-  type Thread,
-} from '../../../shared/schemas/foreshadow.ts';
+import { ROLE_GLYPHS, type Occurrence, type Thread } from '../../../shared/schemas/foreshadow.ts';
 import { useDeleteOccurrence, useDeleteThread } from '../../api/foreshadows.ts';
-import { reportCodexError } from '../codex/errors.ts';
 import { Button, Dialog, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
+import { useWorkspaceStore } from '../../stores/workspace.ts';
 import { OccurrenceDialog } from './OccurrenceDialog.tsx';
 import { ThreadDialog } from './ThreadDialog.tsx';
 import { describeSection, type SectionOption } from './sections.ts';
 import styles from './foreshadow.module.css';
+import { roleLabel, statusLabel } from './labels.ts';
+import { warningText } from './warning-text.ts';
 
 interface ThreadListProps {
   bookId: string;
@@ -28,6 +25,12 @@ interface ThreadListProps {
   options: readonly SectionOption[];
 }
 
+function reportError(action: string, error: Error): void {
+  useWorkspaceStore
+    .getState()
+    .notify({ tone: 'error', message: `${action} ${apiErrorMessage(error)}` });
+}
+
 /** FS-03: every thread with its occurrences in the current reading order. */
 export function ThreadList({
   bookId,
@@ -37,6 +40,15 @@ export function ThreadList({
   order,
   options,
 }: ThreadListProps) {
+  const t = useT();
+  const linkTexts = useMemo(
+    () => ({
+      untitled: t('common.untitled'),
+      missing: t('foreshadow.link.missing'),
+      inTrash: (title: string) => t('foreshadow.link.inTrash', { title }),
+    }),
+    [t],
+  );
   const [editing, setEditing] = useState<Thread | null>(null);
   const [deleting, setDeleting] = useState<Thread | null>(null);
   const [adding, setAdding] = useState<Thread | null>(null);
@@ -54,11 +66,7 @@ export function ThreadList({
   }, [warnings]);
 
   if (threads.length === 0) {
-    return (
-      <p className={styles.empty}>
-        No threads yet. A thread is one planted idea; add its setup, hints and payoff here.
-      </p>
-    );
+    return <p className={styles.empty}>{t('foreshadow.threadList.empty')}</p>;
   }
 
   return (
@@ -85,16 +93,16 @@ export function ThreadList({
                 />
                 <h3 className={styles.threadTitle}>{thread.title}</h3>
                 <span className={`${styles.status} ${styles[`status_${thread.status}`]}`}>
-                  {STATUS_LABELS[thread.status]}
+                  {statusLabel(t, thread.status)}
                 </span>
                 <span className={styles.spacer} />
                 <Button onClick={() => setAdding(thread)}>
-                  <Plus size={14} /> Occurrence
+                  <Plus size={14} /> {t('foreshadow.threadList.addOccurrence')}
                 </Button>
                 <button
                   type="button"
                   className={styles.iconButton}
-                  aria-label={`Edit thread ${thread.title}`}
+                  aria-label={t('foreshadow.threadList.editThread', { title: thread.title })}
                   onClick={() => setEditing(thread)}
                 >
                   <Pencil size={14} />
@@ -102,7 +110,7 @@ export function ThreadList({
                 <button
                   type="button"
                   className={styles.iconButton}
-                  aria-label={`Delete thread ${thread.title}`}
+                  aria-label={t('foreshadow.threadList.deleteThread', { title: thread.title })}
                   onClick={() => setDeleting(thread)}
                 >
                   <Trash2 size={14} />
@@ -118,28 +126,28 @@ export function ThreadList({
                   data-testid="thread-warning"
                   data-kind={w.kind}
                 >
-                  {w.message}
+                  {warningText(t, w)}
                 </p>
               ))}
               {sorted.length === 0 ? (
-                <p className={styles.empty}>No occurrences yet.</p>
+                <p className={styles.empty}>{t('foreshadow.threadList.noOccurrences')}</p>
               ) : (
                 <ol className={styles.occurrences}>
                   {sorted.map((o) => {
-                    const section = describeSection(o.nodeId, targets);
+                    const section = describeSection(o.nodeId, targets, linkTexts);
                     return (
                       <li key={o.id} className={styles.occurrence} data-role={o.role}>
                         <span
                           className={styles.glyph}
                           role="img"
-                          aria-label={ROLE_LABELS[o.role]}
-                          title={ROLE_LABELS[o.role]}
+                          aria-label={roleLabel(t, o.role)}
+                          title={roleLabel(t, o.role)}
                         >
                           {ROLE_GLYPHS[o.role]}
                         </span>
                         <div className={styles.occurrenceBody}>
                           <div>
-                            <span className={styles.roleLabel}>{ROLE_LABELS[o.role]}</span>
+                            <span className={styles.roleLabel}>{roleLabel(t, o.role)}</span>
                             {' · '}
                             {section.state === 'ok' && o.nodeId ? (
                               <Link
@@ -154,7 +162,7 @@ export function ThreadList({
                           </div>
                           {o.anchorState === 'missing' ? (
                             <p className={styles.anchorMissing} data-testid="anchor-missing">
-                              Anchor missing: the marked text was deleted.
+                              {t('foreshadow.threadList.anchorMissing')}
                             </p>
                           ) : null}
                           {o.excerpt ? (
@@ -165,7 +173,9 @@ export function ThreadList({
                         <button
                           type="button"
                           className={styles.iconButton}
-                          aria-label={`Edit ${ROLE_LABELS[o.role]} occurrence`}
+                          aria-label={t('foreshadow.threadList.editOccurrence', {
+                            role: roleLabel(t, o.role),
+                          })}
                           onClick={() => setEditingOccurrence({ thread, occurrence: o })}
                         >
                           <Pencil size={14} />
@@ -173,10 +183,16 @@ export function ThreadList({
                         <button
                           type="button"
                           className={styles.iconButton}
-                          aria-label={`Remove ${ROLE_LABELS[o.role]} occurrence`}
+                          aria-label={t('foreshadow.threadList.removeOccurrence', {
+                            role: roleLabel(t, o.role),
+                          })}
                           onClick={() =>
                             deleteOccurrence.mutate(o.id, {
-                              onError: reportCodexError('Could not remove the occurrence.'),
+                              onError: (error) =>
+                                reportError(
+                                  t('foreshadow.threadList.removeOccurrenceFailed'),
+                                  error,
+                                ),
                             })
                           }
                         >
@@ -215,22 +231,25 @@ export function ThreadList({
         <Dialog
           open
           onOpenChange={(open) => !open && setDeleting(null)}
-          title="Delete this thread?"
-          description={`“${deleting.title}” and its ${deleting.occurrences.length} occurrence(s) will be removed. Your manuscript text is not touched.`}
+          title={t('foreshadow.threadList.deleteTitle')}
+          description={t('foreshadow.threadList.deleteDescription', {
+            title: deleting.title,
+            count: deleting.occurrences.length,
+          })}
         >
           <div className={uiStyles.actions}>
-            <Button onClick={() => setDeleting(null)}>Cancel</Button>
+            <Button onClick={() => setDeleting(null)}>{t('common.cancel')}</Button>
             <Button
               variant="danger"
               disabled={deleteThread.isPending}
               onClick={() =>
                 deleteThread.mutate(deleting.id, {
                   onSuccess: () => setDeleting(null),
-                  onError: reportCodexError('Could not delete the thread.'),
+                  onError: (error) => reportError(t('foreshadow.threadList.deleteFailed'), error),
                 })
               }
             >
-              Delete thread
+              {t('foreshadow.threadList.deleteConfirm')}
             </Button>
           </div>
         </Dialog>

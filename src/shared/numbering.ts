@@ -129,6 +129,7 @@ export const UNTITLED = '(untitled)';
 export function computeDisplayTitles(
   nodes: readonly NumberableNode[],
   structure: StructureSettings = DEFAULT_STRUCTURE,
+  untitled: string = UNTITLED,
 ): Map<string, string> {
   const titles = new Map<string, string>();
   const counters = new Map<string, number>();
@@ -148,7 +149,7 @@ export function computeDisplayTitles(
         const number = formatLabel(cfg.format, n);
         titles.set(node.id, node.title ? number + cfg.separator + node.title : number);
       } else {
-        titles.set(node.id, node.title || UNTITLED);
+        titles.set(node.id, node.title || untitled);
       }
       walk(children, { ...scopes, [node.kind]: node.id });
     }

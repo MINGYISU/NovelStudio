@@ -11,11 +11,12 @@ import {
 } from '../../../shared/schemas/codex.ts';
 import { useUpdateCategory } from '../../api/codex.ts';
 import { Button, Dialog, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, type MessageKey, useT } from '../../i18n/index.ts';
 import styles from './codex.module.css';
 
-export const FIELD_TYPE_LABELS: Record<CodexFieldType, string> = {
-  text: 'Short text',
-  longtext: 'Long text',
+export const FIELD_TYPE_LABEL_KEYS: Record<CodexFieldType, MessageKey> = {
+  text: 'codex.fieldType.text',
+  longtext: 'codex.fieldType.longtext',
 };
 
 /** Moves the item at `from` by `delta` places; out-of-range moves return the list unchanged. */
@@ -36,6 +37,7 @@ interface TemplateDialogProps {
 
 /** CDX-04: the template is copied into new entries; existing entries are not touched. */
 export function TemplateDialog({ bookId, category, onClose }: TemplateDialogProps) {
+  const t = useT();
   const update = useUpdateCategory(bookId);
   const [fields, setFields] = useState<CodexFieldDef[]>(category.fieldTemplate);
   const [label, setLabel] = useState('');
@@ -54,7 +56,7 @@ export function TemplateDialog({ bookId, category, onClose }: TemplateDialogProp
 
   const save = () => {
     if (fields.some((f) => f.label.trim() === '')) {
-      setError('Every field needs a name.');
+      setError(t('codex.template.nameRequired'));
       return;
     }
     update.mutate(
@@ -62,7 +64,7 @@ export function TemplateDialog({ bookId, category, onClose }: TemplateDialogProp
         id: category.id,
         patch: { fieldTemplate: fields.map((f) => ({ ...f, label: f.label.trim() })) },
       },
-      { onSuccess: onClose, onError: (err) => setError(err.message) },
+      { onSuccess: onClose, onError: (err) => setError(apiErrorMessage(err)) },
     );
   };
 
@@ -70,15 +72,15 @@ export function TemplateDialog({ bookId, category, onClose }: TemplateDialogProp
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title={`Field template: ${category.name}`}
-      description="New entries in this category start with these fields. Existing entries keep theirs."
+      title={t('codex.template.title', { name: category.name })}
+      description={t('codex.template.description')}
     >
       <ul className={styles.templateList}>
         {fields.map((field, index) => (
           <li key={field.key} className={styles.templateRow}>
             <input
               className={uiStyles.input}
-              aria-label={`Template field ${index + 1} name`}
+              aria-label={t('codex.template.fieldNameLabel', { number: index + 1 })}
               maxLength={CODEX_LABEL_MAX}
               value={field.label}
               onChange={(e) =>
@@ -87,7 +89,7 @@ export function TemplateDialog({ bookId, category, onClose }: TemplateDialogProp
             />
             <select
               className={`${uiStyles.input} ${styles.typeSelect}`}
-              aria-label={`Template field ${index + 1} type`}
+              aria-label={t('codex.template.fieldTypeLabel', { number: index + 1 })}
               value={field.type}
               onChange={(e) =>
                 setFields(
@@ -97,16 +99,16 @@ export function TemplateDialog({ bookId, category, onClose }: TemplateDialogProp
                 )
               }
             >
-              {CODEX_FIELD_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {FIELD_TYPE_LABELS[t]}
+              {CODEX_FIELD_TYPES.map((fieldType) => (
+                <option key={fieldType} value={fieldType}>
+                  {t(FIELD_TYPE_LABEL_KEYS[fieldType])}
                 </option>
               ))}
             </select>
             <button
               type="button"
               className={styles.iconButton}
-              aria-label={`Move template field ${index + 1} up`}
+              aria-label={t('codex.template.moveUp', { number: index + 1 })}
               disabled={index === 0}
               onClick={() => setFields(moveItem(fields, index, -1))}
             >
@@ -115,7 +117,7 @@ export function TemplateDialog({ bookId, category, onClose }: TemplateDialogProp
             <button
               type="button"
               className={styles.iconButton}
-              aria-label={`Move template field ${index + 1} down`}
+              aria-label={t('codex.template.moveDown', { number: index + 1 })}
               disabled={index === fields.length - 1}
               onClick={() => setFields(moveItem(fields, index, 1))}
             >
@@ -124,14 +126,16 @@ export function TemplateDialog({ bookId, category, onClose }: TemplateDialogProp
             <button
               type="button"
               className={styles.iconButton}
-              aria-label={`Remove template field ${index + 1}`}
+              aria-label={t('codex.template.remove', { number: index + 1 })}
               onClick={() => setFields(fields.filter((_, i) => i !== index))}
             >
               <Trash2 size={14} />
             </button>
           </li>
         ))}
-        {fields.length === 0 ? <li className={styles.empty}>No fields yet.</li> : null}
+        {fields.length === 0 ? (
+          <li className={styles.empty}>{t('codex.template.noFields')}</li>
+        ) : null}
       </ul>
       <form
         className={styles.addField}
@@ -142,33 +146,33 @@ export function TemplateDialog({ bookId, category, onClose }: TemplateDialogProp
       >
         <input
           className={uiStyles.input}
-          aria-label="New template field name"
-          placeholder="New field name"
+          aria-label={t('codex.template.newNameLabel')}
+          placeholder={t('codex.template.newNamePlaceholder')}
           maxLength={CODEX_LABEL_MAX}
           value={label}
           onChange={(e) => setLabel(e.target.value)}
         />
         <select
           className={`${uiStyles.input} ${styles.typeSelect}`}
-          aria-label="New template field type"
+          aria-label={t('codex.template.newTypeLabel')}
           value={type}
           onChange={(e) => setType(e.target.value as CodexFieldType)}
         >
-          {CODEX_FIELD_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {FIELD_TYPE_LABELS[t]}
+          {CODEX_FIELD_TYPES.map((fieldType) => (
+            <option key={fieldType} value={fieldType}>
+              {t(FIELD_TYPE_LABEL_KEYS[fieldType])}
             </option>
           ))}
         </select>
         <Button type="submit" disabled={!label.trim() || fields.length >= CODEX_MAX_FIELDS}>
-          Add field
+          {t('codex.template.addField')}
         </Button>
       </form>
       <FormError message={error} />
       <div className={styles.dialogActions}>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.cancel')}</Button>
         <Button variant="primary" onClick={save} disabled={update.isPending}>
-          Save template
+          {t('codex.template.save')}
         </Button>
       </div>
     </Dialog>

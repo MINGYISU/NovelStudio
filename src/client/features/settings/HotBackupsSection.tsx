@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCancelHotRestore, useHotBackups, useRestoreHotBackup } from '../../api/hot-backups.ts';
 import { Button, Dialog, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, formatDateTime, useT } from '../../i18n/index.ts';
 import styles from './settings.module.css';
 
 function formatBytes(bytes: number): string {
@@ -11,6 +12,7 @@ function formatBytes(bytes: number): string {
 
 /** HOT-02: the automatic database copies, and restoring one (applied at the next start). */
 export function HotBackupsSection() {
+  const t = useT();
   const backups = useHotBackups();
   const restore = useRestoreHotBackup();
   const cancel = useCancelHotRestore();
@@ -19,51 +21,49 @@ export function HotBackupsSection() {
 
   return (
     <section className={styles.section} aria-labelledby="hot-heading">
-      <h2 id="hot-heading">Automatic database backups</h2>
-      <p className={styles.hint}>
-        NovelStudio copies its database when it starts and hourly while you write, and keeps the
-        newest 20. Restoring one replaces all books with the state at that time and takes effect the
-        next time the server starts. Your current database is copied first and kept, so a restore
-        can itself be undone.
-      </p>
+      <h2 id="hot-heading">{t('settings.hot.title')}</h2>
+      <p className={styles.hint}>{t('settings.hot.intro')}</p>
       {backups.error ? (
         <p className={styles.warning} role="alert">
-          {backups.error.message}
+          {apiErrorMessage(backups.error)}
         </p>
       ) : null}
       {data?.pending ? (
         <div className={styles.banner} role="status">
           <p>
-            <strong>Restore of {data.pending.name} is waiting for a restart.</strong> Stop the
-            server (Ctrl+C) and start NovelStudio again to finish. Anything you write before then
-            will not be in the restored database.
+            <strong>{t('settings.hot.pendingLead', { name: data.pending.name })}</strong>{' '}
+            {t('settings.hot.pendingBody')}
           </p>
           <Button onClick={() => cancel.mutate()} disabled={cancel.isPending}>
-            Cancel restore
+            {t('settings.hot.cancelRestore')}
           </Button>
         </div>
       ) : null}
       {data?.failed ? (
         <div className={styles.banner} role="alert">
           <p>
-            The last restore ({data.failed.name}) could not be applied and nothing was changed:{' '}
-            {data.failed.error}
+            {t('settings.hot.failed', { name: data.failed.name, error: data.failed.error ?? '' })}
           </p>
           <Button onClick={() => cancel.mutate()} disabled={cancel.isPending}>
-            Dismiss
+            {t('settings.hot.dismiss')}
           </Button>
         </div>
       ) : null}
-      <FormError message={cancel.error?.message ?? null} />
-      {data && data.backups.length === 0 ? <p className={styles.hint}>No backups yet.</p> : null}
-      <ul className={styles.backupList} aria-label="Automatic database backups">
+      <FormError message={cancel.error ? apiErrorMessage(cancel.error) : null} />
+      {data && data.backups.length === 0 ? (
+        <p className={styles.hint}>{t('settings.hot.none')}</p>
+      ) : null}
+      <ul className={styles.backupList} aria-label={t('settings.hot.listAria')}>
         {data?.backups.map((b) => (
           <li key={b.name}>
             <span>{b.name}</span>
-            <span>{new Date(b.createdAt).toLocaleString()}</span>
+            <span>{formatDateTime(b.createdAt)}</span>
             <span className={styles.hint}>{formatBytes(b.bytes)}</span>
-            <Button onClick={() => setChoice(b.name)} aria-label={`Restore ${b.name}`}>
-              Restore…
+            <Button
+              onClick={() => setChoice(b.name)}
+              aria-label={t('settings.hot.restoreAria', { name: b.name })}
+            >
+              {t('settings.hot.restoreButton')}
             </Button>
           </li>
         ))}
@@ -72,12 +72,12 @@ export function HotBackupsSection() {
         <Dialog
           open
           onOpenChange={(open) => !open && setChoice(null)}
-          title="Restore this backup?"
-          description={`All books will be replaced by the state in ${choice}. Nothing changes until the server restarts, and your current database is copied first.`}
+          title={t('settings.hot.confirmTitle')}
+          description={t('settings.hot.confirmBody', { name: choice })}
         >
-          <FormError message={restore.error?.message ?? null} />
+          <FormError message={restore.error ? apiErrorMessage(restore.error) : null} />
           <div className={uiStyles.actions}>
-            <Button onClick={() => setChoice(null)}>Cancel</Button>
+            <Button onClick={() => setChoice(null)}>{t('common.cancel')}</Button>
             <Button
               variant="danger"
               disabled={restore.isPending}
@@ -87,7 +87,7 @@ export function HotBackupsSection() {
                 })
               }
             >
-              {restore.isPending ? 'Preparing…' : 'Restore at next start'}
+              {restore.isPending ? t('settings.hot.preparing') : t('settings.hot.atNextStart')}
             </Button>
           </div>
         </Dialog>

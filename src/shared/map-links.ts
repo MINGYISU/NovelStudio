@@ -12,19 +12,34 @@ export interface ResolvedLink {
   state: 'ok' | 'trashed' | 'missing';
 }
 
+/** The words a resolved link can contain; the client passes the interface language (PRD I18N-07). */
+export interface LinkTexts {
+  untitled: string;
+  missing: string;
+  inTrash: (title: string) => string;
+}
+
+export const ENGLISH_LINK_TEXTS: LinkTexts = {
+  untitled: UNTITLED,
+  missing: '(missing)',
+  inTrash: (title) => `${title} (in trash)`,
+};
+
 /** Current display title of every section, trashed ones included (they show their plain title). */
 export function sectionTargets(
   nodes: readonly (NumberableNode & { deletedAt: string | null })[],
   structure?: StructureSettings,
+  untitled: string = UNTITLED,
 ): Map<string, LinkTarget> {
   const titles = computeDisplayTitles(
     nodes.filter((n) => n.deletedAt === null),
     structure,
+    untitled,
   );
   return new Map(
     nodes.map((n) => [
       n.id,
-      { title: titles.get(n.id) ?? (n.title || UNTITLED), trashed: n.deletedAt !== null },
+      { title: titles.get(n.id) ?? (n.title || untitled), trashed: n.deletedAt !== null },
     ]),
   );
 }
@@ -34,17 +49,18 @@ export function resolveMapLink(
   link: MapLink,
   sections: ReadonlyMap<string, LinkTarget>,
   entryTitles: ReadonlyMap<string, string>,
+  texts: LinkTexts = ENGLISH_LINK_TEXTS,
 ): ResolvedLink {
   if (link.type === 'node') {
     const section = sections.get(link.id);
-    if (!section) return { label: '(missing)', state: 'missing' };
-    if (section.trashed) return { label: `${section.title} (in trash)`, state: 'trashed' };
+    if (!section) return { label: texts.missing, state: 'missing' };
+    if (section.trashed) return { label: texts.inTrash(section.title), state: 'trashed' };
     return { label: section.title, state: 'ok' };
   }
   const title = entryTitles.get(link.id);
   return title === undefined
-    ? { label: '(missing)', state: 'missing' }
-    : { label: title || UNTITLED, state: 'ok' };
+    ? { label: texts.missing, state: 'missing' }
+    : { label: title || texts.untitled, state: 'ok' };
 }
 
 /** Rewrites link ids (restore with new ids); ids the lookup does not know are kept as they are. */

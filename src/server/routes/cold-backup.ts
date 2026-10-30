@@ -7,6 +7,7 @@ import {
   validateLocationBodySchema,
   verifyBodySchema,
 } from '../../shared/schemas/cold-backup-settings.ts';
+import { localeBodySchema } from '../../shared/schemas/locale.ts';
 import { ApiError, parseOrThrow } from '../errors.ts';
 import type { ColdBackupService } from '../services/cold-backup.ts';
 import { restoreColdBackup } from '../services/cold-backup-restore.ts';
@@ -63,6 +64,7 @@ export function registerColdBackupRoutes(
       let file: Buffer | null = null;
       let sidecar: string | null = null;
       let ignoreChecksum = false;
+      let localeField: string | undefined;
       try {
         for await (const part of request.parts()) {
           if (part.type === 'file') {
@@ -73,6 +75,8 @@ export function registerColdBackupRoutes(
             else if (part.fieldname === 'file') file = data;
           } else if (part.fieldname === 'ignoreChecksum') {
             ignoreChecksum = part.value === '1';
+          } else if (part.fieldname === 'locale') {
+            localeField = typeof part.value === 'string' ? part.value : undefined;
           }
         }
       } catch (err) {
@@ -89,6 +93,7 @@ export function registerColdBackupRoutes(
       const result = restoreColdBackup(db, paths, file, {
         expectedSha256: expected,
         ignoreChecksum,
+        locale: parseOrThrow(localeBodySchema, { locale: localeField }).locale,
       });
       return reply.code(201).send(result);
     });

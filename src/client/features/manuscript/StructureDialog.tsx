@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useUpdateBook } from '../../api/books.ts';
 import { Button, Dialog, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, useT, type MessageKey } from '../../i18n/index.ts';
 import { formatLabel } from '../../../shared/numbering.ts';
 import {
   RESTART_SCOPES,
@@ -19,13 +20,14 @@ interface StructureDialogProps {
   onClose: () => void;
 }
 
-const PRESET_LABELS: Record<StructurePresetId, string> = {
-  english: 'English',
-  chinese: 'Chinese (中文)',
+const PRESET_LABELS: Record<StructurePresetId, MessageKey> = {
+  english: 'manuscript.structure.presetEnglish',
+  chinese: 'manuscript.structure.presetChinese',
 };
 
 /** Per-book labels and number formats (NUM-01, NUM-04). Display numbers are computed, never stored. */
 export function StructureDialog({ bookId, structure, onClose }: StructureDialogProps) {
+  const t = useT();
   const [draft, setDraft] = useState<StructureSettings>(structure);
   const [error, setError] = useState<string | null>(null);
   const update = useUpdateBook();
@@ -37,7 +39,7 @@ export function StructureDialog({ bookId, structure, onClose }: StructureDialogP
     event.preventDefault();
     const parsed = structureSettingsSchema.safeParse(draft);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'These settings are not valid.');
+      setError(parsed.error.issues[0]?.message ?? t('manuscript.structure.invalid'));
       return;
     }
     setError(null);
@@ -48,15 +50,15 @@ export function StructureDialog({ bookId, structure, onClose }: StructureDialogP
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title="Structure settings"
-      description="Labels and number formats for this book. Use {n}, {n:roman}, {n:roman-lower}, {n:cn} or {n:alpha}."
+      title={t('manuscript.structure.title')}
+      description={t('manuscript.structure.description')}
     >
       <form onSubmit={submit}>
         <div className={styles.presets}>
-          <span>Preset:</span>
+          <span>{t('manuscript.structure.preset')}</span>
           {(Object.keys(STRUCTURE_PRESETS) as StructurePresetId[]).map((id) => (
             <Button key={id} onClick={() => setDraft(structuredClone(STRUCTURE_PRESETS[id]))}>
-              {PRESET_LABELS[id]}
+              {t(PRESET_LABELS[id])}
             </Button>
           ))}
         </div>
@@ -64,9 +66,9 @@ export function StructureDialog({ bookId, structure, onClose }: StructureDialogP
           const cfg = draft[kind];
           return (
             <fieldset key={kind} className={styles.kindFieldset}>
-              <legend>{kind}</legend>
+              <legend>{t(`kind.${kind}`)}</legend>
               <label className={styles.inline}>
-                Label
+                {t('manuscript.structure.label')}
                 <input
                   className={uiStyles.input}
                   value={cfg.label}
@@ -75,7 +77,7 @@ export function StructureDialog({ bookId, structure, onClose }: StructureDialogP
                 />
               </label>
               <label className={styles.inline}>
-                Format
+                {t('manuscript.structure.format')}
                 <input
                   className={uiStyles.input}
                   value={cfg.format}
@@ -84,7 +86,7 @@ export function StructureDialog({ bookId, structure, onClose }: StructureDialogP
                 />
               </label>
               <label className={styles.inline}>
-                Separator
+                {t('manuscript.structure.separator')}
                 <input
                   className={uiStyles.input}
                   value={cfg.separator}
@@ -93,7 +95,7 @@ export function StructureDialog({ bookId, structure, onClose }: StructureDialogP
                 />
               </label>
               <label className={styles.inline}>
-                Restart within
+                {t('manuscript.structure.restartWithin')}
                 <select
                   className={uiStyles.input}
                   value={cfg.restartWithin}
@@ -106,7 +108,9 @@ export function StructureDialog({ bookId, structure, onClose }: StructureDialogP
                   {RESTART_SCOPES.filter((s) => s === 'book' || NODE_RANK[s] < NODE_RANK[kind]).map(
                     (scope) => (
                       <option key={scope} value={scope}>
-                        {scope}
+                        {scope === 'book'
+                          ? t('manuscript.structure.scopeBook')
+                          : t(`kind.${scope}`)}
                       </option>
                     ),
                   )}
@@ -118,20 +122,21 @@ export function StructureDialog({ bookId, structure, onClose }: StructureDialogP
                   checked={cfg.defaultNumbered}
                   onChange={(e) => change(kind, { defaultNumbered: e.target.checked })}
                 />
-                Numbered by default
+                {t('manuscript.structure.numberedByDefault')}
               </label>
               <p className={styles.preview}>
-                Preview: {formatLabel(cfg.format, 1)}
-                {cfg.separator}Title
+                {t('manuscript.structure.preview', {
+                  text: `${formatLabel(cfg.format, 1)}${cfg.separator}${t('manuscript.structure.sampleTitle')}`,
+                })}
               </p>
             </fieldset>
           );
         })}
-        <FormError message={error ?? update.error?.message ?? null} />
+        <FormError message={(error ?? update.error) ? apiErrorMessage(update.error) : null} />
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={update.isPending}>
-            Save
+            {t('common.save')}
           </Button>
         </div>
       </form>

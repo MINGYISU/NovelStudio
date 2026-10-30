@@ -5,6 +5,7 @@ import {
   moveNodeBodySchema,
   patchNodeBodySchema,
 } from '../../shared/schemas/node.ts';
+import { localeBodySchema } from '../../shared/schemas/locale.ts';
 import { parseOrThrow } from '../errors.ts';
 import type { ManuscriptService } from '../services/manuscript.ts';
 
@@ -34,7 +35,8 @@ export function registerNodeRoutes(app: FastifyInstance, manuscript: ManuscriptS
 
   app.post('/api/nodes/:id/duplicate', async (request, reply) => {
     const { id } = parseOrThrow(idParams, request.params);
-    return reply.code(201).send(manuscript.duplicate(id));
+    const { locale } = parseOrThrow(localeBodySchema, request.body ?? {});
+    return reply.code(201).send(manuscript.duplicate(id, locale));
   });
 
   // Moves the section (with its subtree) to the trash; the subtree root carries `deletedAt`.

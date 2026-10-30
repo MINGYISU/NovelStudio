@@ -29,6 +29,9 @@ export interface ForeshadowWarning {
   threadId: string;
   kind: WarningKind;
   level: WarningLevel;
+  /** The thread's title, so the client can build the message in the interface language (I18N-07). */
+  threadTitle: string;
+  /** English fallback; the client translates from `kind` and `threadTitle`. */
   message: string;
   /** Sections to mark with a badge. */
   nodeIds: string[];
@@ -102,6 +105,7 @@ export function analyzeForeshadows(
       threadId: thread.id,
       kind,
       level: LEVELS[kind],
+      threadTitle: thread.title,
       message: warningMessage(kind, thread.title),
       nodeIds: [...new Set(nodeIds.filter((id): id is string => id !== null))],
       occurrenceIds: occurrences.map((o) => o.id),

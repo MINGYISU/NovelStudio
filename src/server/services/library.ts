@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Book, CreateBookBody, PatchBookBody } from '../../shared/schemas/book.ts';
+import { DEFAULT_LOCALE } from '../../shared/schemas/locale.ts';
+import { CHINESE_STRUCTURE } from '../../shared/schemas/structure.ts';
 import type { DataPaths } from '../config.ts';
 import type { Db } from '../db/connection.ts';
 import { ApiError } from '../errors.ts';
@@ -23,10 +25,16 @@ export class LibraryService {
   ) {}
 
   /** A new book starts with the default Codex categories (CDX-01), in the same transaction. */
-  create(body: CreateBookBody): Book {
+  create({ locale = DEFAULT_LOCALE, ...body }: CreateBookBody): Book {
     return this.db.transaction(() => {
-      const book = insertBook(this.db, body, new Date().toISOString());
-      insertDefaultCategories(this.db, book.id);
+      const now = new Date().toISOString();
+      const book = insertBook(this.db, body, now);
+      insertDefaultCategories(this.db, book.id, locale);
+      // I18N-06: a book created in Chinese starts with the Chinese numbering preset.
+      if (locale === 'zh-CN') {
+        updateBookFields(this.db, book.id, { structure: CHINESE_STRUCTURE }, now);
+        return this.requireBook(book.id);
+      }
       return book;
     })();
   }

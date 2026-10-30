@@ -10,7 +10,9 @@ import {
   validateLocation,
 } from '../../api/cold-backup.ts';
 import { Button, Field, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, formatDateTime, useT } from '../../i18n/index.ts';
 import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
+import { LanguageSection } from '../../features/settings/LanguageSection.tsx';
 import { HotBackupsSection } from '../../features/settings/HotBackupsSection.tsx';
 import { isBackupOverdue } from '../../../shared/cold-backup.ts';
 import type {
@@ -22,21 +24,23 @@ import styles from '../../features/settings/settings.module.css';
 
 /** Settings (COLD-01, COLD-06, COLD-10): where cold backups go, retention, reminders, verification. */
 export function SettingsPage() {
+  const t = useT();
   const settings = useColdBackupSettings();
   return (
     <main className={styles.page}>
       <header className={libraryStyles.header}>
         <Link className={libraryStyles.sort} to="/">
-          <ArrowLeft size={16} /> Library
+          <ArrowLeft size={16} /> {t('settings.page.library')}
         </Link>
-        <h1 className={libraryStyles.heading}>Settings</h1>
+        <h1 className={libraryStyles.heading}>{t('settings.page.title')}</h1>
       </header>
-      {settings.isPending ? <p className={libraryStyles.empty}>Loading…</p> : null}
+      {settings.isPending ? <p className={libraryStyles.empty}>{t('common.loading')}</p> : null}
       {settings.error ? (
         <p className={`${libraryStyles.empty} ${libraryStyles.error}`} role="alert">
-          {settings.error.message}
+          {apiErrorMessage(settings.error)}
         </p>
       ) : null}
+      <LanguageSection />
       {settings.data ? <ColdBackupSection data={settings.data} /> : null}
       <HotBackupsSection />
     </main>
@@ -44,6 +48,7 @@ export function SettingsPage() {
 }
 
 function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
+  const t = useT();
   const save = useSaveColdBackupSettings();
   const books = useBooks({ sort: 'title', trashed: false });
   const verify = useVerifyBackups();
@@ -63,7 +68,7 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
       setValidation(await validateLocation(dir.trim()));
     } catch (err) {
       setValidation(null);
-      setMessage((err as Error).message);
+      setMessage(apiErrorMessage(err));
     }
   };
 
@@ -76,7 +81,7 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
         setValidation(null);
       }
     } catch (err) {
-      setMessage((err as Error).message);
+      setMessage(apiErrorMessage(err));
     }
   };
 
@@ -91,7 +96,7 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
         reminderDays: days,
         autoDaily,
       },
-      { onSuccess: () => setMessage('Saved.') },
+      { onSuccess: () => setMessage(t('settings.cold.saved')) },
     );
   };
 
@@ -99,14 +104,10 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
   return (
     <>
       <section className={styles.section} aria-labelledby="cold-heading">
-        <h2 id="cold-heading">Cold backup</h2>
-        <p className={styles.hint}>
-          A plain JSON copy of each book that can be read without NovelStudio. Choose a folder on
-          another disk or in a synced folder (iCloud Drive, Dropbox). It cannot be inside the
-          NovelStudio data or source folders.
-        </p>
+        <h2 id="cold-heading">{t('settings.cold.title')}</h2>
+        <p className={styles.hint}>{t('settings.cold.intro')}</p>
         <form onSubmit={submit}>
-          <Field label="Cold backup folder (absolute path)">
+          <Field label={t('settings.cold.folderLabel')}>
             <div className={styles.row}>
               <input
                 className={uiStyles.input}
@@ -115,13 +116,15 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
                   setDir(e.target.value);
                   setValidation(null);
                 }}
-                placeholder="/Volumes/Backup/NovelStudio Cold Backups"
-                aria-label="Cold backup folder (absolute path)"
+                placeholder={t('settings.cold.folderPlaceholder')}
+                aria-label={t('settings.cold.folderLabel')}
               />
               <Button onClick={() => void check()} disabled={dir.trim() === ''}>
-                Validate
+                {t('settings.cold.validate')}
               </Button>
-              {data.pickerSupported ? <Button onClick={() => void pick()}>Choose…</Button> : null}
+              {data.pickerSupported ? (
+                <Button onClick={() => void pick()}>{t('settings.cold.choose')}</Button>
+              ) : null}
             </div>
           </Field>
           {validation ? (
@@ -131,7 +134,7 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
           ) : null}
           <label className={styles.check}>
             <input type="checkbox" checked={keepOn} onChange={(e) => setKeepOn(e.target.checked)} />{' '}
-            Keep only the newest
+            {t('settings.cold.keepBefore')}
             <input
               className={uiStyles.input}
               type="number"
@@ -140,10 +143,10 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
               value={keepN}
               disabled={!keepOn}
               onChange={(e) => setKeepN(Number(e.target.value))}
-              aria-label="Number of backups to keep per book"
+              aria-label={t('settings.cold.keepAria')}
               style={{ width: '5rem' }}
             />
-            backups per book (off by default: nothing is ever deleted)
+            {t('settings.cold.keepAfter')}
           </label>
           <label className={styles.check}>
             <input
@@ -151,10 +154,10 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
               checked={snapshots}
               onChange={(e) => setSnapshots(e.target.checked)}
             />{' '}
-            Include section snapshots (larger files)
+            {t('settings.cold.includeSnapshots')}
           </label>
           <label className={styles.check}>
-            Remind me when a book has not been backed up for
+            {t('settings.cold.remindBefore')}
             <input
               className={uiStyles.input}
               type="number"
@@ -162,10 +165,10 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
               max={365}
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-              aria-label="Reminder days"
+              aria-label={t('settings.cold.remindAria')}
               style={{ width: '5rem' }}
             />
-            days
+            {t('settings.cold.remindAfter')}
           </label>
           <label className={styles.check}>
             <input
@@ -173,47 +176,50 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
               checked={autoDaily}
               onChange={(e) => setAutoDaily(e.target.checked)}
             />{' '}
-            Back up automatically once a day, at the first start, the books that changed (off by
-            default)
+            {t('settings.cold.autoDaily')}
           </label>
           {data.autoDailyLast ? (
             <p
               className={data.autoDailyLast.ok ? styles.hint : styles.warning}
               role={data.autoDailyLast.ok ? 'status' : 'alert'}
             >
-              Last automatic backup, {new Date(data.autoDailyLast.at).toLocaleString()}:{' '}
-              {data.autoDailyLast.message}
+              {t('settings.cold.autoLast', {
+                time: formatDateTime(data.autoDailyLast.at),
+                message: data.autoDailyLast.message,
+              })}
             </p>
           ) : null}
-          <FormError message={save.error?.message ?? null} />
+          <FormError message={save.error ? apiErrorMessage(save.error) : null} />
           {message ? (
             <p className={styles.hint} role="status">
               {message}
             </p>
           ) : null}
           <Button type="submit" variant="primary" disabled={save.isPending}>
-            Save settings
+            {t('settings.cold.save')}
           </Button>
         </form>
       </section>
 
       <section className={styles.section} aria-labelledby="backups-heading">
-        <h2 id="backups-heading">Backups</h2>
+        <h2 id="backups-heading">{t('settings.backups.title')}</h2>
         <div className={styles.row} style={{ margin: '0.75rem 0' }}>
           <Button variant="primary" onClick={() => setExportingAll(true)}>
-            Export all books…
+            {t('settings.backups.exportAll')}
           </Button>
           <Button onClick={() => verify.mutate()} disabled={verify.isPending}>
-            Verify latest backups
+            {t('settings.backups.verify')}
           </Button>
         </div>
-        <FormError message={verify.error?.message ?? null} />
+        <FormError message={verify.error ? apiErrorMessage(verify.error) : null} />
         {verify.data ? (
-          <ul className={styles.results} aria-label="Verification results">
-            {verify.data.length === 0 ? <li>No backups have been made yet.</li> : null}
+          <ul className={styles.results} aria-label={t('settings.backups.resultsAria')}>
+            {verify.data.length === 0 ? <li>{t('settings.backups.noneYet')}</li> : null}
             {verify.data.map((r) => (
               <li key={r.bookId}>
-                <span className={r.ok ? styles.ok : styles.warning}>{r.ok ? 'OK' : 'Problem'}</span>{' '}
+                <span className={r.ok ? styles.ok : styles.warning}>
+                  {r.ok ? t('settings.backups.ok') : t('settings.backups.problem')}
+                </span>{' '}
                 <span className={styles.path}>{r.file}</span>
                 {r.problems.map((p) => (
                   <div key={p} className={styles.warning}>
@@ -227,8 +233,8 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Book</th>
-              <th>Last cold backup</th>
+              <th>{t('settings.backups.book')}</th>
+              <th>{t('settings.backups.lastCold')}</th>
             </tr>
           </thead>
           <tbody>
@@ -239,7 +245,7 @@ function ColdBackupSection({ data }: { data: ColdBackupSettingsResponse }) {
                 <tr key={book.id}>
                   <td>{book.title}</td>
                   <td className={overdue ? styles.overdue : undefined}>
-                    {last ? new Date(last.at).toLocaleString() : 'Never'}
+                    {last ? formatDateTime(last.at) : t('common.never')}
                     {last ? <div className={styles.path}>{last.file}</div> : null}
                   </td>
                 </tr>

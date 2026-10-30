@@ -4,7 +4,9 @@ import {
   type ExportFormat,
   type ExportSection,
 } from '../../shared/manuscript-export.ts';
-import { computeDisplayTitles, UNTITLED } from '../../shared/numbering.ts';
+import { computeDisplayTitles } from '../../shared/numbering.ts';
+import { DEFAULT_LOCALE, type Locale } from '../../shared/schemas/locale.ts';
+import { untitledLabel } from '../../shared/seed-text.ts';
 import { contentSchema, type ContentDoc } from '../../shared/schemas/content.ts';
 import { buildTree, type TreeBranch } from '../../shared/tree.ts';
 import type { TreeNode } from '../../shared/types.ts';
@@ -33,6 +35,7 @@ export function exportManuscript(
   library: LibraryService,
   bookId: string,
   format: ExportFormat,
+  lang: Locale = DEFAULT_LOCALE,
 ): ManuscriptDownload {
   const { book, nodes, rows } = db.transaction(() => ({
     book: library.requireBook(bookId),
@@ -40,7 +43,8 @@ export function exportManuscript(
     rows: listLiveContentRows(db, bookId),
   }))();
 
-  const titles = computeDisplayTitles(nodes, book.structure);
+  const untitled = untitledLabel(lang);
+  const titles = computeDisplayTitles(nodes, book.structure, untitled);
   const text = new Map(rows.map((r) => [r.id, r]));
 
   const sections: ExportSection[] = [];
@@ -49,7 +53,7 @@ export function exportManuscript(
       const row = text.get(node.id);
       sections.push({
         depth,
-        displayTitle: titles.get(node.id) ?? (node.title || UNTITLED),
+        displayTitle: titles.get(node.id) ?? (node.title || untitled),
         doc: row ? parseDoc(row.content) : null,
         plainText: row?.plainText ?? '',
       });

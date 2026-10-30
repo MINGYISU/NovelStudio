@@ -5,6 +5,7 @@ import {
   patchMapBodySchema,
   putMapDataBodySchema,
 } from '../../shared/schemas/map.ts';
+import { localeBodySchema } from '../../shared/schemas/locale.ts';
 import { parseOrThrow } from '../errors.ts';
 import type { MapService } from '../services/maps.ts';
 
@@ -33,7 +34,8 @@ export function registerMapRoutes(app: FastifyInstance, maps: MapService): void 
 
   app.post('/api/maps/:id/duplicate', async (request, reply) => {
     const { id } = parseOrThrow(idParams, request.params);
-    return reply.code(201).send(maps.duplicate(id));
+    const { locale } = parseOrThrow(localeBodySchema, request.body ?? {});
+    return reply.code(201).send(maps.duplicate(id, locale));
   });
 
   app.delete('/api/maps/:id', async (request) => {

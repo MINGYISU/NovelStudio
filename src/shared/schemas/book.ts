@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { displaySettingsSchema } from './display.ts';
+import { localeSchema } from './locale.ts';
 import { foreshadowSettingsSchema } from './foreshadow.ts';
 import { structureSettingsSchema } from './structure.ts';
 
@@ -34,6 +35,8 @@ export const createBookBodySchema = z.object({
   title,
   author: author.optional(),
   description: description.optional(),
+  /** Language of the default Codex categories and the numbering preset (I18N-06); default `en`. */
+  locale: localeSchema.optional(),
 });
 export type CreateBookBody = z.infer<typeof createBookBodySchema>;
 

@@ -7,6 +7,7 @@ import type { ForeshadowWarning } from '../../../shared/foreshadow.ts';
 import type { StructureSettings } from '../../../shared/schemas/structure.ts';
 import { arboristIndexToFinalIndex, checkMove, type KeyboardMove } from '../../../shared/tree.ts';
 import { NODE_KINDS, type TreeNode } from '../../../shared/types.ts';
+import { formatWords, useT } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import { buildItems, totalWords, type TreeItem } from './build-items.ts';
 import { initialOpenState, saveOpenState } from './fold-state.ts';
@@ -45,9 +46,13 @@ function useElementSize<T extends HTMLElement>() {
 
 /** Sidebar tree (TREE-05..07, MOVE-01..11). Mount it with `key={bookId}`. */
 export function Sidebar({ bookId, nodes, structure, selectedId, warnings }: SidebarProps) {
+  const t = useT();
   const navigate = useNavigate();
   const actions = useTreeActions(bookId, nodes);
-  const items = useMemo(() => buildItems(nodes, structure), [nodes, structure]);
+  const items = useMemo(
+    () => buildItems(nodes, structure, t('common.untitled')),
+    [nodes, structure, t],
+  );
   const words = useMemo(() => totalWords(nodes), [nodes]);
   const trashed = useMemo(() => nodes.filter((n) => n.deletedAt !== null).length, [nodes]);
   const [trashOpen, setTrashOpen] = useState(false);
@@ -113,12 +118,16 @@ export function Sidebar({ bookId, nodes, structure, selectedId, warnings }: Side
   return (
     <SidebarContext.Provider value={actions}>
       <SectionWarningsContext.Provider value={warnings}>
-        <aside className={styles.sidebar} aria-label="Manuscript">
+        <aside className={styles.sidebar} aria-label={t('manuscript.sidebar.title')}>
           <div className={styles.sidebarHeader}>
-            <span>Manuscript</span>
+            <span>{t('manuscript.sidebar.title')}</span>
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
-                <button type="button" className={styles.iconButton} aria-label="Add section">
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  aria-label={t('manuscript.sidebar.addSection')}
+                >
                   <Plus size={16} />
                 </button>
               </DropdownMenu.Trigger>
@@ -130,7 +139,7 @@ export function Sidebar({ bookId, nodes, structure, selectedId, warnings }: Side
                       className={styles.menuItem}
                       onSelect={() => actions.createAtRoot(kind)}
                     >
-                      New {kind}
+                      {t('manuscript.sidebar.newKind', { kind: t(`kind.${kind}`).toLowerCase() })}
                     </DropdownMenu.Item>
                   ))}
                 </DropdownMenu.Content>
@@ -139,7 +148,7 @@ export function Sidebar({ bookId, nodes, structure, selectedId, warnings }: Side
           </div>
           <div ref={boxRef} className={styles.treeBox} onKeyDownCapture={onKeyDownCapture}>
             {items.length === 0 ? (
-              <p className={styles.emptyTree}>No sections yet. Use + to add the first one.</p>
+              <p className={styles.emptyTree}>{t('manuscript.sidebar.empty')}</p>
             ) : null}
             {width > 0 && height > 0 ? (
               <Tree<TreeItem>
@@ -181,15 +190,19 @@ export function Sidebar({ bookId, nodes, structure, selectedId, warnings }: Side
             ) : null}
           </div>
           <div className={styles.sidebarFooter}>
-            <span>{words.toLocaleString()} words</span>
+            <span>{formatWords(words)}</span>
             <button
               type="button"
               className={styles.trashButton}
               onClick={() => setTrashOpen(true)}
-              aria-label={trashed > 0 ? `Trash (${trashed})` : 'Trash'}
+              aria-label={
+                trashed > 0
+                  ? t('manuscript.sidebar.trashWithCount', { count: trashed })
+                  : t('manuscript.sidebar.trash')
+              }
             >
               <Trash2 size={14} aria-hidden="true" />
-              Trash
+              {t('manuscript.sidebar.trash')}
               {trashed > 0 ? <span data-testid="trash-count">{trashed}</span> : null}
             </button>
           </div>

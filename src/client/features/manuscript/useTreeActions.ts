@@ -12,6 +12,7 @@ import {
 } from '../../api/nodes.ts';
 import { checkMove, keyboardMoveTarget, type KeyboardMove } from '../../../shared/tree.ts';
 import type { NodeKind, TreeNode } from '../../../shared/types.ts';
+import { apiErrorMessage, t, type MessageKey } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import { saverRegistry } from '../editor/save-registry.ts';
 import { hasUnsavedWork } from '../editor/unsaved-work.ts';
@@ -19,7 +20,7 @@ import { childKindOf } from './build-items.ts';
 import { recordMoveUndo } from './move-undo.ts';
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong.';
+  return apiErrorMessage(error);
 }
 
 export interface TreeActions {
@@ -36,9 +37,6 @@ export interface TreeActions {
   /** Restores a trashed section and opens it; rejects with the server's message. */
   restore: (node: TreeNode) => Promise<void>;
 }
-
-const TRASH_UNSAVED_MESSAGE =
-  'Could not save the latest text, so the section was not moved to the trash.';
 
 /** The section and every section below it, trashed or not. */
 function subtreeIds(nodes: readonly TreeNode[], rootId: string): string[] {
@@ -72,8 +70,8 @@ export function useTreeActions(bookId: string, nodes: readonly TreeNode[]): Tree
   const { notify, setLastMove, setPendingEditId } = useWorkspaceStore.getState();
 
   const fail = useCallback(
-    (prefix: string) => (error: unknown) =>
-      notify({ tone: 'error', message: `${prefix} ${messageOf(error)}` }),
+    (prefix: MessageKey) => (error: unknown) =>
+      notify({ tone: 'error', message: `${t(prefix)} ${messageOf(error)}` }),
     [notify],
   );
 
@@ -98,7 +96,7 @@ export function useTreeActions(bookId: string, nodes: readonly TreeNode[]): Tree
       );
       moveMutation.mutateAsync({ id: nodeId, parentId, index }).catch((error: unknown) => {
         undo.failed();
-        fail('The move was not saved and has been reverted.')(error);
+        fail('manuscript.action.moveFailed')(error);
       });
     };
 
@@ -121,63 +119,65 @@ export function useTreeActions(bookId: string, nodes: readonly TreeNode[]): Tree
         setLastMove(null);
         moveMutation
           .mutateAsync({ id: last.nodeId, parentId: last.parentId, index: last.index })
-          .catch(fail('Could not undo the move.'));
+          .catch(fail('manuscript.action.undoFailed'));
       },
       createSibling: (node) =>
         createMutation
           .mutateAsync({ kind: node.kind, parentId: node.parentId, index: node.position + 1 })
           .then(({ node: created }) => open(created))
-          .catch(fail('Could not create the section.')),
+          .catch(fail('manuscript.action.createFailed')),
       createChild: (node) => {
         const kind = childKindOf(node.kind);
         if (!kind) return;
         createMutation
           .mutateAsync({ kind, parentId: node.id })
           .then(({ node: created }) => open(created))
-          .catch(fail('Could not create the section.'));
+          .catch(fail('manuscript.action.createFailed'));
       },
       createAtRoot: (kind) =>
         createMutation
           .mutateAsync({ kind, parentId: null })
           .then(({ node: created }) => open(created))
-          .catch(fail('Could not create the section.')),
+          .catch(fail('manuscript.action.createFailed')),
       duplicate: (node) =>
         duplicateMutation
           .mutateAsync(node.id)
           .then(({ node: copy }) =>
             navigate(`/book/${bookId}/manuscript/${copy.id}`, { replace: true }),
           )
-          .catch(fail('Could not duplicate the section.')),
+          .catch(fail('manuscript.action.duplicateFailed')),
       rename: (nodeId, title) => {
         const trimmed = title.trim();
         if (nodes.find((n) => n.id === nodeId)?.title === trimmed) return;
         updateMutation
           .mutateAsync({ id: nodeId, patch: { title: trimmed } })
-          .catch(fail('The new title was not saved.'));
+          .catch(fail('manuscript.action.renameFailed'));
       },
       setNumbered: (node, numbered) =>
         updateMutation
           .mutateAsync({ id: node.id, patch: { numbered } })
-          .catch(fail('Could not change numbering.')),
+          .catch(fail('manuscript.action.numberingFailed')),
       trash: (node) =>
         void flushSubtree(latest(), node.id)
           .then((saved) => {
-            if (!saved) throw new Error(TRASH_UNSAVED_MESSAGE);
+            if (!saved) throw new Error(t('manuscript.action.trashUnsaved'));
             return trashMutation.mutateAsync(node.id).catch((error: unknown) => {
-              throw new Error(`Could not move the section to the trash. ${messageOf(error)}`);
+              throw new Error(`${t('manuscript.action.trashFailed')} ${messageOf(error)}`);
             });
           })
           .then(() => {
             setLastMove(null);
             notify({
               tone: 'info',
-              message: `Moved “${node.title || 'untitled section'}” to the trash.`,
+              message: t('manuscript.action.trashed', {
+                title: node.title || t('manuscript.action.untitledSection'),
+              }),
               action: {
-                label: 'Restore',
+                label: t('common.restore'),
                 run: () => {
                   restoreMutation
                     .mutateAsync(node.id)
-                    .catch(fail('Could not restore the section.'));
+                    .catch(fail('manuscript.action.restoreFailed'));
                 },
               },
             });

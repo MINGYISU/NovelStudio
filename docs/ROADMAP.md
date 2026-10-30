@@ -17,7 +17,7 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 | M7b | In-text foreshadow anchors | FS-08 | ☑ |
 | M8 | Polish, import/export | WS-03, ED-09, DISP-02, HOT-02, IMP-02/03, EXP-01, COLD-11 | ☑ |
 | M9 | Review fixes | TREE-08, ED-02/04/05/10/12, HOT-02, WS-01/02, CDX-01, MOVE-11, MAP-08, EXP-01, COLD-02, IMP-02 | ☑ |
-| M10 | Interface language (English / 简体中文) | I18N-01..10 | ☐ |
+| M10 | Interface language (English / 简体中文) | I18N-01..10 | ☑ |
 | M11 | Images: illustrations and section header images | IMG-01..14, IMG-20..23, COLD-09 | ☐ |
 
 **Finish M9 before writing real chapters.** The post-M8 review found ways typed text could be lost (see M9 group A). After M9, make sure a cold backup folder is set and one export has succeeded.
@@ -471,9 +471,9 @@ Default Codex categories in Chinese: 人物, 地点, 时代与年表, 文化与�
 
 ### Done when
 
-- [ ] Every item A1–A4, B1–B3, C1–C3 is implemented.
-- [ ] `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:e2e` all pass; results reported with counts.
-- [ ] Docs updated as listed.
+- [x] Every item A1–A4, B1–B3, C1–C3 is implemented.
+- [x] `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:e2e` all pass; results reported with counts (789 unit/API tests, 77 E2E tests).
+- [x] Docs updated as listed.
 - [ ] Manual checklist, run against `./.data-dev` only:
   - [ ] Click through every view and dialog in 简体中文: no English left except the product name, user data and fixed formats.
   - [ ] Read the Chinese text for tone and terminology (the user reviews the wording).

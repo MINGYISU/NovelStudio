@@ -9,6 +9,7 @@ import {
   useUpdateCategory,
 } from '../../api/codex.ts';
 import { Button, uiStyles } from '../../components/ui.tsx';
+import { useT } from '../../i18n/index.ts';
 import libraryStyles from '../../pages/library/library.module.css';
 import styles from './codex.module.css';
 import { reportCodexError } from './errors.ts';
@@ -30,6 +31,7 @@ export function CategoryList({
   selectedId,
   onSelect,
 }: CategoryListProps) {
+  const t = useT();
   const create = useCreateCategory(bookId);
   const update = useUpdateCategory(bookId);
   const move = useMoveCategory(bookId);
@@ -51,7 +53,7 @@ export function CategoryList({
           setNewName('');
           onSelect(category.id);
         },
-        onError: reportCodexError('The category was not added.'),
+        onError: reportCodexError(t('codex.categoryList.addFailed')),
       },
     );
   };
@@ -62,20 +64,20 @@ export function CategoryList({
     if (name && name !== category.name) {
       update.mutate(
         { id: category.id, patch: { name } },
-        { onError: reportCodexError('The category was not renamed.') },
+        { onError: reportCodexError(t('codex.categoryList.renameFailed')) },
       );
     }
   };
 
   return (
-    <nav className={styles.categories} aria-label="Codex categories">
+    <nav className={styles.categories} aria-label={t('codex.categoryList.label')}>
       <div className={styles.categoriesHeader}>
-        <span>Categories</span>
+        <span>{t('codex.categoryList.heading')}</span>
         <button
           type="button"
           className={styles.iconButton}
-          aria-label="Add category"
-          title="Add category"
+          aria-label={t('codex.categoryList.addCategory')}
+          title={t('codex.categoryList.addCategory')}
           onClick={() => setAdding((open) => !open)}
         >
           <Plus size={16} />
@@ -92,15 +94,15 @@ export function CategoryList({
           <input
             className={uiStyles.input}
             autoFocus
-            aria-label="New category name"
-            placeholder="Category name"
+            aria-label={t('codex.categoryList.newNameLabel')}
+            placeholder={t('codex.categoryList.namePlaceholder')}
             maxLength={CODEX_NAME_MAX}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && setAdding(false)}
           />
           <Button type="submit" variant="primary" disabled={!newName.trim() || create.isPending}>
-            Add
+            {t('common.add')}
           </Button>
         </form>
       ) : null}
@@ -116,7 +118,7 @@ export function CategoryList({
               <input
                 className={uiStyles.input}
                 autoFocus
-                aria-label={`Rename ${category.name}`}
+                aria-label={t('codex.categoryList.renameLabel', { name: category.name })}
                 maxLength={CODEX_NAME_MAX}
                 value={renameText}
                 onChange={(e) => setRenameText(e.target.value)}
@@ -142,7 +144,7 @@ export function CategoryList({
             <DropdownMenu.Root>
               <DropdownMenu.Trigger
                 className={styles.iconButton}
-                aria-label={`Category menu: ${category.name}`}
+                aria-label={t('codex.categoryList.menuLabel', { name: category.name })}
               >
                 <MoreHorizontal size={16} />
               </DropdownMenu.Trigger>
@@ -155,13 +157,13 @@ export function CategoryList({
                       setRenamingId(category.id);
                     }}
                   >
-                    Rename
+                    {t('common.rename')}
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className={libraryStyles.menuItem}
                     onSelect={() => setTemplateFor(category)}
                   >
-                    Edit field template…
+                    {t('codex.categoryList.editTemplate')}
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className={libraryStyles.menuItem}
@@ -169,11 +171,11 @@ export function CategoryList({
                     onSelect={() =>
                       move.mutate(
                         { id: category.id, index: index - 1 },
-                        { onError: reportCodexError('The category was not moved.') },
+                        { onError: reportCodexError(t('codex.categoryList.moveFailed')) },
                       )
                     }
                   >
-                    <ChevronUp size={16} /> Move up
+                    <ChevronUp size={16} /> {t('codex.categoryList.moveUp')}
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className={libraryStyles.menuItem}
@@ -181,25 +183,27 @@ export function CategoryList({
                     onSelect={() =>
                       move.mutate(
                         { id: category.id, index: index + 1 },
-                        { onError: reportCodexError('The category was not moved.') },
+                        { onError: reportCodexError(t('codex.categoryList.moveFailed')) },
                       )
                     }
                   >
-                    <ChevronDown size={16} /> Move down
+                    <ChevronDown size={16} /> {t('codex.categoryList.moveDown')}
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className={libraryStyles.menuItem}
                     disabled={count > 0}
                     onSelect={() =>
                       remove.mutate(category.id, {
-                        onError: reportCodexError('The category was not deleted.'),
+                        onError: reportCodexError(t('codex.categoryList.deleteFailed')),
                       })
                     }
                   >
-                    Delete category
+                    {t('codex.categoryList.delete')}
                   </DropdownMenu.Item>
                   {count > 0 ? (
-                    <div className={styles.menuHint}>Only empty categories can be deleted.</div>
+                    <div className={styles.menuHint}>
+                      {t('codex.categoryList.onlyEmptyDeletable')}
+                    </div>
                   ) : null}
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>

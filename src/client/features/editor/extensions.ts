@@ -2,6 +2,7 @@ import { Highlight } from '@tiptap/extension-highlight';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { TextAlign } from '@tiptap/extension-text-align';
 import StarterKit from '@tiptap/starter-kit';
+import { t } from '../../i18n/index.ts';
 import { createForeshadowAnchor, type AnchorColors } from './anchor-extension.ts';
 import { FindExtension } from './find-extension.ts';
 import { NoNestedQuotes } from './no-nested-quotes.ts';
@@ -30,7 +31,8 @@ export function createExtensions(anchorColors: AnchorColors) {
     }),
     Highlight.configure({ multicolor: true }),
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
-    Placeholder.configure({ placeholder: 'Start writing…' }),
+    // Read lazily, so a language change shows on the next view update without recreating the editor.
+    Placeholder.configure({ placeholder: () => t('editor.placeholder') }),
     FindExtension,
     NoNestedQuotes,
     createForeshadowAnchor(anchorColors),

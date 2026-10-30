@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { localeSchema } from './locale.ts';
 
 export const MAP_TEMPLATES = ['blank', 'timeline', 'plot-tree', 'character-arc'] as const;
 export type MapTemplate = (typeof MAP_TEMPLATES)[number];
@@ -228,6 +229,7 @@ export const mapSavedResponseSchema = z.object({ updatedAt: z.string() });
 export const createMapBodySchema = z.object({
   title: mapTitle.optional(),
   template: z.enum(MAP_TEMPLATES),
+  locale: localeSchema.optional(),
 });
 export type CreateMapBody = z.infer<typeof createMapBodySchema>;
 

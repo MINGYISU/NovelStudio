@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { Button, Dialog, uiStyles } from '../../components/ui.tsx';
+import { useT } from '../../i18n/index.ts';
 import { saverRegistry } from '../editor/save-registry.ts';
 import { hasUnsavedWork } from '../editor/unsaved-work.ts';
 import { mapSavers } from '../maps/map-saver.ts';
@@ -32,6 +33,7 @@ export function useExportGuard(): {
   guard: (includeMaps: boolean, proceed: () => void) => void;
   element: ReactNode;
 } {
+  const t = useT();
   const [pending, setPending] = useState<{ proceed: () => void } | null>(null);
   const guard = useCallback((includeMaps: boolean, proceed: () => void) => {
     void flushForExport(includeMaps).then((saved) => {
@@ -40,11 +42,15 @@ export function useExportGuard(): {
     });
   }, []);
   const element = pending ? (
-    <Dialog open onOpenChange={(open) => !open && setPending(null)} title="Unsaved text">
-      <p>Some text is not saved and will not be in the export.</p>
+    <Dialog
+      open
+      onOpenChange={(open) => !open && setPending(null)}
+      title={t('settings.exportGuard.title')}
+    >
+      <p>{t('settings.exportGuard.body')}</p>
       <div className={uiStyles.actions}>
         <Button autoFocus onClick={() => setPending(null)}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           variant="danger"
@@ -53,7 +59,7 @@ export function useExportGuard(): {
             pending.proceed();
           }}
         >
-          Export anyway
+          {t('settings.exportGuard.anyway')}
         </Button>
       </div>
     </Dialog>

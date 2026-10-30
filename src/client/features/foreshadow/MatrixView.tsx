@@ -3,11 +3,12 @@ import type { ForeshadowWarning } from '../../../shared/foreshadow.ts';
 import type { LinkTarget } from '../../../shared/map-links.ts';
 import {
   ROLE_GLYPHS,
-  ROLE_LABELS,
   type OccurrenceRole,
   type Thread,
 } from '../../../shared/schemas/foreshadow.ts';
+import { useT } from '../../i18n/index.ts';
 import styles from './foreshadow.module.css';
+import { roleLabel } from './labels.ts';
 
 interface MatrixViewProps {
   bookId: string;
@@ -25,12 +26,13 @@ const ROLE_ORDER: OccurrenceRole[] = ['setup', 'hint', 'payoff'];
  * unnumbered section that holds an occurrence). A filled cell jumps to that section.
  */
 export function MatrixView({ bookId, threads, warnings, sections, targets }: MatrixViewProps) {
-  const used = new Set(threads.flatMap((t) => t.occurrences.map((o) => o.nodeId)));
+  const t = useT();
+  const used = new Set(threads.flatMap((thread) => thread.occurrences.map((o) => o.nodeId)));
   const columns = sections.filter((s) => s.numbered || used.has(s.id));
   const live = new Set(sections.map((s) => s.id));
 
   if (threads.length === 0) {
-    return <p className={styles.empty}>No threads yet. Create one to see it in the matrix.</p>;
+    return <p className={styles.empty}>{t('foreshadow.matrix.empty')}</p>;
   }
 
   return (
@@ -39,7 +41,7 @@ export function MatrixView({ bookId, threads, warnings, sections, targets }: Mat
         <thead>
           <tr>
             <th className={styles.matrixCorner} scope="col">
-              Thread
+              {t('foreshadow.matrix.thread')}
             </th>
             {columns.map((c) => (
               <th key={c.id} scope="col" className={styles.matrixColumn} data-node-id={c.id}>
@@ -47,7 +49,7 @@ export function MatrixView({ bookId, threads, warnings, sections, targets }: Mat
               </th>
             ))}
             <th scope="col" className={styles.matrixColumn}>
-              <span>Trash / missing</span>
+              <span>{t('foreshadow.matrix.trashMissing')}</span>
             </th>
           </tr>
         </thead>
@@ -74,6 +76,9 @@ export function MatrixView({ bookId, threads, warnings, sections, targets }: Mat
                     thread.occurrences.some((o) => o.nodeId === c.id && o.role === r),
                   );
                   const label = targets.get(c.id)?.title ?? '';
+                  const roleNames = roles
+                    .map((r) => roleLabel(t, r))
+                    .join(t('foreshadow.matrix.listSeparator'));
                   return (
                     <td
                       key={c.id}
@@ -85,8 +90,15 @@ export function MatrixView({ bookId, threads, warnings, sections, targets }: Mat
                           to={`/book/${bookId}/manuscript/${c.id}`}
                           data-testid="matrix-cell"
                           data-roles={roles.join(' ')}
-                          aria-label={`${thread.title}: ${roles.map((r) => ROLE_LABELS[r]).join(', ')} in ${label}`}
-                          title={`${roles.map((r) => ROLE_LABELS[r]).join(', ')} — ${label}`}
+                          aria-label={t('foreshadow.matrix.cellLabel', {
+                            thread: thread.title,
+                            roles: roleNames,
+                            section: label,
+                          })}
+                          title={t('foreshadow.matrix.cellTitle', {
+                            roles: roleNames,
+                            section: label,
+                          })}
                         >
                           {roles.map((r) => ROLE_GLYPHS[r]).join('')}
                         </Link>
@@ -96,10 +108,7 @@ export function MatrixView({ bookId, threads, warnings, sections, targets }: Mat
                 })}
                 <td className={styles.matrixCell}>
                   {orphaned.length > 0 ? (
-                    <span
-                      className={styles.missing}
-                      title="Occurrences in a trashed or missing section"
-                    >
+                    <span className={styles.missing} title={t('foreshadow.matrix.orphanedTitle')}>
                       ⚠ {orphaned.length}
                     </span>
                   ) : null}

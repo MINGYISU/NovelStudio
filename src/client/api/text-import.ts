@@ -4,6 +4,7 @@ import {
   importTextCommitResponseSchema,
   type IMPORT_PRESETS,
 } from '../../shared/schemas/import.ts';
+import { currentLocale } from '../i18n/index.ts';
 import { apiRequest } from './http.ts';
 
 export interface TextImportVars {
@@ -16,6 +17,7 @@ export interface TextImportVars {
 function form(mode: 'preview' | 'commit', vars: TextImportVars): FormData {
   const data = new FormData();
   data.append('mode', mode);
+  data.append('locale', currentLocale());
   data.append('detect', vars.detect ? '1' : '0');
   if (vars.title) data.append('title', vars.title);
   if (vars.preset) data.append('preset', vars.preset);

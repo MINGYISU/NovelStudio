@@ -5,6 +5,7 @@ import { findMentionedCharacters, isCharacterCategory } from '../../../shared/co
 import { docToPlainText } from '../../../shared/prosemirror-text.ts';
 import { useCodex } from '../../api/codex.ts';
 import { fetchNodeContent } from '../../api/content.ts';
+import { useT } from '../../i18n/index.ts';
 import { saverRegistry } from '../editor/save-registry.ts';
 import styles from './codex.module.css';
 
@@ -29,6 +30,7 @@ function useSectionText(nodeId: string): string | undefined {
 
 /** CDX-07: characters from the codex whose names appear in the selected section. */
 export function CharactersInSection({ bookId, nodeId }: { bookId: string; nodeId: string }) {
+  const t = useT();
   const codex = useCodex(bookId);
   const text = useSectionText(nodeId);
 
@@ -42,12 +44,12 @@ export function CharactersInSection({ bookId, nodeId }: { bookId: string; nodeId
   }, [codex.data, text]);
 
   return (
-    <section className={styles.characters} aria-label="Characters in this section">
-      <h3 className={styles.charactersHeading}>Characters in this section</h3>
+    <section className={styles.characters} aria-label={t('codex.characters.title')}>
+      <h3 className={styles.charactersHeading}>{t('codex.characters.title')}</h3>
       {text === undefined || codex.isPending ? (
-        <p className={styles.empty}>Loading…</p>
+        <p className={styles.empty}>{t('common.loading')}</p>
       ) : mentioned.length === 0 ? (
-        <p className={styles.empty}>No codex characters are named here.</p>
+        <p className={styles.empty}>{t('codex.characters.none')}</p>
       ) : (
         <ul className={styles.characterList}>
           {mentioned.map((entry) => (

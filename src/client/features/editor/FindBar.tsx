@@ -1,11 +1,13 @@
 import { useEditorState, type Editor } from '@tiptap/react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { formatNumber, useT } from '../../i18n/index.ts';
 import { clearFind, getFindState, setFindQuery, stepFind } from './find-extension.ts';
 import styles from './editor.module.css';
 
 /** Find in section (ED-08): Enter / Shift+Enter step through matches, Escape closes. */
 export function FindBar({ editor, onClose }: { editor: Editor; onClose: () => void }) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -36,8 +38,8 @@ export function FindBar({ editor, onClose }: { editor: Editor; onClose: () => vo
         ref={input}
         className={styles.findInput}
         value={query}
-        placeholder="Find in this section"
-        aria-label="Find in this section"
+        placeholder={t('editor.find.placeholder')}
+        aria-label={t('editor.find.placeholder')}
         onChange={(e) => search(e.target.value, caseSensitive)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -52,7 +54,7 @@ export function FindBar({ editor, onClose }: { editor: Editor; onClose: () => vo
       <button
         type="button"
         className={styles.tool}
-        aria-label="Previous match"
+        aria-label={t('editor.find.previous')}
         onClick={() => stepFind(editor, -1)}
       >
         <ChevronUp size={16} />
@@ -60,7 +62,7 @@ export function FindBar({ editor, onClose }: { editor: Editor; onClose: () => vo
       <button
         type="button"
         className={styles.tool}
-        aria-label="Next match"
+        aria-label={t('editor.find.next')}
         onClick={() => stepFind(editor, 1)}
       >
         <ChevronDown size={16} />
@@ -68,17 +70,29 @@ export function FindBar({ editor, onClose }: { editor: Editor; onClose: () => vo
       <button
         type="button"
         className={styles.tool}
-        aria-label="Match case"
+        aria-label={t('editor.find.matchCase')}
         aria-pressed={caseSensitive}
         onClick={() => search(query, !caseSensitive)}
       >
-        Aa
+        {t('editor.find.matchCaseButton')}
       </button>
       <span className={styles.findCount} aria-live="polite">
-        {query === '' ? '' : total === 0 ? 'No matches' : `${current + 1} of ${total}`}
+        {query === ''
+          ? ''
+          : total === 0
+            ? t('editor.find.noMatches')
+            : t('editor.find.position', {
+                current: formatNumber(current + 1),
+                total: formatNumber(total),
+              })}
       </span>
       <span className={styles.spacer} />
-      <button type="button" className={styles.tool} aria-label="Close find" onClick={onClose}>
+      <button
+        type="button"
+        className={styles.tool}
+        aria-label={t('editor.find.close')}
+        onClick={onClose}
+      >
         <X size={16} />
       </button>
     </div>

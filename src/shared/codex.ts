@@ -6,53 +6,28 @@ import {
   type CodexEntry,
   type CodexFieldDef,
 } from './schemas/codex.ts';
+import { defaultCategories } from './seed-text.ts';
 
-const text = (key: string, label: string): CodexFieldDef => ({ key, label, type: 'text' });
-const longtext = (key: string, label: string): CodexFieldDef => ({
-  key,
-  label,
-  type: 'longtext',
-});
+const ENGLISH_DEFAULTS = defaultCategories('en');
 
 /** CDX-02 */
-export const CHARACTER_FIELDS: readonly CodexFieldDef[] = [
-  text('name', 'Name'),
-  text('aliases', 'Aliases'),
-  text('role', 'Role'),
-  text('age', 'Age'),
-  longtext('appearance', 'Appearance'),
-  longtext('background', 'Background'),
-  longtext('personality', 'Personality'),
-  longtext('goals', 'Goals & Motivation'),
-  longtext('relationships', 'Relationships'),
-  longtext('arc_notes', 'Arc notes'),
-  longtext('notes', 'Notes'),
-];
+export const CHARACTER_FIELDS: readonly CodexFieldDef[] = ENGLISH_DEFAULTS[0]?.fieldTemplate ?? [];
 
 /** CDX-03 */
-export const GENERIC_FIELDS: readonly CodexFieldDef[] = [
-  longtext('description', 'Description'),
-  longtext('notes', 'Notes'),
-];
+export const GENERIC_FIELDS: readonly CodexFieldDef[] = ENGLISH_DEFAULTS[1]?.fieldTemplate ?? [];
 
 export const CHARACTERS_CATEGORY_NAME = 'Characters';
 const NAME_KEY = 'name';
 const ALIASES_KEY = 'aliases';
 
-/** CDX-01: the categories every book starts with, in order. */
+/** CDX-01: the English categories every book starts with, in order. `defaultCategories(locale)` has the others. */
 export const DEFAULT_CATEGORIES: readonly {
   name: string;
   fieldTemplate: readonly CodexFieldDef[];
-}[] = [
-  { name: CHARACTERS_CATEGORY_NAME, fieldTemplate: CHARACTER_FIELDS },
-  { name: 'Locations', fieldTemplate: GENERIC_FIELDS },
-  { name: 'Era & Timeline', fieldTemplate: GENERIC_FIELDS },
-  { name: 'Culture & Traditions', fieldTemplate: GENERIC_FIELDS },
-  { name: 'Organizations', fieldTemplate: GENERIC_FIELDS },
-  { name: 'Creatures & Species', fieldTemplate: GENERIC_FIELDS },
-  { name: 'Rules & Concepts', fieldTemplate: GENERIC_FIELDS },
-  { name: 'Other', fieldTemplate: GENERIC_FIELDS },
-];
+}[] = ENGLISH_DEFAULTS.map((c, i) => ({
+  name: c.name,
+  fieldTemplate: i === 0 ? CHARACTER_FIELDS : GENERIC_FIELDS,
+}));
 
 /** The template for a category added by hand. */
 export const NEW_CATEGORY_TEMPLATE: readonly CodexFieldDef[] = GENERIC_FIELDS;

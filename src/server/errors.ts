@@ -1,11 +1,12 @@
 import type { z } from 'zod';
+import type { ErrorCode } from '../shared/error-codes.ts';
 
 export class ApiError extends Error {
   override name = 'ApiError';
 
   constructor(
     readonly statusCode: number,
-    readonly code: string,
+    readonly code: ErrorCode,
     message: string,
   ) {
     super(message);

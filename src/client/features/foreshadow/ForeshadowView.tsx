@@ -7,6 +7,7 @@ import type { StructureSettings } from '../../../shared/schemas/structure.ts';
 import type { TreeNode } from '../../../shared/types.ts';
 import { useUpdateBook } from '../../api/books.ts';
 import { Button, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import { MatrixView } from './MatrixView.tsx';
 import { ThreadDialog } from './ThreadDialog.tsx';
@@ -36,12 +37,13 @@ export function ForeshadowView({
   warnings,
   failed,
 }: ForeshadowViewProps) {
+  const t = useT();
   const [mode, setMode] = useState<Mode>('threads');
   const [creating, setCreating] = useState(false);
 
   const targets = useMemo(
-    () => (nodes ? sectionTargets(nodes, structure) : null),
-    [nodes, structure],
+    () => (nodes ? sectionTargets(nodes, structure, t('common.untitled')) : null),
+    [nodes, structure, t],
   );
   const reading = useMemo(() => (nodes ? computeReadingOrder(nodes) : null), [nodes]);
   const order = useMemo(() => new Map(reading?.ordered.map((n, i) => [n.id, i]) ?? []), [reading]);
@@ -52,14 +54,18 @@ export function ForeshadowView({
   const warningCount = warnings.filter((w) => w.level === 'warning').length;
 
   return (
-    <main className={styles.view} aria-label="Foreshadowing">
+    <main className={styles.view} aria-label={t('foreshadow.view.label')}>
       <header className={styles.toolbar}>
-        <h2 className={styles.heading}>Foreshadowing</h2>
-        <div className={styles.segmented} role="tablist" aria-label="Foreshadowing display">
+        <h2 className={styles.heading}>{t('foreshadow.view.heading')}</h2>
+        <div
+          className={styles.segmented}
+          role="tablist"
+          aria-label={t('foreshadow.view.displayLabel')}
+        >
           {(
             [
-              ['threads', 'Threads'],
-              ['matrix', 'Matrix'],
+              ['threads', t('foreshadow.view.modeThreads')],
+              ['matrix', t('foreshadow.view.modeMatrix')],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -76,22 +82,22 @@ export function ForeshadowView({
         </div>
         <span className={styles.summary} data-testid="warning-summary">
           {warningCount === 0
-            ? 'No warnings'
-            : `${warningCount} warning${warningCount === 1 ? '' : 's'}`}
+            ? t('foreshadow.view.noWarnings')
+            : t('foreshadow.view.warnings', { count: warningCount })}
         </span>
         <span className={styles.spacer} />
         <DormantSetting key={dormantAfter} bookId={bookId} value={dormantAfter} />
         <Button variant="primary" onClick={() => setCreating(true)}>
-          <Plus size={16} /> New thread
+          <Plus size={16} /> {t('foreshadow.view.newThread')}
         </Button>
       </header>
       <div className={styles.content}>
         {failed ? (
           <p className={styles.error} role="alert">
-            The foreshadowing threads could not be loaded.
+            {t('foreshadow.view.loadFailed')}
           </p>
         ) : !threads || !nodes || !targets || !reading ? (
-          <p className={styles.empty}>Loading…</p>
+          <p className={styles.empty}>{t('common.loading')}</p>
         ) : mode === 'threads' ? (
           <ThreadList
             bookId={bookId}
@@ -118,6 +124,7 @@ export function ForeshadowView({
 
 /** FS-05d: the number of chapters a thread may stay silent before it is flagged as dormant. */
 function DormantSetting({ bookId, value }: { bookId: string; value: number }) {
+  const t = useT();
   const update = useUpdateBook();
   const [text, setText] = useState(String(value));
 
@@ -133,9 +140,10 @@ function DormantSetting({ bookId, value }: { bookId: string; value: number }) {
       {
         onError: (error) => {
           setText(String(value));
-          useWorkspaceStore
-            .getState()
-            .notify({ tone: 'error', message: `The setting was not saved. ${error.message}` });
+          useWorkspaceStore.getState().notify({
+            tone: 'error',
+            message: t('foreshadow.dormant.saveFailed', { reason: apiErrorMessage(error) }),
+          });
         },
       },
     );
@@ -143,7 +151,7 @@ function DormantSetting({ bookId, value }: { bookId: string; value: number }) {
 
   return (
     <label className={styles.dormant}>
-      <span>Dormant after</span>
+      <span>{t('foreshadow.dormant.label')}</span>
       <input
         className={`${uiStyles.input} ${styles.dormantInput}`}
         type="number"
@@ -151,14 +159,14 @@ function DormantSetting({ bookId, value }: { bookId: string; value: number }) {
         max={DORMANT_AFTER_MAX}
         step={1}
         value={text}
-        aria-label="Dormant after (chapters)"
+        aria-label={t('foreshadow.dormant.ariaLabel')}
         onChange={(e) => setText(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur();
         }}
       />
-      <span>chapters</span>
+      <span>{t('foreshadow.dormant.unit')}</span>
     </label>
   );
 }

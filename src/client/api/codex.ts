@@ -14,6 +14,7 @@ import {
   type PatchCategoryBody,
   type PatchEntryBody,
 } from '../../shared/schemas/codex.ts';
+import { currentLocale } from '../i18n/index.ts';
 import { apiRequest } from './http.ts';
 
 export const codexKey = (bookId: string) => ['codex', bookId] as const;
@@ -59,7 +60,10 @@ export function useSeedCodex(bookId: string) {
     bookId,
     async () =>
       categoriesResponseSchema.parse(
-        await apiRequest(`/api/books/${bookId}/codex/seed`, { method: 'POST' }),
+        await apiRequest(`/api/books/${bookId}/codex/seed`, {
+          method: 'POST',
+          json: { locale: currentLocale() },
+        }),
       ).categories,
   );
 }

@@ -12,7 +12,8 @@ import {
 } from '../../shared/schemas/snapshot.ts';
 import { errorResponseSchema } from '../../shared/schemas/book.ts';
 import { SaveError, type SaveTransport } from '../features/editor/autosave.ts';
-import { apiRequest } from './http.ts';
+import { apiErrorMessage } from '../i18n/index.ts';
+import { ApiRequestError, apiRequest } from './http.ts';
 
 export async function fetchNodeContent(id: string, signal?: AbortSignal): Promise<NodeContent> {
   return nodeContentResponseSchema.parse(await apiRequest(`/api/nodes/${id}`, { signal })).node;
@@ -34,13 +35,19 @@ export const httpSaveTransport: SaveTransport = {
         keepalive: new TextEncoder().encode(body).length <= KEEPALIVE_MAX_BYTES,
       });
     } catch {
-      throw new SaveError('failed', 'Cannot reach the NovelStudio server.');
+      throw new SaveError('failed', apiErrorMessage(new ApiRequestError(0, 'NETWORK', '')));
     }
     const data: unknown = await res.json().catch(() => undefined);
     if (res.ok) return saveContentResponseSchema.parse(data);
     const parsed = errorResponseSchema.safeParse(data);
     const code = parsed.success ? parsed.data.error.code : 'UNKNOWN';
-    const message = parsed.success ? parsed.data.error.message : `Save failed (${res.status}).`;
+    const message = apiErrorMessage(
+      new ApiRequestError(
+        res.status,
+        code,
+        parsed.success ? parsed.data.error.message : `Save failed (${res.status}).`,
+      ),
+    );
     if (code === 'STALE_REVISION') throw new SaveError('stale', message);
     throw new SaveError('failed', message, res.status >= 500);
   },

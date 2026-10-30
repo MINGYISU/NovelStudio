@@ -1,20 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { useUpdateBook } from '../../api/books.ts';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
 import {
   DEFAULT_DISPLAY,
   DISPLAY_FONTS,
   DISPLAY_THEMES,
   displaySettingsSchema,
-  FONT_LABELS,
   type DisplaySettings,
 } from '../../../shared/schemas/display.ts';
-
-const THEME_LABELS: Record<DisplaySettings['theme'], string> = {
-  light: 'Light',
-  dark: 'Dark',
-  sepia: 'Sepia',
-};
 
 /** Per-book editor appearance (DISP-01, DISP-02). Stored in the book settings, never in the text. */
 export function DisplaySettingsDialog({
@@ -26,6 +20,7 @@ export function DisplaySettingsDialog({
   display: DisplaySettings;
   onClose: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<DisplaySettings>(display);
   // undefined keeps the stored image, null removes it, a File replaces it.
   const [background, setBackground] = useState<File | null | undefined>(undefined);
@@ -36,7 +31,7 @@ export function DisplaySettingsDialog({
     event.preventDefault();
     const parsed = displaySettingsSchema.safeParse(draft);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'These settings are not valid.');
+      setError(t('editor.display.invalid'));
       return;
     }
     setError(null);
@@ -63,11 +58,11 @@ export function DisplaySettingsDialog({
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title="Display settings"
-      description="How the text looks while you write in this book. Only system fonts are offered."
+      title={t('editor.display.title')}
+      description={t('editor.display.description')}
     >
       <form onSubmit={submit}>
-        <Field label="Font">
+        <Field label={t('editor.display.font')}>
           <select
             className={uiStyles.input}
             value={draft.fontFamily}
@@ -77,18 +72,16 @@ export function DisplaySettingsDialog({
           >
             {DISPLAY_FONTS.map((font) => (
               <option key={font} value={font}>
-                {FONT_LABELS[font]}
+                {t(`font.${font}`)}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Font size (px)">{number('fontSize', 1)}</Field>
-        <Field label="Line height">{number('lineHeight', 0.1)}</Field>
-        <Field label="First-line indent (em, 2 suits Chinese)">
-          {number('firstLineIndent', 0.5)}
-        </Field>
-        <Field label="Editor width (px)">{number('editorWidth', 20)}</Field>
-        <Field label="Theme">
+        <Field label={t('editor.display.fontSize')}>{number('fontSize', 1)}</Field>
+        <Field label={t('editor.display.lineHeight')}>{number('lineHeight', 0.1)}</Field>
+        <Field label={t('editor.display.firstLineIndent')}>{number('firstLineIndent', 0.5)}</Field>
+        <Field label={t('editor.display.editorWidth')}>{number('editorWidth', 20)}</Field>
+        <Field label={t('editor.display.theme')}>
           <select
             className={uiStyles.input}
             value={draft.theme}
@@ -98,13 +91,15 @@ export function DisplaySettingsDialog({
           >
             {DISPLAY_THEMES.map((theme) => (
               <option key={theme} value={theme}>
-                {THEME_LABELS[theme]}
+                {t(`theme.${theme}`)}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Space between paragraphs (em)">{number('paragraphSpacing', 0.1)}</Field>
-        <Field label="Background color">
+        <Field label={t('editor.display.paragraphSpacing')}>
+          {number('paragraphSpacing', 0.1)}
+        </Field>
+        <Field label={t('editor.display.backgroundColor')}>
           <span className={uiStyles.inline}>
             <input
               type="checkbox"
@@ -112,29 +107,29 @@ export function DisplaySettingsDialog({
               onChange={(e) =>
                 setDraft({ ...draft, backgroundColor: e.target.checked ? '#f4ecd8' : null })
               }
-              aria-label="Use a custom background color"
+              aria-label={t('editor.display.useBackgroundColor')}
             />
             <input
               type="color"
               value={draft.backgroundColor ?? '#ffffff'}
               disabled={draft.backgroundColor === null}
               onChange={(e) => setDraft({ ...draft, backgroundColor: e.target.value })}
-              aria-label="Background color"
+              aria-label={t('editor.display.backgroundColor')}
             />
           </span>
         </Field>
-        <Field label="Background image (PNG, JPEG, WebP or GIF)">
+        <Field label={t('editor.display.backgroundImageField')}>
           <input
             className={uiStyles.input}
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif"
             onChange={(e) => setBackground(e.target.files?.[0] ?? undefined)}
-            aria-label="Background image"
+            aria-label={t('editor.display.backgroundImage')}
           />
         </Field>
         {background || (background === undefined && draft.backgroundImageAssetId) ? (
           <>
-            <Field label="Background image opacity">
+            <Field label={t('editor.display.backgroundOpacity')}>
               <input
                 type="range"
                 min={0.05}
@@ -144,13 +139,15 @@ export function DisplaySettingsDialog({
                 onChange={(e) =>
                   setDraft({ ...draft, backgroundImageOpacity: Number(e.target.value) })
                 }
-                aria-label="Background image opacity"
+                aria-label={t('editor.display.backgroundOpacity')}
               />
             </Field>
-            <Button onClick={() => setBackground(null)}>Remove background image</Button>
+            <Button onClick={() => setBackground(null)}>
+              {t('editor.display.removeBackground')}
+            </Button>
           </>
         ) : null}
-        <FormError message={error ?? update.error?.message ?? null} />
+        <FormError message={error ?? (update.error ? apiErrorMessage(update.error) : null)} />
         <div className={uiStyles.actions}>
           <Button
             onClick={() => {
@@ -158,11 +155,11 @@ export function DisplaySettingsDialog({
               setBackground(display.backgroundImageAssetId ? null : undefined);
             }}
           >
-            Reset
+            {t('editor.display.reset')}
           </Button>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={update.isPending}>
-            Save
+            {t('common.save')}
           </Button>
         </div>
       </form>

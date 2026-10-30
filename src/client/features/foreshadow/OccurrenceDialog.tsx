@@ -3,14 +3,15 @@ import {
   OCCURRENCE_ROLES,
   OCCURRENCE_TEXT_MAX,
   ROLE_GLYPHS,
-  ROLE_LABELS,
   type Occurrence,
   type OccurrenceRole,
   type Thread,
 } from '../../../shared/schemas/foreshadow.ts';
 import { useAddOccurrence, useUpdateOccurrence } from '../../api/foreshadows.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 import styles from './foreshadow.module.css';
+import { roleLabel } from './labels.ts';
 import type { SectionOption } from './sections.ts';
 
 interface OccurrenceDialogProps {
@@ -31,6 +32,7 @@ export function OccurrenceDialog({
   defaultNodeId,
   onClose,
 }: OccurrenceDialogProps) {
+  const t = useT();
   const add = useAddOccurrence(bookId);
   const update = useUpdateOccurrence(bookId);
   const [nodeId, setNodeId] = useState(occurrence?.nodeId ?? defaultNodeId ?? options[0]?.id ?? '');
@@ -47,7 +49,7 @@ export function OccurrenceDialog({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const done = { onSuccess: onClose, onError: (e: Error) => setError(e.message) };
+    const done = { onSuccess: onClose, onError: (e: Error) => setError(apiErrorMessage(e)) };
     if (occurrence) {
       update.mutate(
         {
@@ -65,11 +67,15 @@ export function OccurrenceDialog({
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title={occurrence ? 'Edit occurrence' : 'Add occurrence'}
-      description={`Thread: ${thread.title}`}
+      title={
+        occurrence
+          ? t('foreshadow.occurrenceDialog.editTitle')
+          : t('foreshadow.occurrenceDialog.addTitle')
+      }
+      description={t('foreshadow.occurrenceDialog.thread', { title: thread.title })}
     >
       <form onSubmit={submit}>
-        <Field label="Section">
+        <Field label={t('foreshadow.occurrenceDialog.section')}>
           <select
             className={uiStyles.input}
             value={nodeId}
@@ -78,7 +84,7 @@ export function OccurrenceDialog({
             required
           >
             {keepsOldTarget && !options.some((o) => o.id === nodeId) ? (
-              <option value={nodeId}>(current section: in the trash or missing)</option>
+              <option value={nodeId}>{t('foreshadow.occurrenceDialog.currentGone')}</option>
             ) : null}
             {options.map((o) => (
               <option key={o.id} value={o.id}>
@@ -89,11 +95,9 @@ export function OccurrenceDialog({
           </select>
         </Field>
         {followsAnchor ? (
-          <p className={styles.empty}>
-            This occurrence follows its marked text. Move the text to change its section.
-          </p>
+          <p className={styles.empty}>{t('foreshadow.occurrenceDialog.followsAnchor')}</p>
         ) : null}
-        <Field label="Role">
+        <Field label={t('foreshadow.occurrenceDialog.role')}>
           <select
             className={uiStyles.input}
             value={role}
@@ -101,12 +105,12 @@ export function OccurrenceDialog({
           >
             {OCCURRENCE_ROLES.map((r) => (
               <option key={r} value={r}>
-                {ROLE_GLYPHS[r]} {ROLE_LABELS[r]}
+                {ROLE_GLYPHS[r]} {roleLabel(t, r)}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Excerpt (quoted text, optional)">
+        <Field label={t('foreshadow.occurrenceDialog.excerpt')}>
           <textarea
             className={uiStyles.input}
             rows={3}
@@ -115,7 +119,7 @@ export function OccurrenceDialog({
             onChange={(e) => setExcerpt(e.target.value)}
           />
         </Field>
-        <Field label="Note (optional)">
+        <Field label={t('foreshadow.occurrenceDialog.note')}>
           <textarea
             className={`${uiStyles.input} ${styles.noteInput}`}
             rows={2}
@@ -126,9 +130,9 @@ export function OccurrenceDialog({
         </Field>
         <FormError message={error} />
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={busy || !pickable}>
-            {occurrence ? 'Save' : 'Add occurrence'}
+            {occurrence ? t('common.save') : t('foreshadow.occurrenceDialog.add')}
           </Button>
         </div>
       </form>

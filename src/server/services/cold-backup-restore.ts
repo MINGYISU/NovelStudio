@@ -6,6 +6,8 @@ import { CODEX_SUMMARY_MAX, CODEX_TITLE_MAX } from '../../shared/schemas/codex.t
 import { remapAnchorIds } from '../../shared/foreshadow-anchors.ts';
 import { remapMapLinks } from '../../shared/map-links.ts';
 import { docToPlainText } from '../../shared/prosemirror-text.ts';
+import { DEFAULT_LOCALE, type Locale } from '../../shared/schemas/locale.ts';
+import { restoredSuffix } from '../../shared/seed-text.ts';
 import { MAP_TEMPLATES, MAP_TITLE_MAX, repairMapData } from '../../shared/schemas/map.ts';
 import {
   DEFAULT_THREAD_COLOR,
@@ -58,6 +60,8 @@ export interface RestoreOptions {
   expectedSha256?: string | null;
   ignoreChecksum?: boolean;
   now?: Date;
+  /** Language of the title suffix of a restored book (I18N-06); default `en`. */
+  locale?: Locale;
 }
 
 export interface RestoreResult {
@@ -99,9 +103,9 @@ export function parseColdBackup(bytes: Buffer): ColdBackupDoc {
   return parsed.data;
 }
 
-function restoredTitle(db: Db, title: string, now: Date): string {
+function restoredTitle(db: Db, title: string, now: Date, locale: Locale): string {
   if (!titleExists(db, title)) return title;
-  const suffix = ` (restored ${now.toISOString().slice(0, 10)})`;
+  const suffix = restoredSuffix(now.toISOString().slice(0, 10), locale);
   return title.slice(0, TITLE_MAX - suffix.length) + suffix;
 }
 
@@ -505,7 +509,7 @@ export function restoreColdBackup(
       db.pragma('defer_foreign_keys = ON');
       insertBookRow(db, {
         id: bookId,
-        title: restoredTitle(db, doc.book.title, now),
+        title: restoredTitle(db, doc.book.title, now, options.locale ?? DEFAULT_LOCALE),
         author: doc.book.author,
         description: doc.book.description,
         coverAssetId,

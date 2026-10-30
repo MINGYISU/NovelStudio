@@ -124,6 +124,14 @@ describe('analyzeForeshadows (FS-05)', () => {
     );
   });
 
+  it('carries the thread title so the client can translate the message (I18N-07)', () => {
+    const t = thread([['payoff', 'c1']], { title: 'The red door' });
+    expect(analyzeForeshadows(chapters(1), [t])[0]).toMatchObject({
+      kind: 'PAYOFF_WITHOUT_SETUP',
+      threadTitle: 'The red door',
+    });
+  });
+
   it('PAYOFF_BEFORE_SETUP ignores a payoff after the first setup, and only marks the early ones', () => {
     const t = thread([
       ['setup', 'c2'],
@@ -332,6 +340,7 @@ describe('newWarnings (FS-06 toast)', () => {
     threadId,
     kind,
     level: 'warning',
+    threadTitle: '',
     message: '',
     nodeIds,
     occurrenceIds: [],
@@ -367,6 +376,7 @@ describe('warningsByNode (sidebar badges)', () => {
       threadId: 'a',
       kind: 'DORMANT',
       level: 'warning',
+      threadTitle: '',
       message: '',
       nodeIds: ['c1', 'c2'],
       occurrenceIds: [],

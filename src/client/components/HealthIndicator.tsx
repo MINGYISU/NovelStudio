@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../i18n/index.ts';
 import { fetchHealth } from '../api/health.ts';
 import type { Health } from '../../shared/schemas/health.ts';
 import styles from './HealthIndicator.module.css';
@@ -8,6 +9,7 @@ type HealthState = { kind: 'checking' } | { kind: 'ok'; health: Health } | { kin
 const POLL_MS = 10_000;
 
 export function HealthIndicator() {
+  const t = useT();
   const [state, setState] = useState<HealthState>({ kind: 'checking' });
 
   useEffect(() => {
@@ -31,10 +33,14 @@ export function HealthIndicator() {
     state.kind === 'ok' ? styles.ok : state.kind === 'down' ? styles.down : undefined;
   const label =
     state.kind === 'checking'
-      ? 'Checking server…'
+      ? t('app.health.checking')
       : state.kind === 'down'
-        ? 'Server unreachable'
-        : `Server OK · ${state.health.mode === 'production' ? 'real data' : 'dev data'}`;
+        ? t('app.health.down')
+        : t('app.health.ok', {
+            data: t(
+              state.health.mode === 'production' ? 'app.health.realData' : 'app.health.devData',
+            ),
+          });
 
   return (
     <div className={styles.health} role="status">

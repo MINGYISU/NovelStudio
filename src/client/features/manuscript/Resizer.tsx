@@ -1,10 +1,12 @@
 import { useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import { useT } from '../../i18n/index.ts';
 import { SIDEBAR_MAX, SIDEBAR_MIN, useWorkspaceStore } from '../../stores/workspace.ts';
 import styles from './manuscript.module.css';
 
 const KEY_STEP = 16;
 
 export function Resizer() {
+  const t = useT();
   const width = useWorkspaceStore((s) => s.sidebarWidth);
   const setWidth = useWorkspaceStore((s) => s.setSidebarWidth);
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -26,7 +28,7 @@ export function Resizer() {
       className={styles.resizer}
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize sidebar"
+      aria-label={t('manuscript.resizer.label')}
       aria-valuemin={SIDEBAR_MIN}
       aria-valuemax={SIDEBAR_MAX}
       aria-valuenow={width}

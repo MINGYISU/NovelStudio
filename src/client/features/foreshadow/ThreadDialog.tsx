@@ -2,14 +2,15 @@ import { useState, type FormEvent } from 'react';
 import {
   DEFAULT_THREAD_COLOR,
   FORESHADOW_STATUSES,
-  STATUS_LABELS,
   THREAD_TEXT_MAX,
   THREAD_TITLE_MAX,
   type Thread,
 } from '../../../shared/schemas/foreshadow.ts';
 import { useCreateThread, useUpdateThread } from '../../api/foreshadows.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 import styles from './foreshadow.module.css';
+import { statusLabel } from './labels.ts';
 
 interface ThreadDialogProps {
   bookId: string;
@@ -19,6 +20,7 @@ interface ThreadDialogProps {
 }
 
 export function ThreadDialog({ bookId, thread, onClose }: ThreadDialogProps) {
+  const t = useT();
   const create = useCreateThread(bookId);
   const update = useUpdateThread(bookId);
   const [title, setTitle] = useState(thread?.title ?? '');
@@ -32,7 +34,7 @@ export function ThreadDialog({ bookId, thread, onClose }: ThreadDialogProps) {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const body = { title, status, color, description, notes };
-    const done = { onSuccess: onClose, onError: (e: Error) => setError(e.message) };
+    const done = { onSuccess: onClose, onError: (e: Error) => setError(apiErrorMessage(e)) };
     if (thread) update.mutate({ id: thread.id, patch: body }, done);
     else create.mutate(body, done);
   };
@@ -41,10 +43,12 @@ export function ThreadDialog({ bookId, thread, onClose }: ThreadDialogProps) {
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title={thread ? 'Edit thread' : 'New thread'}
+      title={
+        thread ? t('foreshadow.threadDialog.editTitle') : t('foreshadow.threadDialog.newTitle')
+      }
     >
       <form onSubmit={submit}>
-        <Field label="Title">
+        <Field label={t('foreshadow.threadDialog.title')}>
           <input
             className={uiStyles.input}
             value={title}
@@ -55,7 +59,7 @@ export function ThreadDialog({ bookId, thread, onClose }: ThreadDialogProps) {
           />
         </Field>
         <div className={styles.formRow}>
-          <Field label="Status">
+          <Field label={t('foreshadow.threadDialog.status')}>
             <select
               className={uiStyles.input}
               value={status}
@@ -63,12 +67,12 @@ export function ThreadDialog({ bookId, thread, onClose }: ThreadDialogProps) {
             >
               {FORESHADOW_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
+                  {statusLabel(t, s)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Color">
+          <Field label={t('foreshadow.threadDialog.color')}>
             <input
               className={`${uiStyles.input} ${styles.colorInput}`}
               type="color"
@@ -77,7 +81,7 @@ export function ThreadDialog({ bookId, thread, onClose }: ThreadDialogProps) {
             />
           </Field>
         </div>
-        <Field label="Description">
+        <Field label={t('foreshadow.threadDialog.description')}>
           <textarea
             className={uiStyles.input}
             rows={3}
@@ -86,7 +90,7 @@ export function ThreadDialog({ bookId, thread, onClose }: ThreadDialogProps) {
             onChange={(e) => setDescription(e.target.value)}
           />
         </Field>
-        <Field label="Notes">
+        <Field label={t('foreshadow.threadDialog.notes')}>
           <textarea
             className={uiStyles.input}
             rows={3}
@@ -97,9 +101,9 @@ export function ThreadDialog({ bookId, thread, onClose }: ThreadDialogProps) {
         </Field>
         <FormError message={error} />
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={busy || title.trim() === ''}>
-            {thread ? 'Save' : 'Create thread'}
+            {thread ? t('common.save') : t('foreshadow.threadDialog.create')}
           </Button>
         </div>
       </form>

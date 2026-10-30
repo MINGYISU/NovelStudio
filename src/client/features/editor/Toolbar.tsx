@@ -28,11 +28,19 @@ import { HIGHLIGHT_COLORS } from '../../../shared/schemas/content.ts';
 import {
   OCCURRENCE_ROLES,
   ROLE_GLYPHS,
-  ROLE_LABELS,
   type OccurrenceRole,
 } from '../../../shared/schemas/foreshadow.ts';
+import { useT, type MessageKey } from '../../i18n/index.ts';
 import libraryStyles from '../../pages/library/library.module.css';
 import styles from './editor.module.css';
+
+const HIGHLIGHT_KEYS: Record<(typeof HIGHLIGHT_COLORS)[number]['name'], MessageKey> = {
+  Yellow: 'editor.highlight.yellow',
+  Green: 'editor.highlight.green',
+  Blue: 'editor.highlight.blue',
+  Pink: 'editor.highlight.pink',
+  Orange: 'editor.highlight.orange',
+};
 
 function Tool({
   label,
@@ -87,6 +95,7 @@ export function Toolbar({
   showAnchors,
   onToggleAnchors,
 }: ToolbarProps) {
+  const t = useT();
   const s = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -110,43 +119,43 @@ export function Toolbar({
   const run = () => editor.chain().focus();
 
   return (
-    <div className={styles.toolbar} role="toolbar" aria-label="Formatting">
+    <div className={styles.toolbar} role="toolbar" aria-label={t('editor.toolbar.label')}>
       <Tool
-        label="Undo"
+        label={t('editor.toolbar.undo')}
         icon={Undo2}
         disabled={!editable || !s.canUndo}
         onClick={() => run().undo().run()}
       />
       <Tool
-        label="Redo"
+        label={t('editor.toolbar.redo')}
         icon={Redo2}
         disabled={!editable || !s.canRedo}
         onClick={() => run().redo().run()}
       />
       <span className={styles.separator} />
       <Tool
-        label="Bold"
+        label={t('editor.toolbar.bold')}
         icon={Bold}
         active={s.bold}
         disabled={!editable}
         onClick={() => run().toggleBold().run()}
       />
       <Tool
-        label="Italic"
+        label={t('editor.toolbar.italic')}
         icon={Italic}
         active={s.italic}
         disabled={!editable}
         onClick={() => run().toggleItalic().run()}
       />
       <Tool
-        label="Underline"
+        label={t('editor.toolbar.underline')}
         icon={Underline}
         active={s.underline}
         disabled={!editable}
         onClick={() => run().toggleUnderline().run()}
       />
       <Tool
-        label="Strikethrough"
+        label={t('editor.toolbar.strikethrough')}
         icon={Strikethrough}
         active={s.strike}
         disabled={!editable}
@@ -157,8 +166,8 @@ export function Toolbar({
           <button
             type="button"
             className={styles.tool}
-            aria-label="Highlight"
-            title="Highlight"
+            aria-label={t('editor.toolbar.highlight')}
+            title={t('editor.toolbar.highlight')}
             aria-pressed={s.highlight}
             onMouseDown={(e) => e.preventDefault()}
           >
@@ -181,70 +190,71 @@ export function Toolbar({
                 className={libraryStyles.menuItem}
                 onSelect={() => run().setHighlight({ color: color.value }).run()}
               >
-                <span className={styles.swatch} style={{ background: color.value }} /> {color.name}
+                <span className={styles.swatch} style={{ background: color.value }} />{' '}
+                {t(HIGHLIGHT_KEYS[color.name])}
               </DropdownMenu.Item>
             ))}
             <DropdownMenu.Item
               className={libraryStyles.menuItem}
               onSelect={() => run().unsetHighlight().run()}
             >
-              Remove highlight
+              {t('editor.toolbar.removeHighlight')}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
       <span className={styles.separator} />
       <Tool
-        label="Heading 1"
+        label={t('editor.toolbar.heading1')}
         icon={Heading1}
         active={s.h1}
         disabled={!editable}
         onClick={() => run().toggleHeading({ level: 1 }).run()}
       />
       <Tool
-        label="Heading 2"
+        label={t('editor.toolbar.heading2')}
         icon={Heading2}
         active={s.h2}
         disabled={!editable}
         onClick={() => run().toggleHeading({ level: 2 }).run()}
       />
       <Tool
-        label="Quote"
+        label={t('editor.toolbar.quote')}
         icon={Quote}
         active={s.quote}
         disabled={!editable}
         onClick={() => run().toggleBlockquote().run()}
       />
       <Tool
-        label="Scene break"
+        label={t('editor.toolbar.sceneBreak')}
         icon={Minus}
         disabled={!editable}
         onClick={() => run().setHorizontalRule().run()}
       />
       <span className={styles.separator} />
       <Tool
-        label="Align left"
+        label={t('editor.toolbar.alignLeft')}
         icon={AlignLeft}
         active={s.left}
         disabled={!editable}
         onClick={() => run().setTextAlign('left').run()}
       />
       <Tool
-        label="Align center"
+        label={t('editor.toolbar.alignCenter')}
         icon={AlignCenter}
         active={s.center}
         disabled={!editable}
         onClick={() => run().setTextAlign('center').run()}
       />
       <Tool
-        label="Align right"
+        label={t('editor.toolbar.alignRight')}
         icon={AlignRight}
         active={s.right}
         disabled={!editable}
         onClick={() => run().setTextAlign('right').run()}
       />
       <Tool
-        label="Justify"
+        label={t('editor.toolbar.justify')}
         icon={AlignJustify}
         active={s.justify}
         disabled={!editable}
@@ -256,8 +266,8 @@ export function Toolbar({
           <button
             type="button"
             className={styles.tool}
-            aria-label="Mark as foreshadowing"
-            title="Mark selection as setup, hint or payoff"
+            aria-label={t('editor.toolbar.markForeshadowing')}
+            title={t('editor.toolbar.markTooltip')}
             onMouseDown={(e) => e.preventDefault()}
           >
             <Flag size={16} />
@@ -271,22 +281,22 @@ export function Toolbar({
                 className={libraryStyles.menuItem}
                 onSelect={() => onMarkAnchor(role)}
               >
-                {ROLE_GLYPHS[role]} Mark as {ROLE_LABELS[role].toLowerCase()}
+                {ROLE_GLYPHS[role]} {t(`editor.toolbar.markAs.${role}`)}
               </DropdownMenu.Item>
             ))}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
       <Tool
-        label={showAnchors ? 'Hide foreshadow anchors' : 'Show foreshadow anchors'}
+        label={t(showAnchors ? 'editor.toolbar.hideAnchors' : 'editor.toolbar.showAnchors')}
         icon={showAnchors ? Eye : EyeOff}
         active={showAnchors}
         onClick={onToggleAnchors}
       />
       <span className={styles.spacer} />
-      <Tool label="Find in section" icon={Search} onClick={onFind} />
-      <Tool label="Snapshots" icon={History} onClick={onSnapshots} />
-      <Tool label="Display settings" icon={Type} onClick={onDisplay} />
+      <Tool label={t('editor.toolbar.find')} icon={Search} onClick={onFind} />
+      <Tool label={t('editor.toolbar.snapshots')} icon={History} onClick={onSnapshots} />
+      <Tool label={t('editor.toolbar.displaySettings')} icon={Type} onClick={onDisplay} />
     </div>
   );
 }

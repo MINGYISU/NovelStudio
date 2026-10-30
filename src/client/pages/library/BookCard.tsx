@@ -2,14 +2,14 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Download, FileText, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { useTrashBook } from '../../api/books.ts';
+import { exportUrl, useTrashBook } from '../../api/books.ts';
 import type { Book } from '../../../shared/schemas/book.ts';
 import { isBackupOverdue } from '../../../shared/cold-backup.ts';
 import { triggerDownload, useExportGuard } from '../../features/settings/export-guard.tsx';
 import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
+import { apiErrorMessage, formatDate, formatWords, useT } from '../../i18n/index.ts';
 import { BookCover } from './BookCover.tsx';
 import { EditBookDialog } from './BookDialogs.tsx';
-import { formatDate, formatWords } from './format.ts';
 import styles from './library.module.css';
 
 export interface BackupInfo {
@@ -19,18 +19,22 @@ export interface BackupInfo {
 
 /** Cold backup reminder (LIB-08): amber when the last backup is older than the threshold or missing. */
 function BackupBadge({ info }: { info: BackupInfo }) {
+  const t = useT();
   const overdue = isBackupOverdue(info.lastAt, new Date(), info.reminderDays);
   return (
     <span
       className={`${styles.badge} ${overdue ? styles.badgeWarn : ''}`}
       data-testid="backup-badge"
     >
-      {info.lastAt ? `Backed up ${formatDate(info.lastAt)}` : 'Never backed up'}
+      {info.lastAt
+        ? t('library.bookCard.backedUp', { date: formatDate(info.lastAt) })
+        : t('library.bookCard.neverBackedUp')}
     </span>
   );
 }
 
 export function BookCard({ book, backup }: { book: Book; backup?: BackupInfo }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const trash = useTrashBook();
@@ -49,35 +53,34 @@ export function BookCard({ book, backup }: { book: Book; backup?: BackupInfo }) 
       </Link>
 
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger className={styles.menuButton} aria-label={`Menu for ${book.title}`}>
+        <DropdownMenu.Trigger
+          className={styles.menuButton}
+          aria-label={t('library.bookCard.menuFor', { title: book.title })}
+        >
           <MoreHorizontal size={18} />
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content className={styles.menu} align="end" sideOffset={4}>
             <DropdownMenu.Item className={styles.menuItem} onSelect={() => setEditing(true)}>
-              <Pencil size={16} /> Edit metadata
+              <Pencil size={16} /> {t('library.bookCard.editMetadata')}
             </DropdownMenu.Item>
             <DropdownMenu.Item
               className={styles.menuItem}
-              onSelect={() =>
-                guard(false, () => triggerDownload(`/api/books/${book.id}/export?format=md`))
-              }
+              onSelect={() => guard(false, () => triggerDownload(exportUrl(book.id, 'md')))}
             >
-              <FileText size={16} /> Export Markdown
+              <FileText size={16} /> {t('library.bookCard.exportMarkdown')}
             </DropdownMenu.Item>
             <DropdownMenu.Item
               className={styles.menuItem}
-              onSelect={() =>
-                guard(false, () => triggerDownload(`/api/books/${book.id}/export?format=txt`))
-              }
+              onSelect={() => guard(false, () => triggerDownload(exportUrl(book.id, 'txt')))}
             >
-              <FileText size={16} /> Export plain text
+              <FileText size={16} /> {t('library.bookCard.exportText')}
             </DropdownMenu.Item>
             <DropdownMenu.Item className={styles.menuItem} onSelect={() => setExporting(true)}>
-              <Download size={16} /> Export cold backup…
+              <Download size={16} /> {t('library.bookCard.exportColdBackup')}
             </DropdownMenu.Item>
             <DropdownMenu.Item className={styles.menuItem} onSelect={() => trash.mutate(book.id)}>
-              <Trash2 size={16} /> Move to trash
+              <Trash2 size={16} /> {t('library.bookCard.moveToTrash')}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
@@ -85,7 +88,7 @@ export function BookCard({ book, backup }: { book: Book; backup?: BackupInfo }) 
 
       {trash.error ? (
         <p className={styles.error} role="alert">
-          {trash.error.message}
+          {apiErrorMessage(trash.error)}
         </p>
       ) : null}
       {exportGuard}

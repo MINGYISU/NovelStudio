@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
+import { useT } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import styles from './manuscript.module.css';
 
@@ -7,6 +8,7 @@ const INFO_TIMEOUT_MS = 10_000;
 
 /** One notice at a time: errors stay until dismissed, informational notices fade out. */
 export function NoticeBar() {
+  const t = useT();
   const notice = useWorkspaceStore((s) => s.notice);
   const dismiss = useWorkspaceStore((s) => s.dismissNotice);
 
@@ -35,7 +37,12 @@ export function NoticeBar() {
           {notice.action.label}
         </button>
       ) : null}
-      <button type="button" className={styles.iconButton} aria-label="Dismiss" onClick={dismiss}>
+      <button
+        type="button"
+        className={styles.iconButton}
+        aria-label={t('manuscript.notice.dismiss')}
+        onClick={dismiss}
+      >
         <X size={14} />
       </button>
     </div>

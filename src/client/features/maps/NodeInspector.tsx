@@ -10,10 +10,19 @@ import {
 } from '../../../shared/schemas/map.ts';
 import type { ResolvedLink } from '../../../shared/map-links.ts';
 import { Button, Dialog, Field, uiStyles } from '../../components/ui.tsx';
+import { useT, type MessageKey } from '../../i18n/index.ts';
 import styles from './maps.module.css';
 import type { StoryNodeData } from './StoryNode.tsx';
 
-const PALETTE = ['#5b4a8a', '#3d8b5a', '#c0841a', '#b3402f', '#2f6f9f', '#8a5a3c', '#7a7168'];
+const PALETTE: { color: string; name: MessageKey }[] = [
+  { color: '#5b4a8a', name: 'maps.color.violet' },
+  { color: '#3d8b5a', name: 'maps.color.green' },
+  { color: '#c0841a', name: 'maps.color.amber' },
+  { color: '#b3402f', name: 'maps.color.red' },
+  { color: '#2f6f9f', name: 'maps.color.blue' },
+  { color: '#8a5a3c', name: 'maps.color.brown' },
+  { color: '#7a7168', name: 'maps.color.gray' },
+];
 
 export interface SectionOption {
   id: string;
@@ -35,6 +44,7 @@ interface LinkPickerProps {
 }
 
 function LinkPicker({ sections, entries, existing, onPick, onClose }: LinkPickerProps) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
   const has = (type: MapLink['type'], id: string) =>
@@ -43,19 +53,21 @@ function LinkPicker({ sections, entries, existing, onPick, onClose }: LinkPicker
   const shownEntries = entries.filter((e) => e.title.toLowerCase().includes(q));
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()} title="Link to…">
+    <Dialog open onOpenChange={(open) => !open && onClose()} title={t('maps.picker.title')}>
       <input
         className={uiStyles.input}
         style={{ width: '100%' }}
-        placeholder="Filter sections and codex entries"
-        aria-label="Filter"
+        placeholder={t('maps.picker.filterPlaceholder')}
+        aria-label={t('maps.picker.filter')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         autoFocus
       />
       <div className={styles.pickerLists}>
-        <h3 className={styles.pickerHeading}>Sections</h3>
-        {shownSections.length === 0 ? <p className={styles.muted}>No matching sections.</p> : null}
+        <h3 className={styles.pickerHeading}>{t('maps.picker.sections')}</h3>
+        {shownSections.length === 0 ? (
+          <p className={styles.muted}>{t('maps.picker.noSections')}</p>
+        ) : null}
         {shownSections.map((s) => (
           <button
             key={s.id}
@@ -68,9 +80,9 @@ function LinkPicker({ sections, entries, existing, onPick, onClose }: LinkPicker
             {s.label}
           </button>
         ))}
-        <h3 className={styles.pickerHeading}>Codex entries</h3>
+        <h3 className={styles.pickerHeading}>{t('maps.picker.entries')}</h3>
         {shownEntries.length === 0 ? (
-          <p className={styles.muted}>No matching codex entries.</p>
+          <p className={styles.muted}>{t('maps.picker.noEntries')}</p>
         ) : null}
         {shownEntries.map((e) => (
           <button
@@ -80,12 +92,12 @@ function LinkPicker({ sections, entries, existing, onPick, onClose }: LinkPicker
             disabled={has('codex', e.id)}
             onClick={() => onPick({ type: 'codex', id: e.id })}
           >
-            {e.title || '(untitled)'} <span className={styles.muted}>· {e.category}</span>
+            {e.title || t('common.untitled')} <span className={styles.muted}>· {e.category}</span>
           </button>
         ))}
       </div>
       <div className={uiStyles.actions}>
-        <Button onClick={onClose}>Done</Button>
+        <Button onClick={onClose}>{t('common.done')}</Button>
       </div>
     </Dialog>
   );
@@ -106,12 +118,13 @@ interface NodeInspectorProps {
 /** MAP-03: edit the selected node's title, story time, description, color and links. */
 export function NodeInspector(props: NodeInspectorProps) {
   const { data, readOnly, resolveLink, openLink, onChange } = props;
+  const t = useT();
   const [picking, setPicking] = useState(false);
 
   return (
-    <aside className={styles.inspector} aria-label="Node details">
-      <h2 className={styles.inspectorTitle}>Node</h2>
-      <Field label="Title">
+    <aside className={styles.inspector} aria-label={t('maps.inspector.nodeLabel')}>
+      <h2 className={styles.inspectorTitle}>{t('maps.inspector.node')}</h2>
+      <Field label={t('maps.inspector.title')}>
         <input
           className={uiStyles.input}
           value={data.title}
@@ -122,17 +135,17 @@ export function NodeInspector(props: NodeInspectorProps) {
           onChange={(e) => onChange({ title: e.target.value })}
         />
       </Field>
-      <Field label="Story time">
+      <Field label={t('maps.inspector.storyTime')}>
         <input
           className={uiStyles.input}
           value={data.storyTime}
           maxLength={MAP_STORY_TIME_MAX}
-          placeholder="e.g. Spring 1923"
+          placeholder={t('maps.inspector.storyTimePlaceholder')}
           disabled={readOnly}
           onChange={(e) => onChange({ storyTime: e.target.value })}
         />
       </Field>
-      <Field label="Description">
+      <Field label={t('maps.inspector.description')}>
         <textarea
           className={uiStyles.input}
           rows={5}
@@ -143,22 +156,22 @@ export function NodeInspector(props: NodeInspectorProps) {
         />
       </Field>
       <div className={styles.field}>
-        <span className={styles.fieldLabel}>Color</span>
+        <span className={styles.fieldLabel}>{t('maps.inspector.color')}</span>
         <div className={styles.swatches}>
-          {PALETTE.map((color) => (
+          {PALETTE.map(({ color, name }) => (
             <button
               key={color}
               type="button"
               className={`${styles.swatch} ${data.color.toLowerCase() === color ? styles.swatchOn : ''}`}
               style={{ background: color }}
-              aria-label={`Color ${color}`}
+              aria-label={t('maps.inspector.colorOption', { name: t(name) })}
               disabled={readOnly}
               onClick={() => onChange({ color })}
             />
           ))}
           <input
             type="color"
-            aria-label="Custom color"
+            aria-label={t('maps.inspector.customColor')}
             value={data.color}
             disabled={readOnly}
             onChange={(e) => onChange({ color: e.target.value })}
@@ -166,8 +179,10 @@ export function NodeInspector(props: NodeInspectorProps) {
         </div>
       </div>
       <div className={styles.field}>
-        <span className={styles.fieldLabel}>Links</span>
-        {data.links.length === 0 ? <p className={styles.muted}>No links.</p> : null}
+        <span className={styles.fieldLabel}>{t('maps.inspector.links')}</span>
+        {data.links.length === 0 ? (
+          <p className={styles.muted}>{t('maps.inspector.noLinks')}</p>
+        ) : null}
         {data.links.map((link) => {
           const resolved = resolveLink(link);
           return (
@@ -178,13 +193,18 @@ export function NodeInspector(props: NodeInspectorProps) {
                 disabled={resolved.state !== 'ok'}
                 onClick={() => openLink(link)}
               >
-                {link.type === 'node' ? 'Section' : 'Codex'}: {resolved.label}
+                {t(
+                  link.type === 'node' ? 'maps.inspector.linkSection' : 'maps.inspector.linkEntry',
+                  {
+                    label: resolved.label,
+                  },
+                )}
               </button>
               {readOnly ? null : (
                 <button
                   type="button"
                   className={styles.iconButton}
-                  aria-label={`Remove link ${resolved.label}`}
+                  aria-label={t('maps.inspector.removeLink', { label: resolved.label })}
                   onClick={() =>
                     onChange({
                       links: data.links.filter((l) => !(l.type === link.type && l.id === link.id)),
@@ -199,13 +219,13 @@ export function NodeInspector(props: NodeInspectorProps) {
         })}
         {readOnly ? null : (
           <Button disabled={data.links.length >= MAP_MAX_LINKS} onClick={() => setPicking(true)}>
-            Add link…
+            {t('maps.inspector.addLink')}
           </Button>
         )}
       </div>
       {readOnly ? null : (
         <Button variant="danger" onClick={props.onDelete}>
-          <Trash2 size={14} /> Delete node
+          <Trash2 size={14} /> {t('maps.inspector.deleteNode')}
         </Button>
       )}
       {picking ? (
@@ -239,13 +259,14 @@ export function EdgeInspector({
   onLabel,
   onDelete,
 }: EdgeInspectorProps) {
+  const t = useT();
   return (
-    <aside className={styles.inspector} aria-label="Edge details">
-      <h2 className={styles.inspectorTitle}>Edge</h2>
+    <aside className={styles.inspector} aria-label={t('maps.inspector.edgeLabel')}>
+      <h2 className={styles.inspectorTitle}>{t('maps.inspector.edge')}</h2>
       <p className={styles.muted}>
-        {from || 'Untitled'} → {to || 'Untitled'}
+        {from || t('common.untitled')} → {to || t('common.untitled')}
       </p>
-      <Field label="Label">
+      <Field label={t('maps.inspector.label')}>
         <input
           className={uiStyles.input}
           value={label}
@@ -256,7 +277,7 @@ export function EdgeInspector({
       </Field>
       {readOnly ? null : (
         <Button variant="danger" onClick={onDelete}>
-          <Trash2 size={14} /> Delete edge
+          <Trash2 size={14} /> {t('maps.inspector.deleteEdge')}
         </Button>
       )}
     </aside>

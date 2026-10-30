@@ -18,9 +18,10 @@ import {
 } from '../../../shared/schemas/codex.ts';
 import { patchEntry, storeEntry, uploadEntryImage, useDeleteEntry } from '../../api/codex.ts';
 import { Button, Dialog, uiStyles } from '../../components/ui.tsx';
+import { type MessageKey, useT } from '../../i18n/index.ts';
 import styles from './codex.module.css';
 import { reportCodexError } from './errors.ts';
-import { FIELD_TYPE_LABELS, moveItem } from './TemplateDialog.tsx';
+import { FIELD_TYPE_LABEL_KEYS, moveItem } from './TemplateDialog.tsx';
 
 const SAVE_DELAY_MS = 600;
 
@@ -42,11 +43,11 @@ const sameFields = (a: readonly CodexField[], b: readonly CodexField[]): boolean
 
 type SaveStatus = 'saved' | 'dirty' | 'saving' | 'error';
 
-const STATUS_LABELS: Record<SaveStatus, string> = {
-  saved: 'Saved',
-  dirty: 'Unsaved changes',
-  saving: 'Saving…',
-  error: 'Not saved',
+const STATUS_LABEL_KEYS: Record<SaveStatus, MessageKey> = {
+  saved: 'codex.editor.status.saved',
+  dirty: 'codex.editor.status.dirty',
+  saving: 'codex.editor.status.saving',
+  error: 'codex.editor.status.error',
 };
 
 const isDirty = (now: Draft, before: Draft): boolean =>
@@ -65,6 +66,7 @@ interface EntryEditorProps {
 
 /** CDX-04, CDX-06: edit one entry; text is saved shortly after typing stops and when focus leaves. */
 export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
+  const t = useT();
   const client = useQueryClient();
   const navigate = useNavigate();
   const remove = useDeleteEntry(bookId);
@@ -119,9 +121,9 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
         // Forget what was "saved" so the next flush tries the same change again.
         saved.current = { ...saved.current, ...before };
         setStatus('error');
-        reportCodexError('The entry was not saved.')(error);
+        reportCodexError(t('codex.editor.saveFailed'))(error);
       });
-  }, [bookId, client, entry.id]);
+  }, [bookId, client, entry.id, t]);
 
   const change = (next: Draft, immediate = false) => {
     latest.current = next;
@@ -180,9 +182,9 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
       const imageAssetId = file ? (await uploadEntryImage(bookId, file)).id : null;
       storeEntry(client, bookId, await patchEntry(entry.id, { imageAssetId }));
     } catch (error) {
-      reportCodexError(file ? 'The image was not added.' : 'The image was not removed.')(
-        error as Error,
-      );
+      reportCodexError(
+        file ? t('codex.editor.imageAddFailed') : t('codex.editor.imageRemoveFailed'),
+      )(error as Error);
     } finally {
       setUploading(false);
       if (fileInput.current) fileInput.current.value = '';
@@ -195,7 +197,7 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
       onSuccess: () => navigate(`/book/${bookId}/codex`),
       onError: (error) => {
         discarded.current = false;
-        reportCodexError('The entry was not deleted.')(error);
+        reportCodexError(t('codex.editor.deleteFailed'))(error);
       },
     });
   };
@@ -210,20 +212,20 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
     >
       <div className={styles.editorTop}>
         <Link className={styles.back} to={`/book/${bookId}/codex`}>
-          <ArrowLeft size={14} /> {category?.name ?? 'Codex'}
+          <ArrowLeft size={14} /> {category?.name ?? t('codex.title')}
         </Link>
         <span
           className={`${styles.status} ${status === 'error' ? styles.statusError : ''}`}
           role="status"
           data-testid="entry-status"
         >
-          {STATUS_LABELS[status]}
+          {t(STATUS_LABEL_KEYS[status])}
         </span>
       </div>
 
       <input
         className={styles.titleInput}
-        aria-label="Entry title"
+        aria-label={t('codex.editor.titleLabel')}
         maxLength={CODEX_TITLE_MAX}
         value={draft.title}
         onChange={(e) => change({ ...draft, title: e.target.value })}
@@ -234,9 +236,9 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
         <div className={styles.portrait}>
           <div className={styles.portraitImage}>
             {entry.imageUrl ? (
-              <img src={entry.imageUrl} alt={`Image of ${entry.title}`} />
+              <img src={entry.imageUrl} alt={t('codex.editor.imageAlt', { title: entry.title })} />
             ) : (
-              <span>No image</span>
+              <span>{t('codex.editor.noImage')}</span>
             )}
           </div>
           <div className={styles.portraitActions}>
@@ -245,24 +247,25 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
               hidden
-              aria-label="Entry image file"
+              aria-label={t('codex.editor.imageFileLabel')}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) void setImage(file);
               }}
             />
             <Button disabled={uploading} onClick={() => fileInput.current?.click()}>
-              <ImagePlus size={16} /> {entry.imageUrl ? 'Replace' : 'Add image'}
+              <ImagePlus size={16} />{' '}
+              {entry.imageUrl ? t('codex.editor.replaceImage') : t('codex.editor.addImage')}
             </Button>
             {entry.imageUrl ? (
               <Button disabled={uploading} onClick={() => void setImage(null)}>
-                Remove
+                {t('common.remove')}
               </Button>
             ) : null}
           </div>
         </div>
         <label className={`${uiStyles.field} ${styles.headFields}`}>
-          <span>Summary</span>
+          <span>{t('codex.editor.summary')}</span>
           <textarea
             className={uiStyles.input}
             rows={5}
@@ -273,13 +276,13 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
         </label>
       </div>
 
-      <ul className={styles.fields} aria-label="Fields">
+      <ul className={styles.fields} aria-label={t('codex.editor.fields')}>
         {fields.map((field, index) => (
           <li key={field.key}>
             <div className={styles.fieldHead}>
               <input
                 className={styles.fieldName}
-                aria-label={`Name of field ${index + 1}`}
+                aria-label={t('codex.editor.fieldNameLabel', { number: index + 1 })}
                 maxLength={CODEX_LABEL_MAX}
                 value={field.label}
                 onChange={(e) => setField(field.key, { label: e.target.value })}
@@ -294,7 +297,7 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
               <button
                 type="button"
                 className={styles.iconButton}
-                aria-label={`Move ${field.label} up`}
+                aria-label={t('codex.editor.moveFieldUp', { name: field.label })}
                 disabled={index === 0}
                 onClick={() =>
                   change({ ...draft, fields: moveItem(draft.fields, index, -1) }, true)
@@ -305,7 +308,7 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
               <button
                 type="button"
                 className={styles.iconButton}
-                aria-label={`Move ${field.label} down`}
+                aria-label={t('codex.editor.moveFieldDown', { name: field.label })}
                 disabled={index === fields.length - 1}
                 onClick={() => change({ ...draft, fields: moveItem(draft.fields, index, 1) }, true)}
               >
@@ -313,7 +316,7 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
               </button>
               {removingKey === field.key ? (
                 <span className={styles.confirmRemove}>
-                  Remove with its text?
+                  {t('codex.editor.removeFieldConfirm')}
                   <Button
                     variant="danger"
                     onClick={() => {
@@ -324,15 +327,15 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
                       );
                     }}
                   >
-                    Remove
+                    {t('common.remove')}
                   </Button>
-                  <Button onClick={() => setRemovingKey(null)}>Keep</Button>
+                  <Button onClick={() => setRemovingKey(null)}>{t('codex.editor.keep')}</Button>
                 </span>
               ) : (
                 <button
                   type="button"
                   className={styles.iconButton}
-                  aria-label={`Remove ${field.label}`}
+                  aria-label={t('codex.editor.removeField', { name: field.label })}
                   onClick={() => setRemovingKey(field.key)}
                 >
                   <Trash2 size={14} />
@@ -370,44 +373,44 @@ export function EntryEditor({ bookId, entry, category }: EntryEditorProps) {
       >
         <input
           className={uiStyles.input}
-          aria-label="New field name"
-          placeholder="New field name"
+          aria-label={t('codex.editor.newFieldName')}
+          placeholder={t('codex.editor.newFieldName')}
           maxLength={CODEX_LABEL_MAX}
           value={newLabel}
           onChange={(e) => setNewLabel(e.target.value)}
         />
         <select
           className={`${uiStyles.input} ${styles.typeSelect}`}
-          aria-label="New field type"
+          aria-label={t('codex.editor.newFieldType')}
           value={newType}
           onChange={(e) => setNewType(e.target.value as CodexFieldType)}
         >
-          {CODEX_FIELD_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {FIELD_TYPE_LABELS[t]}
+          {CODEX_FIELD_TYPES.map((fieldType) => (
+            <option key={fieldType} value={fieldType}>
+              {t(FIELD_TYPE_LABEL_KEYS[fieldType])}
             </option>
           ))}
         </select>
         <Button type="submit" disabled={!newLabel.trim() || fields.length >= CODEX_MAX_FIELDS}>
-          Add field
+          {t('codex.editor.addField')}
         </Button>
       </form>
 
       <div className={styles.dangerZone}>
         <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-          Delete entry
+          {t('codex.editor.deleteEntry')}
         </Button>
       </div>
       <Dialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title="Delete this entry?"
-        description={`“${entry.title}” and its fields and image will be removed. This cannot be undone.`}
+        title={t('codex.editor.deleteTitle')}
+        description={t('codex.editor.deleteDescription', { title: entry.title })}
       >
         <div className={styles.dialogActions}>
-          <Button onClick={() => setConfirmDelete(false)}>Cancel</Button>
+          <Button onClick={() => setConfirmDelete(false)}>{t('common.cancel')}</Button>
           <Button variant="danger" onClick={deleteEntry} disabled={remove.isPending}>
-            Delete entry
+            {t('codex.editor.deleteEntry')}
           </Button>
         </div>
       </Dialog>

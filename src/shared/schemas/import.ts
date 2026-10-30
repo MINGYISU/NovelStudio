@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { bookSchema, TITLE_MAX } from './book.ts';
+import { localeSchema } from './locale.ts';
 
 /** Text and Markdown imports are capped; a larger file is refused outright, never truncated. */
 export const MAX_TEXT_IMPORT_BYTES = 25 * 1024 * 1024;
@@ -12,6 +13,7 @@ export const importTextFieldsSchema = z.object({
   detect: z.enum(['0', '1']).default('1'),
   title: z.string().trim().min(1).max(TITLE_MAX).optional(),
   preset: z.enum(IMPORT_PRESETS).optional(),
+  locale: localeSchema.optional(),
 });
 
 export const importPreviewSectionSchema = z.object({

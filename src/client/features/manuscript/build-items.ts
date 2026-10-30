@@ -11,8 +11,12 @@ export interface TreeItem {
   children: TreeItem[] | null;
 }
 
-export function buildItems(nodes: readonly TreeNode[], structure: StructureSettings): TreeItem[] {
-  const titles = computeDisplayTitles(nodes, structure);
+export function buildItems(
+  nodes: readonly TreeNode[],
+  structure: StructureSettings,
+  untitled?: string,
+): TreeItem[] {
+  const titles = computeDisplayTitles(nodes, structure, untitled);
   const convert = (branch: TreeBranch<TreeNode>): TreeItem => ({
     id: branch.node.id,
     node: branch.node,

@@ -1,4 +1,9 @@
-import { resolveMapLink, type ResolvedLink, type LinkTarget } from '../../../shared/map-links.ts';
+import {
+  resolveMapLink,
+  type LinkTarget,
+  type LinkTexts,
+  type ResolvedLink,
+} from '../../../shared/map-links.ts';
 import { buildTree, type TreeBranch } from '../../../shared/tree.ts';
 import type { TreeNode } from '../../../shared/types.ts';
 
@@ -27,8 +32,9 @@ const NO_ENTRIES: ReadonlyMap<string, string> = new Map();
 export function describeSection(
   nodeId: string | null,
   targets: ReadonlyMap<string, LinkTarget>,
+  texts: LinkTexts,
 ): ResolvedLink {
   return nodeId === null
-    ? { label: '(missing)', state: 'missing' }
-    : resolveMapLink({ type: 'node', id: nodeId }, targets, NO_ENTRIES);
+    ? { label: texts.missing, state: 'missing' }
+    : resolveMapLink({ type: 'node', id: nodeId }, targets, NO_ENTRIES, texts);
 }

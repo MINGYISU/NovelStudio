@@ -5,6 +5,7 @@ import { searchEntries } from '../../../shared/codex.ts';
 import type { CodexCategory, CodexEntry } from '../../../shared/schemas/codex.ts';
 import { useCodex, useSeedCodex } from '../../api/codex.ts';
 import { Button, uiStyles } from '../../components/ui.tsx';
+import { useT } from '../../i18n/index.ts';
 import { CategoryList } from './CategoryList.tsx';
 import styles from './codex.module.css';
 import { EntryCard } from './EntryCard.tsx';
@@ -22,6 +23,7 @@ interface CodexViewProps {
 
 /** The Codex view: categories on the left, cards or the entry editor on the right, search on top. */
 export function CodexView({ bookId, entryId }: CodexViewProps) {
+  const t = useT();
   const navigate = useNavigate();
   const codex = useCodex(bookId);
   const seed = useSeedCodex(bookId);
@@ -50,11 +52,11 @@ export function CodexView({ bookId, entryId }: CodexViewProps) {
   const results = useMemo(() => searchEntries(entries, query), [entries, query]);
   const names = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
 
-  if (codex.isPending) return <p className={styles.empty}>Loading…</p>;
+  if (codex.isPending) return <p className={styles.empty}>{t('common.loading')}</p>;
   if (codex.error || !data) {
     return (
       <p className={styles.empty} role="alert">
-        The codex could not be loaded.
+        {t('codex.loadFailed')}
       </p>
     );
   }
@@ -75,16 +77,16 @@ export function CodexView({ bookId, entryId }: CodexViewProps) {
         selectedId={activeId}
         onSelect={selectCategory}
       />
-      <section className={styles.main} aria-label="Codex">
+      <section className={styles.main} aria-label={t('codex.title')}>
         <div className={styles.mainHeader}>
-          <h2 className={styles.mainTitle}>Codex</h2>
+          <h2 className={styles.mainTitle}>{t('codex.title')}</h2>
           <div className={styles.search}>
             <Search size={14} />
             <input
               className={uiStyles.input}
               type="search"
-              aria-label="Search codex"
-              placeholder="Search all entries"
+              aria-label={t('codex.search.label')}
+              placeholder={t('codex.search.placeholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
@@ -104,17 +106,17 @@ export function CodexView({ bookId, entryId }: CodexViewProps) {
           ) : (
             <div className={styles.scroll}>
               <p className={styles.empty}>
-                This entry no longer exists.{' '}
-                <Link to={`/book/${bookId}/codex`}>Back to the codex</Link>
+                {t('codex.entryMissing')}{' '}
+                <Link to={`/book/${bookId}/codex`}>{t('codex.backToCodex')}</Link>
               </p>
             </div>
           )
         ) : searching ? (
           <div className={styles.scroll}>
             {results.length === 0 ? (
-              <p className={styles.empty}>No entries match “{query.trim()}”.</p>
+              <p className={styles.empty}>{t('codex.search.noMatch', { query: query.trim() })}</p>
             ) : (
-              <ul className={styles.grid} aria-label="Search results">
+              <ul className={styles.grid} aria-label={t('codex.searchResults')}>
                 {results.map((e) => (
                   <EntryCard key={e.id} entry={e} categoryName={names.get(e.categoryId)} />
                 ))}
@@ -133,20 +135,20 @@ export function CodexView({ bookId, entryId }: CodexViewProps) {
             {categories.length === 0 ? (
               // CDX-01: defaults come with a new book; an empty Codex stays empty until asked.
               <div className={styles.empty}>
-                <p>This book has no Codex categories. Add one, or start from the defaults.</p>
+                <p>{t('codex.empty.noCategories')}</p>
                 <Button
                   disabled={seed.isPending}
                   onClick={() =>
                     seed.mutate(undefined, {
-                      onError: reportCodexError('The default categories were not created.'),
+                      onError: reportCodexError(t('codex.addDefaults.failed')),
                     })
                   }
                 >
-                  Add default categories
+                  {t('codex.addDefaults')}
                 </Button>
               </div>
             ) : (
-              <p className={styles.empty}>Add a category to begin.</p>
+              <p className={styles.empty}>{t('codex.empty.addCategory')}</p>
             )}
           </div>
         )}

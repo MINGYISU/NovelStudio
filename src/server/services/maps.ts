@@ -1,12 +1,8 @@
 import crypto from 'node:crypto';
 import { buildTemplate } from '../../shared/map-templates.ts';
-import type {
-  CreateMapBody,
-  MapData,
-  MapTemplate,
-  PatchMapBody,
-  StoryMap,
-} from '../../shared/schemas/map.ts';
+import { DEFAULT_LOCALE, type Locale } from '../../shared/schemas/locale.ts';
+import { copyTitle, defaultMapTitle } from '../../shared/seed-text.ts';
+import type { CreateMapBody, MapData, PatchMapBody, StoryMap } from '../../shared/schemas/map.ts';
 import type { Db } from '../db/connection.ts';
 import { ApiError } from '../errors.ts';
 import {
@@ -22,13 +18,6 @@ import {
 import { touchBook } from '../repos/nodes.ts';
 import type { LibraryService } from './library.ts';
 
-const TEMPLATE_TITLES: Record<MapTemplate, string> = {
-  blank: 'Untitled map',
-  timeline: 'Timeline',
-  'plot-tree': 'Plot tree',
-  'character-arc': 'Character arc',
-};
-
 export class MapService {
   constructor(
     private readonly db: Db,
@@ -40,7 +29,7 @@ export class MapService {
     return { maps: listMaps(this.db, bookId) };
   }
 
-  create(bookId: string, body: CreateMapBody): { map: StoryMap } {
+  create(bookId: string, { locale = DEFAULT_LOCALE, ...body }: CreateMapBody): { map: StoryMap } {
     return this.db.transaction(() => {
       this.library.requireLiveBook(bookId);
       const now = new Date().toISOString();
@@ -48,9 +37,9 @@ export class MapService {
       insertMap(this.db, {
         id,
         bookId,
-        title: body.title ?? TEMPLATE_TITLES[body.template],
+        title: body.title ?? defaultMapTitle(body.template, locale),
         template: body.template,
-        data: JSON.stringify(buildTemplate(body.template, () => crypto.randomUUID())),
+        data: JSON.stringify(buildTemplate(body.template, () => crypto.randomUUID(), locale)),
         position: listMaps(this.db, bookId).length,
         createdAt: now,
         updatedAt: now,
@@ -91,7 +80,7 @@ export class MapService {
   }
 
   /** The copy goes right after the original and gets the stored data as it is, under new ids for the map only. */
-  duplicate(id: string): { map: StoryMap } {
+  duplicate(id: string, locale: Locale = DEFAULT_LOCALE): { map: StoryMap } {
     return this.db.transaction(() => {
       const original = this.require(id);
       this.library.requireLiveBook(original.bookId);
@@ -100,7 +89,7 @@ export class MapService {
       insertMap(this.db, {
         id: copyId,
         bookId: original.bookId,
-        title: `${original.title} (copy)`.slice(0, 200),
+        title: copyTitle(original.title, locale).slice(0, 200),
         template: original.template,
         data: getMapRawData(this.db, id) ?? JSON.stringify(original.data),
         position: original.position + 1,

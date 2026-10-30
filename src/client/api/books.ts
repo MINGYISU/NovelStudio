@@ -9,6 +9,7 @@ import {
   type CreateBookBody,
   type PatchBookBody,
 } from '../../shared/schemas/book.ts';
+import { currentLocale } from '../i18n/index.ts';
 import { apiRequest } from './http.ts';
 
 const booksKey = ['books'] as const;
@@ -46,7 +47,12 @@ function useBookMutation<TVars, TResult>(fn: (vars: TVars) => Promise<TResult>) 
 
 export function useCreateBook() {
   return useBookMutation(async (body: CreateBookBody): Promise<Book> =>
-    bookSchema.parse(await apiRequest('/api/books', { method: 'POST', json: body })),
+    bookSchema.parse(
+      await apiRequest('/api/books', {
+        method: 'POST',
+        json: { ...body, locale: currentLocale() },
+      }),
+    ),
   );
 }
 
@@ -102,4 +108,9 @@ export function usePurgeBook() {
     const params = new URLSearchParams({ purge: '1', confirmTitle: vars.confirmTitle });
     await apiRequest(`/api/books/${vars.id}?${params}`, { method: 'DELETE' });
   });
+}
+
+/** EXP-01: the download URL; `lang` is the language of `(untitled)` and image placeholders (I18N-07). */
+export function exportUrl(bookId: string, format: 'md' | 'txt'): string {
+  return `/api/books/${bookId}/export?format=${format}&lang=${currentLocale()}`;
 }

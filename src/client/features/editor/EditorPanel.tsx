@@ -13,6 +13,7 @@ import { docToPlainText } from '../../../shared/prosemirror-text.ts';
 import type { ContentDoc } from '../../../shared/schemas/content.ts';
 import { FONT_STACKS, type DisplaySettings } from '../../../shared/schemas/display.ts';
 import { countWords } from '../../../shared/wordcount.ts';
+import { apiErrorMessage, formatWords, useT } from '../../i18n/index.ts';
 import type { SectionSaver } from './autosave.ts';
 import { DisplaySettingsDialog } from './DisplaySettingsDialog.tsx';
 import { AnchorColors, anchorColorsKey } from './anchor-extension.ts';
@@ -37,7 +38,7 @@ interface LoadResult {
   token: number;
   epoch: number;
   opened: Opened | null;
-  message: string | null;
+  error: unknown;
 }
 
 /**
@@ -83,6 +84,7 @@ interface EditorPanelProps {
 /** Main panel of the manuscript view: toolbar, find, text, counts (ED-01..08, DISP-01). */
 export function EditorPanel(props: EditorPanelProps) {
   const { bookId, nodeId, display } = props;
+  const t = useT();
   const [token, setToken] = useState(0);
   const [result, setResult] = useState<LoadResult | null>(null);
   // Find & replace changes text on the server; the open section is then re-read, not kept.
@@ -91,9 +93,8 @@ export function EditorPanel(props: EditorPanelProps) {
   useEffect(() => {
     let cancelled = false;
     openSection(nodeId).then(
-      (opened) => !cancelled && setResult({ nodeId, token, epoch, opened, message: null }),
-      (error: Error) =>
-        !cancelled && setResult({ nodeId, token, epoch, opened: null, message: error.message }),
+      (opened) => !cancelled && setResult({ nodeId, token, epoch, opened, error: null }),
+      (error: unknown) => !cancelled && setResult({ nodeId, token, epoch, opened: null, error }),
     );
     return () => {
       cancelled = true;
@@ -107,7 +108,7 @@ export function EditorPanel(props: EditorPanelProps) {
 
   const reload = () => {
     saverRegistry.drop(nodeId);
-    setToken((t) => t + 1);
+    setToken((n) => n + 1);
   };
 
   return (
@@ -115,7 +116,7 @@ export function EditorPanel(props: EditorPanelProps) {
       className={styles.panel}
       data-theme={display.theme}
       style={displayStyle(display)}
-      aria-label="Editor"
+      aria-label={t('editor.region')}
     >
       {display.backgroundImageAssetId ? (
         <div
@@ -129,11 +130,11 @@ export function EditorPanel(props: EditorPanelProps) {
         />
       ) : null}
       {!current ? (
-        <p className={styles.empty}>Loading…</p>
+        <p className={styles.empty}>{t('common.loading')}</p>
       ) : !current.opened ? (
         <div className={styles.empty}>
-          <p role="alert">This section could not be opened. {current.message}</p>
-          <Button onClick={reload}>Try again</Button>
+          <p role="alert">{t('editor.open.failed', { message: apiErrorMessage(current.error) })}</p>
+          <Button onClick={reload}>{t('editor.open.tryAgain')}</Button>
         </div>
       ) : (
         <SectionEditor
@@ -158,6 +159,7 @@ function SectionEditor({
   nodeId,
 }: EditorPanelProps & { opened: Opened; onReload: () => void }) {
   const { saver } = opened;
+  const t = useT();
   const client = useQueryClient();
   const [anchorColors] = useState(() => new AnchorColors());
   const [extensions] = useState(() => createExtensions(anchorColors));
@@ -181,7 +183,7 @@ function SectionEditor({
     extensions,
     content: opened.content,
     editorProps: {
-      attributes: { 'aria-label': 'Section text', 'data-testid': 'editor' },
+      attributes: { 'aria-label': t('editor.sectionText'), 'data-testid': 'editor' },
       transformPastedHTML: cleanPastedHtml,
     },
     onUpdate: ({ editor: e }) => saver.update(normalizeContent(e.getJSON() as ContentDoc)),
@@ -199,7 +201,9 @@ function SectionEditor({
   useEffect(() => {
     anchorColors.replace(
       new Map(
-        (threads.data ?? []).flatMap((t) => t.occurrences.map((o) => [o.id, t.color] as const)),
+        (threads.data ?? []).flatMap((thread) =>
+          thread.occurrences.map((o) => [o.id, thread.color] as const),
+        ),
       ),
     );
     if (editor && !editor.isDestroyed) {
@@ -276,28 +280,26 @@ function SectionEditor({
       ) : null}
       {stale ? (
         <div className={styles.banner} role="alert">
-          <span>
-            This section was changed elsewhere, for example in another tab. Your latest edits here
-            are not saved. Reload to see the newest text.
-          </span>
-          <Button onClick={onReload}>Reload</Button>
+          <span>{t('editor.banner.stale')}</span>
+          <Button onClick={onReload}>{t('editor.banner.reload')}</Button>
         </div>
       ) : null}
       {rejected ? (
         <div className={styles.banner} role="alert" data-testid="save-rejected">
           <span>
-            This section could not be saved: {saver.error ?? 'the server refused the text.'} What
-            you type now is only in this window. Copy the text to keep it safe.
+            {t('editor.banner.rejected', {
+              reason: saver.error ?? t('editor.banner.rejectedFallback'),
+            })}
           </span>
           <Button
             onClick={() =>
               void copyText(docToPlainText(editor.getJSON() as ContentDoc)).then(
-                () => setCopyNote('Copied.'),
-                (err: Error) => setCopyNote(`Could not copy: ${err.message}`),
+                () => setCopyNote(t('editor.copy.done')),
+                (err: Error) => setCopyNote(t('editor.copy.failed', { reason: err.message })),
               )
             }
           >
-            Copy section text
+            {t('editor.banner.copySection')}
           </Button>
           {copyNote ? <span role="status">{copyNote}</span> : null}
         </div>
@@ -310,11 +312,11 @@ function SectionEditor({
           </div>
         </div>
       </div>
-      <div className={styles.footer} aria-label="Word counts">
-        <span>Section {words.section.toLocaleString()} words</span>
-        <span>Book {bookTotal.toLocaleString()} words</span>
+      <div className={styles.footer} aria-label={t('editor.footer.label')}>
+        <span>{t('editor.footer.section', { words: formatWords(words.section) })}</span>
+        <span>{t('editor.footer.book', { words: formatWords(bookTotal) })}</span>
         {words.selection > 0 ? (
-          <span>Selection {words.selection.toLocaleString()} words</span>
+          <span>{t('editor.footer.selection', { words: formatWords(words.selection) })}</span>
         ) : null}
       </div>
       {dialog === 'snapshots' ? (

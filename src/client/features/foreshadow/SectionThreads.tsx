@@ -1,7 +1,9 @@
 import { Link } from 'react-router';
 import type { ForeshadowWarning } from '../../../shared/foreshadow.ts';
-import { ROLE_GLYPHS, ROLE_LABELS, type Thread } from '../../../shared/schemas/foreshadow.ts';
+import { ROLE_GLYPHS, type Thread } from '../../../shared/schemas/foreshadow.ts';
+import { useT } from '../../i18n/index.ts';
 import styles from './foreshadow.module.css';
+import { roleLabel } from './labels.ts';
 
 interface SectionThreadsProps {
   bookId: string;
@@ -12,6 +14,7 @@ interface SectionThreadsProps {
 
 /** FS-07: the threads that occur in the selected section, with their role here. */
 export function SectionThreads({ bookId, nodeId, threads, warnings }: SectionThreadsProps) {
+  const t = useT();
   const here = (threads ?? [])
     .map((thread) => ({
       thread,
@@ -20,12 +23,12 @@ export function SectionThreads({ bookId, nodeId, threads, warnings }: SectionThr
     .filter((x) => x.occurrences.length > 0);
 
   return (
-    <section className={styles.sectionThreads} aria-label="Foreshadowing in this section">
-      <h3 className={styles.sectionThreadsHeading}>Foreshadowing in this section</h3>
+    <section className={styles.sectionThreads} aria-label={t('foreshadow.sectionThreads.heading')}>
+      <h3 className={styles.sectionThreadsHeading}>{t('foreshadow.sectionThreads.heading')}</h3>
       {threads === undefined ? (
-        <p className={styles.empty}>Loading…</p>
+        <p className={styles.empty}>{t('common.loading')}</p>
       ) : here.length === 0 ? (
-        <p className={styles.empty}>No threads occur here.</p>
+        <p className={styles.empty}>{t('foreshadow.sectionThreads.none')}</p>
       ) : (
         <ul className={styles.sectionThreadList}>
           {here.map(({ thread, occurrences }) => {
@@ -47,8 +50,8 @@ export function SectionThreads({ bookId, nodeId, threads, warnings }: SectionThr
                       <span
                         key={o.id}
                         role="img"
-                        aria-label={ROLE_LABELS[o.role]}
-                        title={ROLE_LABELS[o.role]}
+                        aria-label={roleLabel(t, o.role)}
+                        title={roleLabel(t, o.role)}
                       >
                         {ROLE_GLYPHS[o.role]}
                       </span>
@@ -58,16 +61,16 @@ export function SectionThreads({ bookId, nodeId, threads, warnings }: SectionThr
                     <span
                       className={styles.anchorMissingTag}
                       data-testid="anchor-missing"
-                      title="The marked text of an occurrence was deleted"
+                      title={t('foreshadow.sectionThreads.anchorMissingTitle')}
                     >
-                      anchor missing
+                      {t('foreshadow.sectionThreads.anchorMissing')}
                     </span>
                   ) : null}
                   {flagged ? (
                     <span
                       className={styles.badge}
-                      title="This thread has a warning here"
-                      aria-label="Warning"
+                      title={t('foreshadow.sectionThreads.warningTitle')}
+                      aria-label={t('foreshadow.sectionThreads.warningLabel')}
                     >
                       !
                     </span>

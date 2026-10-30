@@ -7,19 +7,23 @@ import {
   useSnapshots,
 } from '../../api/content.ts';
 import { Button, Dialog, FormError, uiStyles } from '../../components/ui.tsx';
-import { formatWords } from '../../pages/library/format.ts';
+import {
+  apiErrorMessage,
+  formatDateTime,
+  formatWords,
+  useT,
+  type MessageKey,
+} from '../../i18n/index.ts';
 import type { NodeContent } from '../../../shared/schemas/node.ts';
 import { copyText } from './clipboard.ts';
 import styles from './editor.module.css';
 
-const REASONS: Record<string, string> = {
-  open: 'First edit',
-  interval: 'While editing',
-  'before-replace': 'Before replace',
-  'before-restore': 'Before a restore',
+const REASONS: Record<string, MessageKey> = {
+  open: 'editor.snapshot.reason.open',
+  interval: 'editor.snapshot.reason.interval',
+  'before-replace': 'editor.snapshot.reason.beforeReplace',
+  'before-restore': 'editor.snapshot.reason.beforeRestore',
 };
-
-const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 interface SnapshotDialogProps {
   nodeId: string;
@@ -42,6 +46,7 @@ export function SnapshotDialog({
   onRestored,
   onClose,
 }: SnapshotDialogProps) {
+  const t = useT();
   const client = useQueryClient();
   const snapshots = useSnapshots(nodeId);
   const [selected, setSelected] = useState<string | null>(null);
@@ -70,7 +75,7 @@ export function SnapshotDialog({
       await client.invalidateQueries({ queryKey: snapshotsKey(nodeId) });
       onRestored(node);
     } catch (err) {
-      setError((err as Error).message);
+      setError(apiErrorMessage(err));
       setBusy(false);
     }
   };
@@ -80,17 +85,15 @@ export function SnapshotDialog({
       open
       wide
       onOpenChange={(open) => !open && onClose()}
-      title="Snapshots"
-      description="Earlier versions of this section. Restoring one saves the current text as a snapshot first."
+      title={t('editor.snapshot.title')}
+      description={t('editor.snapshot.description')}
     >
-      {snapshots.isPending ? <p>Loading…</p> : null}
-      {snapshots.error ? <FormError message={snapshots.error.message} /> : null}
-      {snapshots.data?.length === 0 ? (
-        <p>No snapshots yet. They are created automatically while you write.</p>
-      ) : null}
+      {snapshots.isPending ? <p>{t('common.loading')}</p> : null}
+      {snapshots.error ? <FormError message={apiErrorMessage(snapshots.error)} /> : null}
+      {snapshots.data?.length === 0 ? <p>{t('editor.snapshot.empty')}</p> : null}
       {snapshots.data && snapshots.data.length > 0 ? (
         <div className={styles.snapshotLayout}>
-          <ul className={styles.snapshotList} aria-label="Snapshots">
+          <ul className={styles.snapshotList} aria-label={t('editor.snapshot.title')}>
             {snapshots.data.map((snapshot) => (
               <li key={snapshot.id}>
                 <button
@@ -99,9 +102,9 @@ export function SnapshotDialog({
                   aria-current={snapshot.id === selected}
                   onClick={() => setSelected(snapshot.id)}
                 >
-                  {dateTime.format(new Date(snapshot.createdAt))}
+                  {formatDateTime(snapshot.createdAt)}
                   <span className={styles.snapshotMeta}>
-                    {REASONS[snapshot.reason] ?? snapshot.reason} ·{' '}
+                    {REASONS[snapshot.reason] ? t(REASONS[snapshot.reason]!) : snapshot.reason} ·{' '}
                     {formatWords(snapshot.wordCount)}
                   </span>
                   <span className={styles.snapshotMeta}>{snapshot.excerpt}</span>
@@ -109,44 +112,48 @@ export function SnapshotDialog({
               </li>
             ))}
           </ul>
-          <pre className={styles.snapshotPreview} aria-label="Snapshot text">
+          <pre className={styles.snapshotPreview} aria-label={t('editor.snapshot.previewLabel')}>
             {selected === null
-              ? 'Select a snapshot to preview it.'
+              ? t('editor.snapshot.selectToPreview')
               : detail.isPending
-                ? 'Loading…'
-                : detail.data?.plainText || '(empty)'}
+                ? t('common.loading')
+                : detail.data?.plainText || t('editor.snapshot.emptyText')}
           </pre>
         </div>
       ) : null}
       <FormError message={error} />
       {unsavedWarning ? (
-        <div className={styles.unsavedWarning} role="alertdialog" aria-label="Unsaved text">
-          <p>This section has text that is not saved. Restoring the snapshot will discard it.</p>
+        <div
+          className={styles.unsavedWarning}
+          role="alertdialog"
+          aria-label={t('editor.snapshot.unsavedLabel')}
+        >
+          <p>{t('editor.snapshot.unsavedWarning')}</p>
           <div className={uiStyles.actions}>
             <Button
               onClick={() =>
                 void copyText(unsavedText()).then(
-                  () => setCopyNote('Copied.'),
-                  (err: Error) => setCopyNote(`Could not copy: ${err.message}`),
+                  () => setCopyNote(t('editor.copy.done')),
+                  (err: Error) => setCopyNote(t('editor.copy.failed', { reason: err.message })),
                 )
               }
             >
-              Copy unsaved text
+              {t('editor.snapshot.copyUnsaved')}
             </Button>
             {copyNote ? <span role="status">{copyNote}</span> : null}
             <Button variant="danger" disabled={busy} onClick={() => void restore(true)}>
-              Restore anyway
+              {t('editor.snapshot.restoreAnyway')}
             </Button>
             <Button autoFocus onClick={() => setUnsavedWarning(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
       ) : (
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>Close</Button>
+          <Button onClick={onClose}>{t('common.close')}</Button>
           <Button variant="primary" disabled={!selected || busy} onClick={() => void restore()}>
-            Restore this version
+            {t('editor.snapshot.restoreVersion')}
           </Button>
         </div>
       )}

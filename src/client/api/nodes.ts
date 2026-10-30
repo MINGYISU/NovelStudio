@@ -9,6 +9,7 @@ import {
 } from '../../shared/schemas/node.ts';
 import { applyMove } from '../../shared/tree.ts';
 import type { TreeNode } from '../../shared/types.ts';
+import { currentLocale } from '../i18n/index.ts';
 import { apiRequest } from './http.ts';
 
 export const treeKey = (bookId: string) => ['tree', bookId] as const;
@@ -104,7 +105,10 @@ export function useDuplicateNode(bookId: string) {
     mutationKey: writeKey(bookId),
     mutationFn: async (id: string) =>
       nodeAndTreeResponseSchema.parse(
-        await apiRequest(`/api/nodes/${id}/duplicate`, { method: 'POST' }),
+        await apiRequest(`/api/nodes/${id}/duplicate`, {
+          method: 'POST',
+          json: { locale: currentLocale() },
+        }),
       ),
     onSuccess: ({ nodes }) => commit(client, bookId, nodes),
     onSettled: () => settle(client, bookId),

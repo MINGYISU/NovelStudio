@@ -23,6 +23,8 @@ export const MAP_RETRY_MS = 5000;
 export class MapSaver {
   state: MapSaveState = 'saved';
   error: string | null = null;
+  /** What was thrown, so the UI can show it in the interface language. */
+  cause: unknown = null;
 
   private pending: MapData | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -37,6 +39,7 @@ export class MapSaver {
   update(data: MapData): void {
     this.pending = data;
     this.error = null;
+    this.cause = null;
     this.setState(this.inflight ? 'saving' : 'dirty');
     this.schedule(this.deps.debounceMs ?? MAP_DEBOUNCE_MS);
   }
@@ -66,9 +69,11 @@ export class MapSaver {
         try {
           await this.deps.transport.save(this.mapId, data, { keepalive: this.keepalive });
           this.error = null;
+          this.cause = null;
         } catch (err) {
           this.pending = this.pending ?? data;
           this.error = (err as Error).message;
+          this.cause = err;
           this.setState('error');
           if ((err as { retryable?: boolean }).retryable !== false) {
             this.schedule(this.deps.retryMs ?? MAP_RETRY_MS);

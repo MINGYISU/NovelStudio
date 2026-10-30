@@ -11,9 +11,11 @@ import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
 import { ImportDialog } from '../../features/settings/ImportDialog.tsx';
 import { TextImportDialog } from '../../features/settings/TextImportDialog.tsx';
 import { CreateBookDialog } from './BookDialogs.tsx';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 import styles from './library.module.css';
 
 export function LibraryPage() {
+  const t = useT();
   const [params, setParams] = useSearchParams();
   const sort: BookSort = bookSortSchema.catch('modified').parse(params.get('sort'));
   const books = useBooks({ sort, trashed: false });
@@ -26,9 +28,9 @@ export function LibraryPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.heading}>Library</h1>
+        <h1 className={styles.heading}>{t('library.title')}</h1>
         <label className={styles.sort}>
-          Sort by
+          {t('library.sortBy')}
           <select
             className={styles.select}
             value={sort}
@@ -36,48 +38,48 @@ export function LibraryPage() {
               setParams(e.target.value === 'modified' ? {} : { sort: e.target.value })
             }
           >
-            <option value="modified">Last modified</option>
-            <option value="title">Title</option>
+            <option value="modified">{t('library.sort.modified')}</option>
+            <option value="title">{t('library.sort.title')}</option>
           </select>
         </label>
         <Link className={styles.sort} to="/trash">
-          <Trash2 size={16} /> Trash
+          <Trash2 size={16} /> {t('library.trash')}
         </Link>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <Button variant="primary">
-              <Plus size={16} /> New
+              <Plus size={16} /> {t('library.new')}
             </Button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content className={styles.menu} align="end" sideOffset={4}>
               <DropdownMenu.Item className={styles.menuItem} onSelect={() => setCreating(true)}>
-                Create blank…
+                {t('library.createBlank')}
               </DropdownMenu.Item>
               <DropdownMenu.Item
                 className={styles.menuItem}
                 onSelect={() => setImportingText(true)}
               >
-                Import text or Markdown…
+                {t('library.importText')}
               </DropdownMenu.Item>
               <DropdownMenu.Item className={styles.menuItem} onSelect={() => setImporting(true)}>
-                Import cold backup…
+                {t('library.importColdBackup')}
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
         <DropdownMenu.Root>
-          <DropdownMenu.Trigger className={styles.menuButtonInline} aria-label="Library menu">
+          <DropdownMenu.Trigger className={styles.menuButtonInline} aria-label={t('library.menu')}>
             <MoreHorizontal size={18} />
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content className={styles.menu} align="end" sideOffset={4}>
               <DropdownMenu.Item className={styles.menuItem} onSelect={() => setExportingAll(true)}>
-                Export all books…
+                {t('library.exportAll')}
               </DropdownMenu.Item>
               <DropdownMenu.Item className={styles.menuItem} asChild>
                 <Link to="/settings">
-                  <Settings size={16} /> Settings
+                  <Settings size={16} /> {t('library.settings')}
                 </Link>
               </DropdownMenu.Item>
             </DropdownMenu.Content>
@@ -85,14 +87,14 @@ export function LibraryPage() {
         </DropdownMenu.Root>
       </header>
 
-      {books.isPending ? <p className={styles.empty}>Loading…</p> : null}
+      {books.isPending ? <p className={styles.empty}>{t('common.loading')}</p> : null}
       {books.error ? (
         <p className={`${styles.empty} ${styles.error}`} role="alert">
-          {books.error.message}
+          {apiErrorMessage(books.error)}
         </p>
       ) : null}
       {books.data && books.data.length === 0 ? (
-        <p className={styles.empty}>No books yet. Use New to create your first one.</p>
+        <p className={styles.empty}>{t('library.empty')}</p>
       ) : null}
       {books.data && books.data.length > 0 ? (
         <ul className={styles.grid}>

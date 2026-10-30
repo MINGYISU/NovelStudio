@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { fieldsFromTemplate, NEW_CATEGORY_TEMPLATE } from '../../shared/codex.ts';
+import { DEFAULT_LOCALE, type Locale } from '../../shared/schemas/locale.ts';
 import type {
   CodexCategory,
   CodexData,
@@ -66,11 +67,11 @@ export class CodexService {
    * CDX-01: creates the default categories for a book that has none. New books already get them
    * when created; this is the explicit "Add default categories" action (also for pre-M5 books).
    */
-  seedDefaults(bookId: string): CodexCategory[] {
+  seedDefaults(bookId: string, locale: Locale = DEFAULT_LOCALE): CodexCategory[] {
     return this.db.transaction(() => {
       this.library.requireLiveBook(bookId);
       if (listCategories(this.db, bookId).length === 0) {
-        insertDefaultCategories(this.db, bookId);
+        insertDefaultCategories(this.db, bookId, locale);
         touchBook(this.db, bookId, new Date().toISOString());
       }
       return listCategories(this.db, bookId);

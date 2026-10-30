@@ -7,6 +7,7 @@ import {
   type PatchNodeBody,
 } from '../../../shared/schemas/node.ts';
 import { NODE_STATUSES, type NodeStatus, type TreeNode } from '../../../shared/types.ts';
+import { apiErrorMessage, formatWords, useT } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import type { ForeshadowWarning } from '../../../shared/foreshadow.ts';
 import type { Thread } from '../../../shared/schemas/foreshadow.ts';
@@ -24,8 +25,9 @@ interface DetailsPanelProps {
 
 /** Right panel (TREE-09, TREE-10): title, status, numbering and synopsis of the selected section. */
 export function DetailsPanel({ bookId, node, displayTitle, threads, warnings }: DetailsPanelProps) {
+  const t = useT();
   return (
-    <aside className={styles.details} aria-label="Section details">
+    <aside className={styles.details} aria-label={t('manuscript.details.label')}>
       {node ? (
         <>
           <DetailsForm
@@ -39,7 +41,7 @@ export function DetailsPanel({ bookId, node, displayTitle, threads, warnings }: 
           <CharactersInSection key={node.id} bookId={bookId} nodeId={node.id} />
         </>
       ) : (
-        <p className={styles.detailsEmpty}>Select a section to see its details.</p>
+        <p className={styles.detailsEmpty}>{t('manuscript.details.empty')}</p>
       )}
     </aside>
   );
@@ -54,15 +56,16 @@ function DetailsForm({
   node: TreeNode;
   displayTitle: string;
 }) {
+  const t = useT();
   const update = useUpdateNode(bookId);
   const [title, setTitle] = useState(node.title);
   const [synopsis, setSynopsis] = useState(node.synopsis);
 
   const save = (patch: PatchNodeBody) =>
-    update.mutateAsync({ id: node.id, patch }).catch((error: Error) =>
+    update.mutateAsync({ id: node.id, patch }).catch((error: unknown) =>
       useWorkspaceStore.getState().notify({
         tone: 'error',
-        message: `The change was not saved. ${error.message}`,
+        message: `${t('manuscript.details.saveFailed')} ${apiErrorMessage(error)}`,
       }),
     );
 
@@ -70,10 +73,10 @@ function DetailsForm({
     <div>
       <h2 className={styles.detailsHeading}>{displayTitle}</h2>
       <p className={styles.detailsMeta}>
-        {node.kind} · {node.wordCount.toLocaleString()} words
+        {t(`kind.${node.kind}`)} · {formatWords(node.wordCount)}
       </p>
       <label className={uiStyles.field}>
-        <span>Title</span>
+        <span>{t('manuscript.details.title')}</span>
         <input
           className={uiStyles.input}
           value={title}
@@ -84,7 +87,7 @@ function DetailsForm({
         />
       </label>
       <label className={uiStyles.field}>
-        <span>Status</span>
+        <span>{t('manuscript.details.status')}</span>
         <select
           className={uiStyles.input}
           value={node.status}
@@ -92,7 +95,7 @@ function DetailsForm({
         >
           {NODE_STATUSES.map((status) => (
             <option key={status} value={status}>
-              {status}
+              {t(`status.${status}`)}
             </option>
           ))}
         </select>
@@ -103,10 +106,10 @@ function DetailsForm({
           checked={node.numbered}
           onChange={(e) => save({ numbered: e.target.checked })}
         />
-        Numbered
+        {t('manuscript.details.numbered')}
       </label>
       <label className={uiStyles.field}>
-        <span>Synopsis</span>
+        <span>{t('manuscript.details.synopsis')}</span>
         <textarea
           className={uiStyles.input}
           rows={6}

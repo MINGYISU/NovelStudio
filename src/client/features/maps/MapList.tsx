@@ -10,22 +10,17 @@ import {
 } from '../../../shared/schemas/map.ts';
 import { useCreateMap, useDeleteMap, useDuplicateMap, useRenameMap } from '../../api/maps.ts';
 import { Button, Dialog, Field, FormError, uiStyles } from '../../components/ui.tsx';
+import { apiErrorMessage, useT } from '../../i18n/index.ts';
 import { useWorkspaceStore } from '../../stores/workspace.ts';
 import libraryStyles from '../../pages/library/library.module.css';
 import { mapSavers } from './map-saver.ts';
 import styles from './maps.module.css';
 
-const TEMPLATE_INFO: Record<MapTemplate, { name: string; text: string }> = {
-  blank: { name: 'Blank', text: 'Start from an empty canvas.' },
-  timeline: { name: 'Timeline', text: 'A left-to-right chain of stages.' },
-  'plot-tree': { name: 'Plot tree', text: 'A top-down tree from premise to resolution.' },
-  'character-arc': { name: 'Character arc', text: 'Start state, change points, end state.' },
-};
-
-const report = (action: string) => (error: Error) =>
-  useWorkspaceStore.getState().notify({ tone: 'error', message: `${action} ${error.message}` });
+const notifyError = (message: string) =>
+  useWorkspaceStore.getState().notify({ tone: 'error', message });
 
 function NewMapDialog({ bookId, onClose }: { bookId: string; onClose: () => void }) {
+  const t = useT();
   const navigate = useNavigate();
   const create = useCreateMap(bookId);
   const [template, setTemplate] = useState<MapTemplate>('plot-tree');
@@ -40,7 +35,7 @@ function NewMapDialog({ bookId, onClose }: { bookId: string; onClose: () => void
           onClose();
           navigate(`/book/${bookId}/maps/${map.id}`);
         },
-        onError: (e) => setError(e.message),
+        onError: (e) => setError(apiErrorMessage(e)),
       },
     );
   };
@@ -49,8 +44,8 @@ function NewMapDialog({ bookId, onClose }: { bookId: string; onClose: () => void
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title="New story map"
-      description="Templates are only starting layouts; you can change everything afterwards."
+      title={t('maps.newDialog.title')}
+      description={t('maps.newDialog.description')}
     >
       <form
         onSubmit={(e) => {
@@ -58,35 +53,39 @@ function NewMapDialog({ bookId, onClose }: { bookId: string; onClose: () => void
           submit();
         }}
       >
-        <Field label="Title (optional)">
+        <Field label={t('maps.newDialog.titleField')}>
           <input
             className={uiStyles.input}
             value={title}
             maxLength={MAP_TITLE_MAX}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={TEMPLATE_INFO[template].name}
+            placeholder={t(`maps.template.${template}.name`)}
           />
         </Field>
-        <div className={styles.templates} role="radiogroup" aria-label="Template">
-          {MAP_TEMPLATES.map((t) => (
+        <div
+          className={styles.templates}
+          role="radiogroup"
+          aria-label={t('maps.newDialog.template')}
+        >
+          {MAP_TEMPLATES.map((id) => (
             <button
-              key={t}
+              key={id}
               type="button"
               role="radio"
-              aria-checked={template === t}
-              className={`${styles.template} ${template === t ? styles.templateOn : ''}`}
-              onClick={() => setTemplate(t)}
+              aria-checked={template === id}
+              className={`${styles.template} ${template === id ? styles.templateOn : ''}`}
+              onClick={() => setTemplate(id)}
             >
-              <strong>{TEMPLATE_INFO[t].name}</strong>
-              <span>{TEMPLATE_INFO[t].text}</span>
+              <strong>{t(`maps.template.${id}.name`)}</strong>
+              <span>{t(`maps.template.${id}.text`)}</span>
             </button>
           ))}
         </div>
         <FormError message={error} />
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" type="submit" disabled={create.isPending}>
-            Create
+            {t('common.create')}
           </Button>
         </div>
       </form>
@@ -103,21 +102,22 @@ function RenameDialog({
   map: StoryMap;
   onClose: () => void;
 }) {
+  const t = useT();
   const rename = useRenameMap(bookId);
   const [title, setTitle] = useState(map.title);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()} title="Rename map">
+    <Dialog open onOpenChange={(open) => !open && onClose()} title={t('maps.renameDialog.title')}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           rename.mutate(
             { id: map.id, title },
-            { onSuccess: onClose, onError: (x) => setError(x.message) },
+            { onSuccess: onClose, onError: (x) => setError(apiErrorMessage(x)) },
           );
         }}
       >
-        <Field label="Title">
+        <Field label={t('maps.renameDialog.titleField')}>
           <input
             className={uiStyles.input}
             value={title}
@@ -128,9 +128,9 @@ function RenameDialog({
         </Field>
         <FormError message={error} />
         <div className={uiStyles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" type="submit" disabled={!title.trim() || rename.isPending}>
-            Rename
+            {t('common.rename')}
           </Button>
         </div>
       </form>
@@ -149,18 +149,19 @@ function DeleteDialog({
   onDeleted: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const remove = useDeleteMap(bookId);
   const [error, setError] = useState<string | null>(null);
   return (
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title="Delete map?"
-      description={`“${map.title}” and everything on it will be deleted. This cannot be undone.`}
+      title={t('maps.deleteDialog.title')}
+      description={t('maps.deleteDialog.description', { title: map.title })}
     >
       <FormError message={error} />
       <div className={uiStyles.actions}>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.cancel')}</Button>
         <Button
           variant="danger"
           disabled={remove.isPending}
@@ -170,16 +171,19 @@ function DeleteDialog({
                 onClose();
                 onDeleted();
               },
-              onError: (e) => setError(e.message),
+              onError: (e) => setError(apiErrorMessage(e)),
             })
           }
         >
-          Delete map
+          {t('maps.deleteDialog.confirm')}
         </Button>
       </div>
     </Dialog>
   );
 }
+
+const isTemplate = (value: string): value is MapTemplate =>
+  (MAP_TEMPLATES as readonly string[]).includes(value);
 
 interface MapListProps {
   bookId: string;
@@ -189,6 +193,7 @@ interface MapListProps {
 
 /** MAP-01: the maps of a book, with create, rename, duplicate and delete. */
 export function MapList({ bookId, maps, selectedId }: MapListProps) {
+  const t = useT();
   const navigate = useNavigate();
   const duplicate = useDuplicateMap(bookId);
   const [creating, setCreating] = useState(false);
@@ -196,16 +201,20 @@ export function MapList({ bookId, maps, selectedId }: MapListProps) {
   const [deleting, setDeleting] = useState<StoryMap | null>(null);
 
   return (
-    <aside className={styles.list} aria-label="Story maps">
+    <aside className={styles.list} aria-label={t('maps.list.label')}>
       <div className={styles.listHeader}>
-        <span>Maps</span>
-        <Button onClick={() => setCreating(true)} aria-label="New map" title="New map">
-          <Plus size={14} /> New
+        <span>{t('maps.list.heading')}</span>
+        <Button
+          onClick={() => setCreating(true)}
+          aria-label={t('maps.list.newMap')}
+          title={t('maps.list.newMap')}
+        >
+          <Plus size={14} /> {t('maps.list.new')}
         </Button>
       </div>
       {maps.length === 0 ? (
         <p className={styles.muted} style={{ padding: '0 0.9rem' }}>
-          No maps yet. Create one from a template.
+          {t('maps.list.none')}
         </p>
       ) : null}
       {maps.map((map) => (
@@ -216,14 +225,16 @@ export function MapList({ bookId, maps, selectedId }: MapListProps) {
           <NavLink className={styles.listLink} to={`/book/${bookId}/maps/${map.id}`}>
             <span className={styles.listTitle}>{map.title}</span>
             <span className={styles.muted}>
-              {TEMPLATE_INFO[map.template as MapTemplate]?.name ?? 'Map'} · {map.data.nodes.length}{' '}
-              nodes
+              {isTemplate(map.template)
+                ? t(`maps.template.${map.template}.name`)
+                : t('maps.template.unknown')}{' '}
+              · {t('maps.list.nodeCount', { count: map.data.nodes.length })}
             </span>
           </NavLink>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger
               className={libraryStyles.menuButtonInline}
-              aria-label={`Actions for ${map.title}`}
+              aria-label={t('maps.list.rowActions', { title: map.title })}
             >
               <MoreHorizontal size={16} />
             </DropdownMenu.Trigger>
@@ -233,7 +244,7 @@ export function MapList({ bookId, maps, selectedId }: MapListProps) {
                   className={libraryStyles.menuItem}
                   onSelect={() => setRenaming(map)}
                 >
-                  <Pencil size={16} /> Rename…
+                  <Pencil size={16} /> {t('maps.list.renameMenu')}
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   className={libraryStyles.menuItem}
@@ -242,27 +253,28 @@ export function MapList({ bookId, maps, selectedId }: MapListProps) {
                     const saver = mapSavers().find((s) => s.mapId === map.id);
                     void (saver?.flush() ?? Promise.resolve()).then(() => {
                       if (saver && (saver.state !== 'saved' || saver.hasUnsaved())) {
-                        report('The map was not duplicated.')(
-                          new Error(
-                            `Its latest changes could not be saved: ${saver.error ?? 'unknown error'}`,
-                          ),
+                        notifyError(
+                          t('maps.list.notDuplicatedUnsaved', {
+                            error: apiErrorMessage(saver.cause),
+                          }),
                         );
                         return;
                       }
                       duplicate.mutate(map.id, {
                         onSuccess: (copy) => navigate(`/book/${bookId}/maps/${copy.id}`),
-                        onError: report('The map was not duplicated.'),
+                        onError: (e) =>
+                          notifyError(t('maps.list.notDuplicated', { error: apiErrorMessage(e) })),
                       });
                     });
                   }}
                 >
-                  <Copy size={16} /> Duplicate
+                  <Copy size={16} /> {t('common.duplicate')}
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   className={libraryStyles.menuItem}
                   onSelect={() => setDeleting(map)}
                 >
-                  <Trash2 size={16} /> Delete…
+                  <Trash2 size={16} /> {t('maps.list.deleteMenu')}
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
-import { useBook } from '../../api/books.ts';
+import { exportUrl, useBook } from '../../api/books.ts';
 import { threadsKey } from '../../api/foreshadows.ts';
 import { treeKey, useTree } from '../../api/nodes.ts';
 import { Button } from '../../components/ui.tsx';
@@ -33,6 +33,7 @@ import { FindReplaceDialog } from '../../features/search/FindReplaceDialog.tsx';
 import { totalWords } from '../../features/manuscript/build-items.ts';
 import { rememberedSection, saveLastNode } from '../../features/manuscript/last-node.ts';
 import { StructureDialog } from '../../features/manuscript/StructureDialog.tsx';
+import { useT } from '../../i18n/index.ts';
 import { triggerDownload, useExportGuard } from '../../features/settings/export-guard.tsx';
 import { ExportDialog } from '../../features/settings/ExportDialog.tsx';
 import { warningsByNode } from '../../../shared/foreshadow.ts';
@@ -44,6 +45,7 @@ import styles from '../../features/manuscript/manuscript.module.css';
 
 /** Workspace layout: top bar with save status, resizable sidebar, editor, details panel. */
 export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' | 'foreshadow' }) {
+  const t = useT();
   const { bookId, nodeId, entryId, mapId } = useParams();
   const book = useBook(bookId);
   const tree = useTree(book.data && !book.data.deletedAt ? bookId : undefined);
@@ -122,20 +124,20 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
   const displayTitle = useMemo(
     () =>
       nodes && selected && book.data
-        ? computeDisplayTitles(nodes, book.data.structure).get(selected.id)
+        ? computeDisplayTitles(nodes, book.data.structure, t('common.untitled')).get(selected.id)
         : undefined,
-    [nodes, selected, book.data],
+    [nodes, selected, book.data, t],
   );
 
-  if (book.isPending) return <p className={libraryStyles.empty}>Loading…</p>;
+  if (book.isPending) return <p className={libraryStyles.empty}>{t('common.loading')}</p>;
   if (book.error || !book.data) {
     return (
       <main className={libraryStyles.page}>
         <Link className={libraryStyles.sort} to="/">
-          <ArrowLeft size={16} /> Library
+          <ArrowLeft size={16} /> {t('workspace.topbar.library')}
         </Link>
         <p className={`${libraryStyles.empty} ${libraryStyles.error}`} role="alert">
-          This book could not be opened.
+          {t('workspace.bookOpenFailed')}
         </p>
       </main>
     );
@@ -144,12 +146,10 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
     return (
       <main className={libraryStyles.page}>
         <Link className={libraryStyles.sort} to="/">
-          <ArrowLeft size={16} /> Library
+          <ArrowLeft size={16} /> {t('workspace.topbar.library')}
         </Link>
         <h1 className={libraryStyles.heading}>{book.data.title}</h1>
-        <p className={libraryStyles.empty}>
-          This book is in the trash. Restore it from the library to open it.
-        </p>
+        <p className={libraryStyles.empty}>{t('workspace.bookTrashed')}</p>
       </main>
     );
   }
@@ -159,40 +159,47 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
       {focused ? (
         <div className={styles.focusBar}>
           <SaveStatus />
-          <Button onClick={() => setFocusMode(false)} aria-label="Exit focus mode">
-            <Minimize2 size={16} /> Exit focus mode
+          <Button onClick={() => setFocusMode(false)} aria-label={t('workspace.focus.exit')}>
+            <Minimize2 size={16} /> {t('workspace.focus.exit')}
           </Button>
         </div>
       ) : (
         <header className={styles.topBar}>
           <Link className={libraryStyles.sort} to="/">
-            <ArrowLeft size={16} /> Library
+            <ArrowLeft size={16} /> {t('workspace.topbar.library')}
           </Link>
           <h1 className={styles.bookTitle}>{book.data.title}</h1>
-          <nav className={styles.viewTabs} aria-label="Views">
+          <nav className={styles.viewTabs} aria-label={t('workspace.topbar.views')}>
             {(
               [
-                ['Manuscript', 'manuscript', `/book/${book.data.id}/manuscript`],
-                ['Story Maps', 'maps', `/book/${book.data.id}/maps${lastMap ? `/${lastMap}` : ''}`],
-                ['Foreshadowing', 'foreshadow', `/book/${book.data.id}/foreshadow`],
-                ['Codex', 'codex', `/book/${book.data.id}/codex`],
+                ['workspace.topbar.manuscript', 'manuscript', `/book/${book.data.id}/manuscript`],
+                [
+                  'workspace.topbar.maps',
+                  'maps',
+                  `/book/${book.data.id}/maps${lastMap ? `/${lastMap}` : ''}`,
+                ],
+                ['workspace.topbar.foreshadow', 'foreshadow', `/book/${book.data.id}/foreshadow`],
+                ['workspace.topbar.codex', 'codex', `/book/${book.data.id}/codex`],
               ] as const
             ).map(([label, target, to]) => (
               <NavLink
-                key={label}
+                key={target}
                 to={to}
                 className={() => `${styles.viewTab} ${target === view ? styles.viewTabActive : ''}`}
               >
-                {label}
+                {t(label)}
               </NavLink>
             ))}
           </nav>
           <SaveStatus />
           <Button onClick={() => setEditingStructure(true)}>
-            <Settings2 size={16} /> Structure
+            <Settings2 size={16} /> {t('workspace.topbar.structure')}
           </Button>
           <DropdownMenu.Root>
-            <DropdownMenu.Trigger className={libraryStyles.menuButtonInline} aria-label="Book menu">
+            <DropdownMenu.Trigger
+              className={libraryStyles.menuButtonInline}
+              aria-label={t('workspace.topbar.bookMenu')}
+            >
               <MoreHorizontal size={18} />
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
@@ -203,45 +210,41 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
                       className={libraryStyles.menuItem}
                       onSelect={() => setFocusMode(true)}
                     >
-                      <Maximize2 size={16} /> Focus mode
+                      <Maximize2 size={16} /> {t('workspace.focus.enter')}
                     </DropdownMenu.Item>
                     <DropdownMenu.Item
                       className={libraryStyles.menuItem}
                       onSelect={() => setReplacing(true)}
                     >
-                      <Replace size={16} /> Find and replace in book…
+                      <Replace size={16} /> {t('workspace.menu.findReplace')}
                     </DropdownMenu.Item>
                   </>
                 ) : null}
                 <DropdownMenu.Item
                   className={libraryStyles.menuItem}
                   onSelect={() =>
-                    guard(false, () =>
-                      triggerDownload(`/api/books/${book.data.id}/export?format=md`),
-                    )
+                    guard(false, () => triggerDownload(exportUrl(book.data.id, 'md')))
                   }
                 >
-                  <FileText size={16} /> Export Markdown
+                  <FileText size={16} /> {t('workspace.menu.exportMarkdown')}
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   className={libraryStyles.menuItem}
                   onSelect={() =>
-                    guard(false, () =>
-                      triggerDownload(`/api/books/${book.data.id}/export?format=txt`),
-                    )
+                    guard(false, () => triggerDownload(exportUrl(book.data.id, 'txt')))
                   }
                 >
-                  <FileText size={16} /> Export plain text
+                  <FileText size={16} /> {t('workspace.menu.exportText')}
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   className={libraryStyles.menuItem}
                   onSelect={() => setExporting(true)}
                 >
-                  <Download size={16} /> Export cold backup…
+                  <Download size={16} /> {t('workspace.menu.exportColdBackup')}
                 </DropdownMenu.Item>
                 <DropdownMenu.Item className={libraryStyles.menuItem} asChild>
                   <Link to="/settings">
-                    <Settings size={16} /> Settings
+                    <Settings size={16} /> {t('workspace.menu.settings')}
                   </Link>
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
@@ -290,7 +293,7 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
           ) : (
             <aside className={styles.sidebar}>
               <p className={styles.emptyTree} role={tree.error ? 'alert' : undefined}>
-                {tree.error ? 'The manuscript could not be loaded.' : 'Loading…'}
+                {tree.error ? t('workspace.manuscriptLoadFailed') : t('common.loading')}
               </p>
             </aside>
           )}
@@ -306,7 +309,7 @@ export function WorkspacePage({ view }: { view: 'manuscript' | 'codex' | 'maps' 
                 savedSectionWords={selected.wordCount}
               />
             ) : (
-              <p className={styles.mainPlaceholder}>Select a section to start writing.</p>
+              <p className={styles.mainPlaceholder}>{t('workspace.selectSection')}</p>
             )}
           </main>
           {focused ? null : (
