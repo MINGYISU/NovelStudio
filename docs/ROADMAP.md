@@ -16,7 +16,7 @@ Specs: [PRD.md](./PRD.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [COLD_BACKU
 | M7 | Foreshadowing | FS-01..07 | ☑ |
 | M7b | In-text foreshadow anchors | FS-08 | ☑ |
 | M8 | Polish, import/export | WS-03, ED-09, DISP-02, HOT-02, IMP-02/03, EXP-01, COLD-11 | ☑ |
-| M9 | Review fixes | TREE-08, ED-02/04/05/10/12, HOT-02, WS-01/02, CDX-01, MOVE-11, MAP-08, EXP-01, COLD-02, IMP-02 | ☐ |
+| M9 | Review fixes | TREE-08, ED-02/04/05/10/12, HOT-02, WS-01/02, CDX-01, MOVE-11, MAP-08, EXP-01, COLD-02, IMP-02 | ☑ |
 
 **Finish M9 before writing real chapters.** The post-M8 review found ways typed text could be lost (see M9 group A). After M9, make sure a cold backup folder is set and one export has succeeded.
 
@@ -327,18 +327,18 @@ Work in group order: **A** first (data safety), then **B**, then **C**. Splittin
 
 ### Done when
 
-- [ ] Every item A1–A6, B1–B10, C1 is implemented with its tests.
-- [ ] `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:e2e` all pass; results reported with counts.
-- [ ] Docs updated as listed.
-- [ ] Manual checklist, run against `./.data-dev` only:
-  - [ ] Trash a chapter, wait 15 s, restore it from the Trash dialog.
-  - [ ] Paste a deeply quoted email into a chapter, keep typing, reload: nothing lost.
-  - [ ] Close the tab while a save is failing (stop the dev server first): the browser asks before leaving.
-  - [ ] Paste a passage from Google Docs: only its bold words are bold.
-  - [ ] Reopen a book from the library after restarting the app: the last section opens.
-  - [ ] Delete every Codex category: they do not come back by themselves.
-  - [ ] Start `npm run dev` with `PORT=4317` and double-click `NovelStudio.command`: it refuses instead of opening the dev server.
-  - [ ] Import a Chinese TXT whose body contains `第二节课…` sentences: the preview shows only the real chapters.
+- [x] Every item A1–A6, B1–B10, C1 is implemented with its tests.
+- [x] `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:e2e` all pass; results reported with counts.
+- [x] Docs updated as listed.
+- [x] Manual checklist, run against `./.data-dev` only:
+  - [x] Trash a chapter, wait 15 s, restore it from the Trash dialog.
+  - [x] Paste a deeply quoted email into a chapter, keep typing, reload: nothing lost.
+  - [x] Close the tab while a save is failing (stop the dev server first): the browser asks before leaving.
+  - [x] Paste a passage from Google Docs: only its bold words are bold.
+  - [x] Reopen a book from the library after restarting the app: the last section opens.
+  - [x] Delete every Codex category: they do not come back by themselves.
+  - [x] Start `npm run dev` with `PORT=4317` and double-click `NovelStudio.command`: it refuses instead of opening the dev server.
+  - [x] Import a Chinese TXT whose body contains `第二节课…` sentences: the preview shows only the real chapters.
 
 ---
 
