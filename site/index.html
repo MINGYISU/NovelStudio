@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en" data-theme="paper">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NovelStudio — a calm, local-first studio for long-form fiction</title>
+    <meta
+      name="description"
+      content="NovelStudio is a free, local-first writing app for novelists: drag-and-drop chapters with automatic renumbering, story maps, a foreshadowing tracker, a codex, and four layers of backup. No account, no cloud."
+    />
+    <meta name="theme-color" content="#5b4a8a" />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="NovelStudio — your novel, from first line to final chapter"
+    />
+    <meta
+      property="og:description"
+      content="A calm, local-first writing studio. Drag chapters, watch every number follow. Your books never leave your computer."
+    />
+    <meta
+      property="og:image"
+      content="https://mingyisu.github.io/NovelStudio/shots/03-writing.jpg"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem('ns-site-theme');
+          if (!theme) {
+            theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'paper';
+          }
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {
+          /* storage unavailable: keep the default theme */
+        }
+      })();
+    </script>
+    <script type="module" src="main.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+    <canvas id="glyphs" aria-hidden="true"></canvas>
+
+    <header class="topbar" id="topbar">
+      <a class="brand" href="#top" aria-label="NovelStudio">
+        <img src="icons/icon-192.png" alt="" width="28" height="28" />
+        <span>NovelStudio</span>
+      </a>
+      <nav class="nav" aria-label="Sections" data-i18n="nav.label" data-i18n-attr="aria-label">
+        <a href="#try" data-i18n="nav.try">Try it</a>
+        <a href="#tour" data-i18n="nav.tour">Tour</a>
+        <a href="#safety" data-i18n="nav.safety">Safety</a>
+        <a href="#start" data-i18n="nav.start">Get started</a>
+      </nav>
+      <div class="controls">
+        <div
+          class="seg"
+          role="group"
+          aria-label="Language"
+          data-i18n="ctl.lang"
+          data-i18n-attr="aria-label"
+        >
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="zh-CN" aria-pressed="false">中文</button>
+        </div>
+        <div
+          class="seg themes"
+          role="group"
+          aria-label="Theme"
+          data-i18n="ctl.theme"
+          data-i18n-attr="aria-label"
+        >
+          <button
+            type="button"
+            data-theme-set="paper"
+            aria-label="Paper"
+            title="Paper"
+            data-i18n="ctl.paper"
+            data-i18n-attr="title,aria-label"
+          >
+            <i class="sw sw-paper"></i>
+          </button>
+          <button
+            type="button"
+            data-theme-set="sepia"
+            aria-label="Sepia"
+            title="Sepia"
+            data-i18n="ctl.sepia"
+            data-i18n-attr="title,aria-label"
+          >
+            <i class="sw sw-sepia"></i>
+          </button>
+          <button
+            type="button"
+            data-theme-set="night"
+            aria-label="Night"
+            title="Night"
+            data-i18n="ctl.night"
+            data-i18n-attr="title,aria-label"
+          >
+            <i class="sw sw-night"></i>
+          </button>
+        </div>
+        <a
+          class="gh"
+          href="https://github.com/MINGYISU/NovelStudio"
+          aria-label="GitHub repository"
+          data-i18n="ctl.github"
+          data-i18n-attr="aria-label"
+        >
+          <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+            />
+          </svg>
+        </a>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- HERO -->
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <p class="eyebrow" data-i18n="hero.eyebrow">Local-first · No account · Free forever</p>
+          <h1>
+            <span data-i18n="hero.h1a">Your novel, from first line to</span>
+            <span class="ink"
+              ><span data-i18n="hero.h1b">final chapter</span
+              ><svg viewBox="0 0 300 18" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M3 11 C 60 2, 120 16, 180 7 S 270 5, 297 10" /></svg
+            ></span>
+          </h1>
+          <p class="lede" data-i18n="hero.lede">
+            NovelStudio is a calm writing studio for long-form fiction. Drag a chapter to a new
+            place and every number follows. Plan with story maps, follow every clue to its payoff,
+            and keep your pages safe behind four layers of backup.
+          </p>
+          <div class="cta">
+            <a class="btn primary" href="#start" data-i18n="hero.cta1">Get started</a>
+            <a class="btn" href="#try" data-i18n="hero.cta2">Try the reorder demo ↓</a>
+          </div>
+          <ul class="badges">
+            <li data-i18n="hero.b1">MIT licensed</li>
+            <li data-i18n="hero.b2">Works offline</li>
+            <li data-i18n="hero.b3">English &amp; 简体中文</li>
+            <li data-i18n="hero.b4">Your files, plain JSON</li>
+          </ul>
+        </div>
+
+        <div class="hero-stage">
+          <div class="tilt" id="tilt">
+            <figure class="frame">
+              <div class="frame-bar">
+                <i></i><i></i><i></i>
+                <span class="url">127.0.0.1:4317</span>
+              </div>
+              <img
+                src="shots/03-writing.jpg"
+                width="1440"
+                height="1000"
+                alt="The NovelStudio manuscript workspace: chapter list on the left, the story text in the middle, section details on the right."
+                data-i18n="hero.alt"
+                data-i18n-attr="alt"
+              />
+            </figure>
+            <span class="chip chip-saved"
+              ><i class="dot"></i><b data-i18n="hero.chipSaved">Saved</b></span
+            >
+            <span class="chip chip-move" data-i18n="hero.chipMove">Chapter 4 → Chapter 3</span>
+            <span class="chip chip-star" data-i18n="hero.chipStar">★ Payoff in Chapter 3</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- FACTS STRIP -->
+      <section
+        class="strip"
+        aria-label="Principles"
+        data-i18n="strip.label"
+        data-i18n-attr="aria-label"
+      >
+        <div class="strip-track">
+          <ul>
+            <li data-i18n="strip.1">Binds to 127.0.0.1 only</li>
+            <li data-i18n="strip.2">No accounts</li>
+            <li data-i18n="strip.3">No telemetry</li>
+            <li data-i18n="strip.4">No CDN fonts or scripts</li>
+            <li data-i18n="strip.5">Human-readable cold backups</li>
+            <li data-i18n="strip.6">Stable IDs, links never break</li>
+            <li data-i18n="strip.7">Numbers computed, never typed</li>
+          </ul>
+          <ul aria-hidden="true">
+            <li data-i18n="strip.1">Binds to 127.0.0.1 only</li>
+            <li data-i18n="strip.2">No accounts</li>
+            <li data-i18n="strip.3">No telemetry</li>
+            <li data-i18n="strip.4">No CDN fonts or scripts</li>
+            <li data-i18n="strip.5">Human-readable cold backups</li>
+            <li data-i18n="strip.6">Stable IDs, links never break</li>
+            <li data-i18n="strip.7">Numbers computed, never typed</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- TRY IT -->
+      <section class="section" id="try">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-i18n="try.eyebrow">The reason this app exists</p>
+          <h2 data-i18n="try.h2">Move a chapter. Watch everything follow.</h2>
+          <p data-i18n-html="try.p">
+            In NovelStudio, chapter numbers are computed from the order — never typed into a title.
+            Drag a chapter by its handle (or focus the handle and press <kbd>Alt</kbd> +
+            <kbd>↑</kbd>/<kbd>↓</kbd>). Try putting a payoff before its setup.
+          </p>
+        </header>
+
+        <div class="demo reveal" id="demo">
+          <div class="demo-pane">
+            <div class="pane-head">
+              <span class="label" data-i18n="try.manuscript">MANUSCRIPT</span>
+              <div
+                class="seg small"
+                role="group"
+                aria-label="Numbering style"
+                data-i18n="try.styleLabel"
+                data-i18n-attr="aria-label"
+              >
+                <button type="button" data-style="en" aria-pressed="true">Chapter 1</button>
+                <button type="button" data-style="cn" aria-pressed="false">第一章</button>
+              </div>
+            </div>
+            <ol
+              class="tree"
+              id="demo-list"
+              aria-label="Chapters"
+              data-i18n="try.listLabel"
+              data-i18n-attr="aria-label"
+            ></ol>
+            <div class="pane-foot">
+              <span id="demo-moves"></span>
+              <button type="button" class="link" id="demo-reset" data-i18n="try.reset">
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div class="demo-pane">
+            <div class="pane-head">
+              <span class="label" data-i18n="try.foreshadowing">FORESHADOWING</span>
+              <span class="legend">
+                <span>● <em data-i18n="try.setup">Setup</em></span>
+                <span>◐ <em data-i18n="try.hint">Hint</em></span>
+                <span>★ <em data-i18n="try.payoff">Payoff</em></span>
+              </span>
+            </div>
+            <div class="matrix-wrap"><table class="matrix" id="demo-matrix"></table></div>
+            <div class="warnings" id="demo-warnings" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+        <p class="fineprint reveal" data-i18n="try.note">
+          This is a small, simplified model of the real thing. In the app the same rules run on the
+          server and in the browser, and an invalid move (say, a part inside its own chapter) is
+          refused.
+        </p>
+      </section>
+
+      <!-- TOUR -->
+      <section class="section" id="tour">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-i18n="tour.eyebrow">A tour of the studio</p>
+          <h2 data-i18n="tour.h2">Everything a long book needs. Nothing it doesn’t.</h2>
+          <p data-i18n-html="tour.p">
+            Real screenshots of the real app, using a made-up novel, <em>The Lantern Road</em>.
+            Click a tab, or click the picture to see it larger.
+          </p>
+        </header>
+
+        <div class="tour reveal">
+          <div
+            class="tabs"
+            role="tablist"
+            aria-orientation="vertical"
+            aria-label="Features"
+            data-i18n="tour.tabs"
+            data-i18n-attr="aria-label"
+          >
+            <button
+              type="button"
+              role="tab"
+              id="tab-library"
+              aria-controls="tour-panel"
+              aria-selected="true"
+              data-tab="library"
+            >
+              <b data-i18n="tour.library.t">Library</b>
+              <small data-i18n="tour.library.s">A shelf for every book</small>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-manuscript"
+              aria-controls="tour-panel"
+              aria-selected="false"
+              data-tab="manuscript"
+            >
+              <b data-i18n="tour.manuscript.t">Manuscript</b>
+              <small data-i18n="tour.manuscript.s">Write in the middle</small>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-pictures"
+              aria-controls="tour-panel"
+              aria-selected="false"
+              data-tab="pictures"
+            >
+              <b data-i18n="tour.pictures.t">Illustrations</b>
+              <small data-i18n="tour.pictures.s">Pictures between paragraphs</small>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-maps"
+              aria-controls="tour-panel"
+              aria-selected="false"
+              data-tab="maps"
+            >
+              <b data-i18n="tour.maps.t">Story maps</b>
+              <small data-i18n="tour.maps.s">Plot as a diagram</small>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-foreshadowing"
+              aria-controls="tour-panel"
+              aria-selected="false"
+              data-tab="foreshadowing"
+            >
+              <b data-i18n="tour.fs.t">Foreshadowing</b>
+              <small data-i18n="tour.fs.s">Setups, hints, payoffs</small>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-codex"
+              aria-controls="tour-panel"
+              aria-selected="false"
+              data-tab="codex"
+            >
+              <b data-i18n="tour.codex.t">Codex</b>
+              <small data-i18n="tour.codex.s">Characters and worlds</small>
+            </button>
+          </div>
+
+          <div
+            class="tour-view"
+            id="tour-panel"
+            role="tabpanel"
+            aria-labelledby="tab-library"
+            tabindex="0"
+          >
+            <figure class="frame">
+              <div class="frame-bar">
+                <i></i><i></i><i></i><span class="url">127.0.0.1:4317</span>
+              </div>
+              <button
+                type="button"
+                class="zoom"
+                id="tour-zoom"
+                aria-label="Enlarge screenshot"
+                data-i18n="tour.zoom"
+                data-i18n-attr="aria-label"
+              >
+                <img
+                  id="tour-img"
+                  src="shots/00-library.jpg"
+                  width="1440"
+                  height="1000"
+                  alt=""
+                  loading="lazy"
+                />
+              </button>
+            </figure>
+            <div class="tour-text">
+              <h3 id="tour-title"></h3>
+              <p id="tour-body"></p>
+              <p class="ids" id="tour-ids"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BENTO -->
+      <section class="section" id="features">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-i18n="bento.eyebrow">Made for the long haul</p>
+          <h2 data-i18n="bento.h2">Small details that matter at chapter 80</h2>
+        </header>
+
+        <div class="bento">
+          <article class="card wide reveal">
+            <h3 data-i18n="bento.num.h">Two numbering systems, one click</h3>
+            <p data-i18n="bento.num.p">
+              Chapter 3 or 第三章. Volumes, parts, chapters and scenes each have their own format
+              and restart rules. Prologues and interludes never take a number.
+            </p>
+            <div class="numbers" aria-hidden="true">
+              <span class="n n-en">Chapter 3 — Reunion</span>
+              <span class="n n-cn">第三章 重逢</span>
+              <span class="n n-ro">Volume III</span>
+            </div>
+          </article>
+
+          <article class="card reveal">
+            <h3 data-i18n="bento.anchor.h">Clues tied to the words</h3>
+            <p data-i18n="bento.anchor.p">
+              Select a phrase, flag it as setup, hint or payoff. Cut and paste it into another
+              chapter and the clue moves with it.
+            </p>
+            <p class="prose" aria-hidden="true">
+              <span data-i18n="bento.anchor.s1">Beneath its seal, someone had drawn a tiny</span>
+              <mark
+                ><span data-i18n="bento.anchor.s2">silver moth</span
+                ><i data-i18n="bento.anchor.tag">● setup</i></mark
+              >.
+            </p>
+          </article>
+
+          <article class="card reveal">
+            <h3 data-i18n="bento.look.h">Make the page yours</h3>
+            <p data-i18n="bento.look.p">
+              Font, size, line height, first-line indent, width — plus light, dark and sepia. Try
+              the themes on this page.
+            </p>
+            <div class="swatches">
+              <button
+                type="button"
+                data-theme-set="paper"
+                class="sw-btn sw-paper"
+                aria-label="Paper"
+                data-i18n="ctl.paper"
+                data-i18n-attr="aria-label"
+              >
+                Aa
+              </button>
+              <button
+                type="button"
+                data-theme-set="sepia"
+                class="sw-btn sw-sepia"
+                aria-label="Sepia"
+                data-i18n="ctl.sepia"
+                data-i18n-attr="aria-label"
+              >
+                Aa
+              </button>
+              <button
+                type="button"
+                data-theme-set="night"
+                class="sw-btn sw-night"
+                aria-label="Night"
+                data-i18n="ctl.night"
+                data-i18n-attr="aria-label"
+              >
+                Aa
+              </button>
+            </div>
+          </article>
+
+          <article class="card reveal">
+            <h3 data-i18n="bento.io.h">Bring a manuscript in, take it out</h3>
+            <p data-i18n-html="bento.io.p">
+              Import <code>.txt</code> or <code>.md</code> (UTF-8, or older GB18030 Chinese files)
+              and review the detected chapters before anything is created. Export Markdown or plain
+              text any time.
+            </p>
+          </article>
+
+          <article class="card reveal">
+            <h3 data-i18n="bento.lang.h">English or 简体中文</h3>
+            <p data-i18n="bento.lang.p">
+              Switch the interface at any time. Your books are never changed by the language you
+              pick.
+            </p>
+          </article>
+
+          <article class="card wide reveal">
+            <h3 data-i18n="bento.ids.h">Links that never break</h3>
+            <p data-i18n="bento.ids.p">
+              Maps, clues and notes point to a chapter’s permanent ID — not its title, number or
+              position — so renaming and rearranging can’t orphan anything.
+            </p>
+          </article>
+
+          <article class="card reveal">
+            <h3 data-i18n="bento.local.h">Your computer, your rules</h3>
+            <p data-i18n="bento.local.p">
+              A small server that listens on 127.0.0.1 only. No accounts, no telemetry, no update
+              checks.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- SAFETY -->
+      <section class="section safety" id="safety">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-i18n="safe.eyebrow">Data safety comes first</p>
+          <h2 data-i18n="safe.h2">Four layers between you and a lost chapter</h2>
+          <p data-i18n="safe.p">Pick a mishap and see which layer catches it.</p>
+        </header>
+
+        <div class="safety-grid reveal">
+          <div
+            class="scenarios"
+            role="group"
+            aria-label="Mishaps"
+            data-i18n="safe.scLabel"
+            data-i18n-attr="aria-label"
+          >
+            <button type="button" data-layer="0" aria-pressed="true" data-i18n="safe.sc0">
+              I closed the tab mid-sentence
+            </button>
+            <button type="button" data-layer="1" aria-pressed="false" data-i18n="safe.sc1">
+              I deleted a paragraph yesterday
+            </button>
+            <button type="button" data-layer="2" aria-pressed="false" data-i18n="safe.sc2">
+              A bug scrambled the database
+            </button>
+            <button type="button" data-layer="3" aria-pressed="false" data-i18n="safe.sc3">
+              My laptop’s drive died
+            </button>
+          </div>
+
+          <ol class="layers" id="layers">
+            <li data-layer="0" class="on">
+              <span class="num">1</span>
+              <div>
+                <h3 data-i18n="safe.l0.h">Autosave</h3>
+                <p data-i18n="safe.l0.p">
+                  About a second after you stop typing, and at once when you switch sections or
+                  leave the page.
+                </p>
+              </div>
+            </li>
+            <li data-layer="1">
+              <span class="num">2</span>
+              <div>
+                <h3 data-i18n="safe.l1.h">Snapshots</h3>
+                <p data-i18n="safe.l1.p">
+                  Earlier versions of every section, taken while you edit and before any replace or
+                  restore.
+                </p>
+              </div>
+            </li>
+            <li data-layer="2">
+              <span class="num">3</span>
+              <div>
+                <h3 data-i18n="safe.l2.h">Hourly database backups</h3>
+                <p data-i18n="safe.l2.p">
+                  A full consistent copy on every start and hourly after changes. The newest 20 are
+                  kept.
+                </p>
+              </div>
+            </li>
+            <li data-layer="3">
+              <span class="num">4</span>
+              <div>
+                <h3 data-i18n="safe.l3.h">Cold backup</h3>
+                <p data-i18n="safe.l3.p">
+                  One readable JSON file per book, with a SHA-256 checksum, in a folder you choose —
+                  ideally on another disk.
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+
+        <p class="rescue reveal" id="rescue" role="status" aria-live="polite"></p>
+
+        <div class="terminal reveal">
+          <div class="term-bar">
+            <i></i><i></i><i></i><span data-i18n="safe.term">Read a backup without the app</span>
+          </div>
+          <pre><code><span class="c"># verify the checksum</span>
+shasum -a 256 -c my-novel.novelstudio.json.sha256
+
+<span class="c"># print the whole manuscript, in reading order</span>
+jq -r '.manuscript[] | recurse(.children[]) | "\n\n## " + .displayTitle + "\n\n" + .plainText' \
+  my-novel.novelstudio.json &gt; manuscript.txt</code></pre>
+        </div>
+      </section>
+
+      <!-- START -->
+      <section class="section" id="start">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-i18n="start.eyebrow">Get started</p>
+          <h2 data-i18n="start.h2">Run it on your own computer</h2>
+          <p data-i18n="start.p">
+            NovelStudio is a small Node server plus a browser UI that live on your machine. This
+            page is only a tour — there’s no hosted copy of the app, and that’s the point.
+          </p>
+        </header>
+
+        <ol class="steps">
+          <li class="reveal">
+            <span class="num">1</span>
+            <div>
+              <h3 data-i18n="start.s1.h">Install Node.js 24 or newer</h3>
+              <p data-i18n-html="start.s1.p">The version is pinned in <code>.nvmrc</code>.</p>
+            </div>
+          </li>
+          <li class="reveal">
+            <span class="num">2</span>
+            <div>
+              <h3 data-i18n="start.s2.h">Get the code and build it</h3>
+              <div class="cmd">
+                <pre><code>git clone https://github.com/MINGYISU/NovelStudio.git
+cd NovelStudio
+npm install
+npm run build</code></pre>
+                <button
+                  type="button"
+                  class="copy"
+                  data-copy="git clone https://github.com/MINGYISU/NovelStudio.git&#10;cd NovelStudio&#10;npm install&#10;npm run build"
+                  data-i18n="copy"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </li>
+          <li class="reveal">
+            <span class="num">3</span>
+            <div>
+              <h3 data-i18n="start.s3.h">Start writing</h3>
+              <div class="cmd">
+                <pre><code>npm start   <span class="c"># http://127.0.0.1:4317</span></code></pre>
+                <button type="button" class="copy" data-copy="npm start" data-i18n="copy">
+                  Copy
+                </button>
+              </div>
+              <p data-i18n-html="start.s3.p">
+                On a Mac you can instead double-click <code>NovelStudio.command</code>. Your books
+                live in <code>~/Library/Application Support/NovelStudio/</code>.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="cta center reveal">
+          <a
+            class="btn primary"
+            href="https://github.com/MINGYISU/NovelStudio/blob/main/docs/USER_GUIDE.md"
+            data-i18n="start.guide"
+            >Read the illustrated user guide</a
+          >
+          <a class="btn" href="https://github.com/MINGYISU/NovelStudio" data-i18n="start.repo"
+            >View on GitHub</a
+          >
+        </div>
+      </section>
+
+      <!-- ROADMAP -->
+      <section class="section" id="built">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-i18n="road.eyebrow">How it was built</p>
+          <h2 data-i18n="road.h2">One milestone at a time, every one accepted</h2>
+          <p data-i18n="road.p">
+            Each step ended with type-checks, lint, unit and API tests, end-to-end tests and a
+            manual check before the next began.
+          </p>
+        </header>
+
+        <ol class="road reveal" id="road">
+          <li><b>M0</b><span data-i18n="road.m0">Skeleton &amp; safety</span></li>
+          <li><b>M1</b><span data-i18n="road.m1">Library</span></li>
+          <li><b>M2</b><span data-i18n="road.m2">Tree logic &amp; API</span></li>
+          <li><b>M3</b><span data-i18n="road.m3">Drag-and-drop sidebar</span></li>
+          <li><b>M4</b><span data-i18n="road.m4">Editor, autosave, cold backup</span></li>
+          <li><b>M5</b><span data-i18n="road.m5">Codex</span></li>
+          <li><b>M6</b><span data-i18n="road.m6">Story maps</span></li>
+          <li><b>M7</b><span data-i18n="road.m7">Foreshadowing</span></li>
+          <li><b>M7b</b><span data-i18n="road.m7b">In-text clue anchors</span></li>
+          <li><b>M8</b><span data-i18n="road.m8">Polish, import &amp; export</span></li>
+          <li><b>M9</b><span data-i18n="road.m9">Review fixes</span></li>
+          <li><b>M10</b><span data-i18n="road.m10">English / 简体中文</span></li>
+          <li><b>M11</b><span data-i18n="road.m11">Illustrations</span></li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div>
+        <strong>NovelStudio</strong>
+        <span data-i18n="foot.tag">A personal, local-first writing app.</span>
+      </div>
+      <nav aria-label="Links" data-i18n="foot.label" data-i18n-attr="aria-label">
+        <a href="https://github.com/MINGYISU/NovelStudio" data-i18n="foot.repo">GitHub</a>
+        <a
+          href="https://github.com/MINGYISU/NovelStudio/blob/main/docs/USER_GUIDE.md"
+          data-i18n="foot.guide"
+          >User guide</a
+        >
+        <a href="https://github.com/MINGYISU/NovelStudio/blob/main/docs/PRD.md" data-i18n="foot.prd"
+          >Requirements</a
+        >
+        <a href="https://github.com/MINGYISU/NovelStudio/blob/main/LICENSE" data-i18n="foot.license"
+          >MIT License</a
+        >
+      </nav>
+      <p class="fineprint" data-i18n="foot.note">
+        This page loads no third-party scripts, fonts or trackers, and stores only your language and
+        theme choice in your browser.
+      </p>
+    </footer>
+
+    <dialog
+      class="lightbox"
+      id="lightbox"
+      aria-label="Screenshot"
+      data-i18n="tour.shot"
+      data-i18n-attr="aria-label"
+    >
+      <form method="dialog">
+        <button class="close" aria-label="Close" data-i18n="close" data-i18n-attr="aria-label">
+          ×
+        </button>
+      </form>
+      <img id="lightbox-img" alt="" />
+    </dialog>
+  </body>
+</html>

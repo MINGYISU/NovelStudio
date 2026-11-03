@@ -10,3 +10,4 @@ LICENSE
 
 # Raw clipboard HTML: reformatting would change what a paste test sees.
 tests/fixtures/*.html
+_site

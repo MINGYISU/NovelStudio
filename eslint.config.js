@@ -15,10 +15,20 @@ export default tseslint.config(
       '.data-dev/**',
       '.data-test/**',
       'coverage/**',
+      '_site/**',
     ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    // The project site is plain browser JavaScript, outside the app's TypeScript build.
+    files: ['site/**/*.js'],
+    languageOptions: { globals: globals.browser },
+  },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
   {
     files: ['src/client/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
