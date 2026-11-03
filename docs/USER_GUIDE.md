@@ -73,7 +73,7 @@ Type only the chapter’s name—for example, **The Last Ferry**. NovelStudio su
 
 Click the large writing area beneath the chapter heading and type your opening paragraph. Pause briefly and look for **Saved** at the top of the window. Your text saves automatically after you stop typing for about a second.
 
-![The manuscript workspace with a chapter list on the left, story text in the middle, and title, status, and synopsis on the right.](images/user-guide/03-writing.jpg)
+![The manuscript workspace with a chapter list on the left, story text in the middle, and title, status, synopsis, and header image controls on the right.](images/user-guide/03-writing.jpg)
 
 *Write in the middle. Use the right panel for a short reminder of what happens in this chapter.*
 
@@ -156,7 +156,7 @@ Click **Structure** at the top of the book to change numbering for the whole boo
 
 Select a section and use the right panel:
 
-- **Status:** choose **idea**, **draft**, **revising**, or **done**.
+- **Status:** choose **Idea**, **Draft**, **Revising**, or **Done**.
 - **Synopsis:** write a short reminder of what happens here.
 
 Click outside a field when you finish editing. These notes help you navigate; the synopsis is separate from the prose your reader will see.
@@ -182,15 +182,19 @@ The bottom of the editor shows word counts for the section and book. Select a pa
 3. Choose **Light**, **Dark**, or **Sepia**. You can also set paragraph spacing, a background color, or a background picture, and turn **Show images** off to hide pictures while you draft (see [Add pictures](#add-pictures)).
 4. Click **Save**.
 
-![Display settings for font, spacing, theme, and background.](images/user-guide/04-display-settings.jpg)
+![Display settings for font, spacing, theme, image visibility, and background.](images/user-guide/04-display-settings.jpg)
 
 These settings apply to this book’s writing space. They are not page-layout instructions for an exported manuscript.
 
 ### Switch the interface language
 
-Open **Settings** from the Library and choose **English** or **简体中文** under **Language · 语言**. The change applies at once, without reloading, and does not touch your text. NovelStudio remembers the choice on this computer; the first time it opens, it follows your browser’s language.
+Open **Settings** from the Library’s three-dot menu or the Book menu. **Language · 语言** is at the top: choose **English** or **简体中文**. The change applies at once, without reloading, and does not touch your text. NovelStudio remembers the choice on this computer; the first time it opens, it follows your browser’s language.
 
-Only the interface changes. Titles, text, Codex names, and map contents stay exactly as you wrote them. Text that NovelStudio creates for you, such as the default Codex categories of a new book, uses the language that is active at that moment and is not rewritten later. This guide stays in English for now.
+![Settings with the Language · 语言 choice above the cold backup options.](images/user-guide/16-backup-settings.jpg)
+
+Only the interface changes. Titles, text, Codex names, and map contents stay exactly as you wrote them; in the example below, the chapter titles and text stay in English because that is how they were written. Text that NovelStudio creates for you, such as the default Codex categories of a new book, uses the language that is active at that moment and is not rewritten later. This guide stays in English for now.
+
+![The same chapter with the interface in Simplified Chinese: menus, buttons, and panel labels are translated.](images/user-guide/19-interface-language.jpg)
 
 ### Hide distractions
 
@@ -208,9 +212,13 @@ NovelStudio can place a picture between paragraphs and give each section a heade
 2. Click **Insert image** in the toolbar.
 3. Choose **Upload an image**, or click one of the pictures already in this book. The dialog shows the total size of the book’s pictures.
 
+![The Insert image dialog with an upload chooser, the Keep original option, and one picture already in the book.](images/user-guide/20-insert-image.jpg)
+
 You can also paste a picture (for example after **Copy image** in a browser, or a screenshot) or drop an image file onto the text. While it uploads, a short notice appears. PNG, JPEG, WebP, and GIF files up to 20 MB are accepted.
 
 Click a picture to select it. A small bar appears under it:
+
+![A selected picture with its caption and a bar of Small, Medium, Full, Caption, Replace, and Remove buttons.](images/user-guide/21-picture-in-text.jpg)
 
 - **Small**, **Medium**, or **Full** sets the width: about a third, two thirds, or all of the text column. A picture is never enlarged beyond its own size.
 - **Caption** adds a short line of text under the picture, up to 300 characters.
@@ -237,9 +245,13 @@ Any volume, part, chapter, or scene can have one header image, shown above its t
 
 A header image is not part of the text: it does not change word counts, find and replace, or snapshots. Duplicating a section copies it, and moving or trashing a section keeps it.
 
+![A chapter with a header image above its title and the Header image preview with Replace and Remove buttons in the right panel.](images/user-guide/22-header-image.jpg)
+
 ### Hide pictures while you draft
 
 Open **Display settings** and turn off **Show images**. Each picture, and each header image, shrinks to a thin line (with the caption, if there is one). Nothing in the text changes. Turn it back on any time.
+
+![The chapter with Show images turned off: the header image and the picture appear as short [Image] lines.](images/user-guide/23-images-hidden.jpg)
 
 ## Find words and make revisions
 
@@ -285,6 +297,8 @@ Use **Search codex** to find entries across categories. The menu beside a catego
 In Manuscript, **Characters in this section** shows characters whose names appear in the prose. Add nicknames to the character’s **Aliases** field, separated by commas, so the app can recognize those too.
 
 Deleting a Codex entry is permanent within the app; it does not go to manuscript Trash. Make a [cold backup](#keep-a-separate-backup) before a major cleanup.
+
+If you delete every category, the Codex stays empty rather than refilling itself. Click **Add default categories** to bring back the standard set.
 
 ## Plan with story maps
 
@@ -525,6 +539,7 @@ Refreshing the browser alone does not complete the restore. Before restarting, y
 | **Changed elsewhere — reload** appears. | Another window has saved a newer version. Copy your current text somewhere safe first. Then reload and compare with the saved version before continuing. Use one writing window per book to avoid competing edits. |
 | The browser asks whether you want to leave. | Stay on the page while work is unsaved. Wait for saving to finish, or preserve the text elsewhere before leaving. |
 | The page will not load. | Start NovelStudio with its launcher and leave the Terminal window open. If it reports an error, keep the message for the person helping you. |
+| The launcher says a port is used by a NovelStudio development server. | That is not your real library. Stop the development server, or ask whoever set up NovelStudio to help; the launcher does not open it for you. |
 | A chapter seems missing. | Expand any collapsed groups in the manuscript list, then check that book’s **Trash**. |
 | A book seems missing. | Check **Library → Trash**. Make sure you opened your usual NovelStudio installation, not a demonstration library. |
 | A backup folder is unavailable. | Reconnect the drive or make the folder available, then use **Validate** and retry the export. Check for a **Verified** result. |
@@ -546,4 +561,4 @@ Refreshing the browser alone does not complete the restore. Before restarting, y
 | Move out one level | **Shift+Tab** | In the chapter list. |
 | Undo the most recent structural move | **Command+Z** | With the chapter list focused. |
 
-*Guide prepared against NovelStudio 0.1.0 on October 27, 2026. All story text and names in the screenshots are fictional.*
+*Guide prepared against NovelStudio 0.1.0 (milestones M0–M11) on November 3, 2026. All story text and names in the screenshots are fictional.*
