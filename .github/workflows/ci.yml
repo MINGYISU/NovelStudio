@@ -3,6 +3,16 @@ name: CI
 on:
   push:
     branches: [main]
+    # Not applied to pull_request: a path-skipped workflow leaves required checks pending and blocks merging.
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'AGENTS.md'
+      - 'LICENSE'
+      - 'NovelStudio.command'
+      - '.gitignore'
+      - '.editorconfig'
+      - '.env.example'
   pull_request:
     branches: [main]
 
