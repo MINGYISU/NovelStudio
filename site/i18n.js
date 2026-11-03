@@ -3,6 +3,12 @@
 // strings that main.js builds at runtime in both languages.
 
 export const zh = {
+  'brand.cornerAlt': '新月下，女孩走向安静街道的转角，窗内的暖光落在路上。',
+  'brand.tagline': '某个地方，故事正要开始。',
+  'brand.pageAlt': '桌上的纸页化为一条蜿蜒小路，通向远方的城堡。',
+  'brand.guideLabel': '从这里启程',
+  'brand.guideTitle': '翻开一页，走进一个世界。',
+  'brand.guideText': '从第一章到妥善备份的稿件，图文指南陪你一步步开始。',
   skip: '跳到正文',
   close: '关闭',
   copy: '复制',

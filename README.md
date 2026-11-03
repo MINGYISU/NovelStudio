@@ -1,8 +1,10 @@
 <div align="center">
 
-<img src="public/icons/icon-512.png" alt="NovelStudio icon" width="112" height="112" />
+<img src="public/icons/icon-512.png" alt="NovelStudio icon" width="192" height="192" />
 
 # NovelStudio
+
+*Somewhere, a story begins.*
 
 **A calm, local-first writing studio for long-form fiction.**<br />
 Drag chapters into a new order and every number follows. Plan with story maps, follow every clue to its payoff, and keep your pages safe behind four layers of backup.
@@ -144,8 +146,11 @@ python3 -m http.server 4399 --directory _site    # preview at http://127.0.0.1:4
 
 ## Documentation
 
+<img src="public/brand/beyond-the-page.jpg" alt="A paper path winds toward a distant castle." width="280" />
+
 | Document | For | Purpose |
 |---|---|---|
+| [Visual identity](docs/BRAND.md) | Everyone | The corner girl icon and supporting illustrations |
 | [User guide](docs/USER_GUIDE.md) | Writers | Illustrated walkthroughs: write, organize, plan, back up, recover |
 | [PRD](docs/PRD.md) | Everyone | What the product does, with requirement IDs such as `MOVE-05` |
 | [Developer guide](docs/DEVELOPER_ARCHITECTURE.md) | Developers | How the pieces fit together; where to start for common changes |

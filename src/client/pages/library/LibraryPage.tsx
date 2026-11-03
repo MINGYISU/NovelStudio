@@ -28,7 +28,13 @@ export function LibraryPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.heading}>{t('library.title')}</h1>
+        <div className={styles.identity}>
+          <img src="/icons/icon-192.png" width={56} height={56} alt="" />
+          <div>
+            <span className={styles.brandName}>{t('app.name')}</span>
+            <h1 className={styles.heading}>{t('library.title')}</h1>
+          </div>
+        </div>
         <label className={styles.sort}>
           {t('library.sortBy')}
           <select
@@ -94,7 +100,16 @@ export function LibraryPage() {
         </p>
       ) : null}
       {books.data && books.data.length === 0 ? (
-        <p className={styles.empty}>{t('library.empty')}</p>
+        <div className={styles.empty}>
+          <img
+            className={styles.welcomeArt}
+            src="/brand/door-ajar.jpg"
+            width={144}
+            height={144}
+            alt=""
+          />
+          <p>{t('library.empty')}</p>
+        </div>
       ) : null}
       {books.data && books.data.length > 0 ? (
         <ul className={styles.grid}>

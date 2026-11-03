@@ -7,6 +7,7 @@ on:
       - 'site/**'
       - 'docs/images/user-guide/**'
       - 'public/icons/**'
+      - 'public/brand/**'
       - 'scripts/build-site.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:

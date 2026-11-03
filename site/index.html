@@ -20,10 +20,10 @@
     />
     <meta
       property="og:image"
-      content="https://mingyisu.github.io/NovelStudio/shots/03-writing.jpg"
+      content="https://mingyisu.github.io/NovelStudio/brand/around-the-corner.jpg"
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="icon" type="image/png" href="icons/icon-192.png" />
+    <link rel="icon" type="image/png" href="icons/favicon-32.png" sizes="32x32" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="styles.css" />
     <script>
@@ -152,29 +152,18 @@
           </ul>
         </div>
 
-        <div class="hero-stage">
-          <div class="tilt" id="tilt">
-            <figure class="frame">
-              <div class="frame-bar">
-                <i></i><i></i><i></i>
-                <span class="url">127.0.0.1:4317</span>
-              </div>
-              <img
-                src="shots/03-writing.jpg"
-                width="1440"
-                height="1000"
-                alt="The NovelStudio manuscript workspace: chapter list on the left, the story text in the middle, section details on the right."
-                data-i18n="hero.alt"
-                data-i18n-attr="alt"
-              />
-            </figure>
-            <span class="chip chip-saved"
-              ><i class="dot"></i><b data-i18n="hero.chipSaved">Saved</b></span
-            >
-            <span class="chip chip-move" data-i18n="hero.chipMove">Chapter 4 → Chapter 3</span>
-            <span class="chip chip-star" data-i18n="hero.chipStar">★ Payoff in Chapter 3</span>
-          </div>
-        </div>
+        <figure class="brand-hero">
+          <img
+            src="brand/around-the-corner.jpg"
+            width="960"
+            height="960"
+            alt="A girl turns a quiet street corner beneath a crescent moon, with warm light falling from a window."
+            data-i18n="brand.cornerAlt"
+            data-i18n-attr="alt"
+            fetchpriority="high"
+          />
+          <figcaption data-i18n="brand.tagline">Somewhere, a story begins.</figcaption>
+        </figure>
       </section>
 
       <!-- FACTS STRIP -->
@@ -594,9 +583,43 @@ jq -r '.manuscript[] | recurse(.children[]) | "\n\n## " + .displayTitle + "\n\n"
         </div>
       </section>
 
+      <aside class="guide-invitation section reveal">
+        <img
+          src="brand/beyond-the-page.jpg"
+          width="640"
+          height="640"
+          loading="lazy"
+          alt="A sheet of paper becomes a winding road toward a distant castle."
+          data-i18n="brand.pageAlt"
+          data-i18n-attr="alt"
+        />
+        <div>
+          <p class="eyebrow" data-i18n="brand.guideLabel">A place to begin</p>
+          <h2 data-i18n="brand.guideTitle">One page opens a world.</h2>
+          <p data-i18n="brand.guideText">
+            From your first chapter to a safely backed-up manuscript, the illustrated guide walks
+            with you.
+          </p>
+          <a
+            class="btn"
+            href="https://github.com/MINGYISU/NovelStudio/blob/main/docs/USER_GUIDE.md"
+            data-i18n="start.guide"
+            >Read the illustrated user guide</a
+          >
+        </div>
+      </aside>
+
       <!-- START -->
       <section class="section" id="start">
         <header class="section-head reveal">
+          <img
+            class="welcome-art"
+            src="brand/door-ajar.jpg"
+            alt=""
+            width="144"
+            height="144"
+            loading="lazy"
+          />
           <p class="eyebrow" data-i18n="start.eyebrow">Get started</p>
           <h2 data-i18n="start.h2">Run it on your own computer</h2>
           <p data-i18n="start.p">

@@ -525,6 +525,65 @@ h3 {
   perspective: 1400px;
 }
 
+.brand-hero {
+  margin: 0;
+  text-align: center;
+}
+
+.brand-hero img {
+  display: block;
+  width: min(100%, 480px);
+  height: auto;
+  margin: auto;
+  border-radius: 25%;
+}
+
+.brand-hero figcaption {
+  margin-top: 20px;
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+.guide-invitation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: clamp(24px, 5vw, 64px);
+  align-items: center;
+}
+
+.guide-invitation > img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+.guide-invitation h2 {
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+}
+
+.guide-invitation p:not(.eyebrow) {
+  color: var(--muted);
+  margin: 20px 0;
+}
+
+.welcome-art {
+  display: block;
+  margin: 0 auto 24px;
+  border-radius: 25%;
+}
+
+@media (max-width: 640px) {
+  .guide-invitation {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-invitation > img {
+    max-width: 320px;
+    margin: auto;
+  }
+}
+
 .tilt {
   position: relative;
   transform-style: preserve-3d;

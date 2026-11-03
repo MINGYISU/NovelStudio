@@ -1,5 +1,7 @@
 # Your novel, from first line to final chapter
 
+<img src="../public/brand/beyond-the-page.jpg" alt="A page on a writing desk becomes a path to a distant world." width="360" />
+
 ## The NovelStudio user guide
 
 NovelStudio gives your novel a place to grow. Write your chapters, rearrange their order, keep character notes close by, and follow the clues you plant along the way. You can start with a single chapter and add the planning tools whenever you need them.
