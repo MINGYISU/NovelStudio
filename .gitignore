@@ -169,3 +169,6 @@ blob-report/
 
 # macOS
 .DS_Store
+
+# GitHub Pages build output
+_site/

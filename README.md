@@ -76,6 +76,17 @@ While a database backup restore is waiting for the next start (Settings → **Au
 | Live database, images, hourly backups | `~/Library/Application Support/NovelStudio/` |
 | Cold backups (JSON) | The folder you choose in Settings, ideally on another drive or a synced folder |
 
+## Project site (GitHub Pages)
+
+[site/](site) is a dependency-free static page that introduces the app (English and 简体中文, three themes, an interactive reorder demo). It loads no third-party scripts, fonts or trackers. It reuses the screenshots in `docs/images/user-guide/` and the app icons, so nothing is duplicated.
+
+```sh
+node scripts/build-site.mjs                 # assembles ./_site
+python3 -m http.server 4399 --directory _site   # preview at http://127.0.0.1:4399
+```
+
+The [Pages workflow](.github/workflows/pages.yml) deploys it on every push to `main` that touches the site or its images. One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**. GitHub Pages needs a public repository on the free plan.
+
 ## License
 
 [MIT](LICENSE)
